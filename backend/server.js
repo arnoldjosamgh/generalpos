@@ -4284,17 +4284,30 @@ app.put("/api/pos_orders/:id/items", authenticateToken, async (req, res) => {
       }
 
       // SERVER-SIDE GUARD: Once an order is saved, original items cannot be
-      // removed or have their quantity reduced. Only additions are permitted.
-      for (const [pidStr, origQty] of Object.entries(existingQtyByPid)) {
-        const pid = parseInt(pidStr);
-        if (!pid) continue;
-        const newQty = newQtyByPid[pid] || 0;
-        if (newQty < origQty) {
-          const itemName = existingNamesByPid[pidStr] || `Product #${pid}`;
-          throw new Error(
-            `Cannot reduce "${itemName}" from ${origQty} to ${newQty}. ` +
-            `Saved order items can only be increased, not removed or reduced.`
-          );
+      // removed or have their quantity reduced UNLESS user is Admin or CEO.
+      const isUserAdminOrCEO = [
+        "CEO",
+        "ADMIN",
+        "TECH",
+        "MANAGER",
+        "SUPERVISOR",
+      ].includes(userRoleNow) ||
+        userRoleNow.includes("ADMIN") ||
+        userRoleNow.includes("TECH") ||
+        (req.user && req.user.prefix && String(req.user.prefix).endsWith("000"));
+
+      if (!isUserAdminOrCEO) {
+        for (const [pidStr, origQty] of Object.entries(existingQtyByPid)) {
+          const pid = parseInt(pidStr, 10);
+          if (!pid) continue;
+          const newQty = newQtyByPid[pid] || 0;
+          if (newQty < origQty) {
+            const itemName = existingNamesByPid[pidStr] || `Product #${pid}`;
+            throw new Error(
+              `Cannot reduce "${itemName}" from ${origQty} to ${newQty}. ` +
+              `Saved order items can only be reduced or removed by an Admin or CEO.`
+            );
+          }
         }
       }
 
@@ -4354,11 +4367,12 @@ app.put("/api/pos_orders/:id/items", authenticateToken, async (req, res) => {
         );
       }
 
-      // Update pos_orders & transaction
+      // Update pos_orders, transaction & deliveries
       await q("UPDATE pos_orders SET total_amount = ? WHERE id = ?", [newTotal, posOrderId]);
       if (order.transaction_id) {
         await q("UPDATE transactions SET amount = ? WHERE id = ?", [newTotal, order.transaction_id]);
       }
+      await q("UPDATE deliveries SET total_amount = ? WHERE pos_order_id = ? OR order_id = ?", [newTotal, posOrderId, posOrderId]).catch(() => {});
     });
 
     emitAndBust("products", "products");

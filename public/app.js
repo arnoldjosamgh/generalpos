@@ -4310,12 +4310,16 @@ function addToCart(p, scannedBarcode = null) {
 function updateCartQty(id, delta) {
   const item = posCart.find((i) => i.id === id);
   if (!item) return;
-  // In edit mode: never reduce below the original saved quantity
-  if (_currentEditOrder && delta < 0) {
+
+  const _role = (USER_ROLE || localStorage.getItem("jomish_role") || "").toUpperCase();
+  const isAdminOrCEO = ["CEO", "ADMIN", "TECH", "MANAGER", "SUPERVISOR"].includes(_role) || _role.includes("ADMIN") || _role.includes("TECH");
+
+  // In edit mode: non-admin users can never reduce below the original saved quantity
+  if (_currentEditOrder && delta < 0 && !isAdminOrCEO) {
     const itemId = item.product_id || item.id;
     const origQty = (_editOrderOriginalQtys && _editOrderOriginalQtys[itemId]) ? Number(_editOrderOriginalQtys[itemId]) : 0;
     if (origQty > 0 && item.qty - 1 < origQty) {
-      showToast(`Cannot reduce "${item.name}" below its original quantity of ${origQty}. Cancel the edit to discard the order.`, "warning");
+      showToast(`Only Admin / CEO can reduce or remove saved order items. Cancel the edit to discard the order.`, "warning");
       return;
     }
   }
@@ -4328,13 +4332,16 @@ function updateCartQty(id, delta) {
 }
 
 window.removeFromCart = function (id) {
-  // In edit mode: block removal of any item that existed in the original saved order
-  if (_currentEditOrder) {
+  const _role = (USER_ROLE || localStorage.getItem("jomish_role") || "").toUpperCase();
+  const isAdminOrCEO = ["CEO", "ADMIN", "TECH", "MANAGER", "SUPERVISOR"].includes(_role) || _role.includes("ADMIN") || _role.includes("TECH");
+
+  // In edit mode: non-admin users cannot remove items that existed in the original saved order
+  if (_currentEditOrder && !isAdminOrCEO) {
     const item = posCart.find((i) => i.id === id);
     const itemId = item ? (item.product_id || item.id) : null;
     const origQty = itemId && _editOrderOriginalQtys ? Number(_editOrderOriginalQtys[itemId] || 0) : 0;
     if (origQty > 0) {
-      showToast(`"${item ? item.name : 'Item'}" was part of the original order and cannot be removed. You can only add new items or increase quantities.`, "warning");
+      showToast(`Only Admin / CEO can remove original items from a saved order. You can only add new items or increase quantities.`, "warning");
       return;
     }
   }
@@ -4352,14 +4359,17 @@ window.removeFromCart = function (id) {
 function setCartQty(id, val) {
   const qty = parseInt(val);
   const item = posCart.find((i) => i.id === id);
-  // In edit mode: clamp to original qty minimum for original items
-  if (_currentEditOrder && item) {
+  const _role = (USER_ROLE || localStorage.getItem("jomish_role") || "").toUpperCase();
+  const isAdminOrCEO = ["CEO", "ADMIN", "TECH", "MANAGER", "SUPERVISOR"].includes(_role) || _role.includes("ADMIN") || _role.includes("TECH");
+
+  // In edit mode: clamp to original qty minimum for original items UNLESS user is Admin/CEO
+  if (_currentEditOrder && item && !isAdminOrCEO) {
     const itemId = item.product_id || item.id;
     const origQty = (_editOrderOriginalQtys && _editOrderOriginalQtys[itemId]) ? Number(_editOrderOriginalQtys[itemId]) : 0;
     if (origQty > 0) {
       if (isNaN(qty) || qty < origQty) {
         item.qty = origQty;
-        showToast(`Cannot set "${item.name}" below its original quantity of ${origQty}.`, "warning");
+        showToast(`Only Admin / CEO can set "${item.name}" below its original quantity of ${origQty}.`, "warning");
         renderCart();
         return;
       }
@@ -4962,8 +4972,8 @@ async function submitWaiterOrder() {
 
   if (_currentEditOrder && _currentEditOrder.id) {
     _isSubmittingWaiterOrder = true;
-    // Target whichever button is visible — cashier sees btn-print-invoice, waiter sees btn-send-to-cashier
-    const btnWaiter = document.getElementById("btn-print-invoice") || document.getElementById("btn-send-to-cashier");
+    // Target whichever button is visible — save banner btn, cashier sees btn-print-invoice, waiter sees btn-send-to-cashier
+    const btnWaiter = document.getElementById("btn-save-edit-order") || document.getElementById("btn-print-invoice") || document.getElementById("btn-send-to-cashier");
     const origHtml = btnWaiter ? btnWaiter.innerHTML : "";
     if (btnWaiter) {
       btnWaiter.disabled = true;
@@ -4998,6 +5008,47 @@ async function submitWaiterOrder() {
 
       // Print updated kitchen token for the SAME existing order
       const dateStr = new Date().toLocaleString("en-UG", { timeZone: "Africa/Kampala" });
+
+      const currentItemMap = new Map();
+      posCart.forEach((i) => {
+        const itemId = i.id || i.product_id;
+        currentItemMap.set(String(itemId), i);
+      });
+
+      const tokenItems = posCart.map((i) => {
+        const itemId = i.id || i.product_id;
+        const orig = _editOrderOriginalQtys && _editOrderOriginalQtys[itemId];
+        const origQty = orig !== undefined ? Number(orig) : 0;
+        const currentQty = Number(i.qty) || 1;
+        const addedQty = Math.max(0, currentQty - origQty);
+        return {
+          name: i.name,
+          qty: currentQty,
+          price: i.price,
+          origQty,
+          addedQty,
+          isNew: origQty === 0,
+        };
+      });
+
+      // Also detect if any items were completely removed by CEO/Admin
+      if (Array.isArray(_editOrderOriginalItems)) {
+        _editOrderOriginalItems.forEach((origItem) => {
+          const origId = String(origItem.id || origItem.product_id);
+          if (!currentItemMap.has(origId)) {
+            const origQty = Number(origItem.qty) || 1;
+            tokenItems.push({
+              name: origItem.name || origItem.product_name || "Item",
+              qty: 0,
+              price: origItem.price,
+              origQty,
+              addedQty: 0,
+              isRemoved: true,
+            });
+          }
+        });
+      }
+
       const tokenData = {
         isInvoice: false,
         printTokenOnly: true,
@@ -5006,21 +5057,7 @@ async function submitWaiterOrder() {
         dateStr,
         cashierName: staffFirstName,
         servedBy: _currentEditOrder.served_by || staffFirstName,
-        items: posCart.map((i) => {
-          const itemId = i.id || i.product_id;
-          const orig = _editOrderOriginalQtys && _editOrderOriginalQtys[itemId];
-          const origQty = orig !== undefined ? Number(orig) : 0;
-          const currentQty = Number(i.qty) || 1;
-          const addedQty = Math.max(0, currentQty - origQty);
-          return {
-            name: i.name,
-            qty: currentQty,
-            price: i.price,
-            origQty,
-            addedQty,
-            isNew: origQty === 0,
-          };
-        }),
+        items: tokenItems,
       };
       _printHTMLQueue([_buildKitchenTokenHTML(tokenData)]);
 
@@ -5029,6 +5066,7 @@ async function submitWaiterOrder() {
       if (banner) banner.remove();
       _currentEditOrder = null;
       _editOrderOriginalQtys = {};
+      _editOrderOriginalItems = [];
       posCart = [];
       renderCart();
       loadPOSProducts();
@@ -6059,16 +6097,25 @@ function _buildKitchenTokenHTML(d) {
   const isEdited = !!d.isEdited;
 
   d.items.forEach((i) => {
-    const qty = i.qty || 1;
+    const qty = i.qty !== undefined ? i.qty : 1;
     const addedQty = i.addedQty !== undefined ? i.addedQty : (isEdited ? qty : 0);
     const origQty = i.origQty !== undefined ? i.origQty : 0;
 
     let editBadge = "";
+    let qtyDisplay = `x${qty}`;
+    let itemStyle = "font-size:13pt; font-weight:bold;";
+
     if (isEdited) {
-      if (origQty === 0 || i.isNew) {
+      if (i.isRemoved) {
+        itemStyle += " text-decoration:line-through; color:#555;";
+        qtyDisplay = `<span style="text-decoration:line-through; color:#888;">x${origQty}</span><br><span style="font-size:10pt; font-weight:bold; color:#b91c1c;">REMOVED</span>`;
+        editBadge = `<div style="font-size:10pt; font-weight:bold; color:#b91c1c; margin-top:2px;">&#9658; [REMOVED: ${i.name} x ${origQty}]</div>`;
+      } else if (origQty === 0 || i.isNew) {
         editBadge = `<div style="font-size:11pt; font-weight:bold; color:#000; margin-top:2px;">&#9658; [ADDED: ${i.name} x ${qty}]</div>`;
       } else if (addedQty > 0) {
         editBadge = `<div style="font-size:10pt; font-weight:bold; color:#000; margin-top:2px;">&#9658; [+${addedQty} ADDED (Was ${origQty}, Now ${qty})]</div>`;
+      } else if (qty < origQty) {
+        editBadge = `<div style="font-size:10pt; font-weight:bold; color:#b91c1c; margin-top:2px;">&#9658; [-${origQty - qty} REDUCED (Was ${origQty}, Now ${qty})]</div>`;
       } else {
         editBadge = `<div style="font-size:9pt; color:#666; font-style:italic; margin-top:1px;">(Prev. ordered: ${origQty})</div>`;
       }
@@ -6076,11 +6123,11 @@ function _buildKitchenTokenHTML(d) {
 
     tokenItems += `
       <tr>
-          <td style="padding:4px 0; word-break:break-word; white-space:normal; font-size:13pt; font-weight:bold;">
-            ${i.name} x ${qty}
+          <td style="padding:4px 0; word-break:break-word; white-space:normal; ${itemStyle}">
+            ${i.name} ${i.isRemoved ? `(was x${origQty})` : `x ${qty}`}
             ${editBadge}
           </td>
-          <td style="padding:4px 0; text-align:right; font-size:15pt; font-weight:bold; vertical-align:top;">x${qty}</td>
+          <td style="padding:4px 0; text-align:right; font-size:15pt; font-weight:bold; vertical-align:top;">${qtyDisplay}</td>
       </tr>`;
   });
 
@@ -6104,7 +6151,7 @@ table { width: 100%; border-collapse: collapse; }
 </head>
 <body>
     <div class="center heading" style="font-size:16pt;">KITCHEN TOKEN</div>
-    ${d.isEdited ? `<div class="center" style="background:#000;color:#fff;font-weight:bold;font-size:13pt;padding:4px;letter-spacing:1px;margin:4px 0;">*** EDITED ORDER ***<br><span style="font-size:10pt;">SEE ADDED ITEMS BELOW</span></div>` : ""}
+    ${d.isEdited ? `<div class="center" style="background:#000;color:#fff;font-weight:bold;font-size:13pt;padding:4px;letter-spacing:1px;margin:4px 0;">*** EDITED ORDER ***<br><span style="font-size:10pt;">SEE CHANGES BELOW</span></div>` : ""}
     <div class="row"><span style="font-size:12pt; font-weight:bold;">Order: ${d.orderId}</span></div>
     <div class="row"><span>Date: ${d.dateStr}</span></div>
     ${d.servedBy ? `<div class="row"><span>Served by: ${d.servedBy}</span></div>` : ""}
@@ -13334,11 +13381,12 @@ async function _loadStockMovements() {
 window._loadStockMovements = _loadStockMovements;
 
 // ========================================================
-// CASHIER EDIT PENDING ORDER — Register-based flow
+// CASHIER / ADMIN EDIT PENDING ORDER — Register-based flow
 // ========================================================
 let _currentEditOrder = null;
 let _editOrderItems = [];
-let _editOrderOriginalQtys = {}; // tracks original item qtys to prevent reduction
+let _editOrderOriginalQtys = {}; // tracks original item qtys to prevent unauthorized reduction
+let _editOrderOriginalItems = []; // tracks full original item objects to detect deleted items
 
 async function openEditPendingOrder(posOrderId) {
   const _roleNow = (USER_ROLE || localStorage.getItem("jomish_role") || "").toUpperCase();
@@ -13359,8 +13407,9 @@ async function openEditPendingOrder(posOrderId) {
     _currentEditOrder = await orderRes.json();
     const items = await itemsRes.json();
 
-    // Store original quantities so edit mode can enforce minimum
+    // Store original quantities and full items so edit mode can enforce rules & detect removals
     _editOrderOriginalQtys = {};
+    _editOrderOriginalItems = Array.isArray(items) ? JSON.parse(JSON.stringify(items)) : [];
     posCart = items.map(i => {
       const itemId = i.id || i.product_id;
       const qty = Number(i.qty) || 1;
@@ -13406,7 +13455,8 @@ async function openEditPendingOrder(posOrderId) {
     }
 
     const invLabel = formatDocNo("INV", _currentEditOrder.invoice_number || posOrderId);
-    showToast(`Editing Order ${invLabel} — add/remove items then tap PRINT INVOICE or Save`, 'warning');
+    const isAdminOrCEO = ["CEO", "ADMIN", "TECH", "MANAGER", "SUPERVISOR"].includes(_role) || _role.includes("ADMIN") || _role.includes("TECH");
+    showToast(`Editing Order ${invLabel} — ${isAdminOrCEO ? 'add, reduce, or remove items then save' : 'add items then save'}`, 'warning');
   } catch (e) {
     alert('Error loading order: ' + e.message);
   }
@@ -13423,6 +13473,8 @@ function _showEditOrderBanner(posOrderId, order) {
   if (existing) existing.remove();
 
   const invLabel = formatDocNo("INV", order.invoice_number || posOrderId);
+  const _role = (USER_ROLE || localStorage.getItem("jomish_role") || "").toUpperCase();
+  const isAdminOrCEO = ["CEO", "ADMIN", "TECH", "MANAGER", "SUPERVISOR"].includes(_role) || _role.includes("ADMIN") || _role.includes("TECH");
 
   const banner = document.createElement('div');
   banner.id = 'edit-order-banner';
@@ -13437,10 +13489,15 @@ function _showEditOrderBanner(posOrderId, order) {
     </button>
   `;
 
+  const adminBadge = isAdminOrCEO
+    ? `<span style="background:#000;color:#fcd34d;padding:2px 8px;border-radius:10px;font-size:0.75rem;margin-left:6px;"><i class="fa-solid fa-shield-halved"></i> CEO / Admin (Can remove & reduce items)</span>`
+    : `<span style="background:rgba(0,0,0,0.12);color:#000;padding:2px 8px;border-radius:10px;font-size:0.75rem;margin-left:6px;"><i class="fa-solid fa-lock"></i> Staff (Additions only)</span>`;
+
   banner.innerHTML = `
-    <span style="display:flex;align-items:center;gap:7px;">
+    <span style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
       <i class="fa-solid fa-pen-to-square"></i>
       EDITING Order ${invLabel}&nbsp;&bull;&nbsp;${order.buyer_name || 'Walk-in'}
+      ${adminBadge}
     </span>
     <span style="display:flex;gap:8px;flex-wrap:wrap;">
       ${buttonsHtml}
@@ -13461,6 +13518,7 @@ function cancelEditOrder() {
   _currentEditOrder = null;
   _editOrderItems = [];
   _editOrderOriginalQtys = {};
+  _editOrderOriginalItems = [];
   posCart = [];
   renderCart();
   const btnPrintInvoice = document.getElementById("btn-print-invoice");
@@ -14583,6 +14641,9 @@ window.renderCustomerInvoicesTable = function(searchTerm = "") {
         <td style="font-weight:800; color:var(--text); white-space:nowrap;">UGX ${Number(inv.total_amount || 0).toLocaleString()}</td>
         <td><span style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:3px 9px; border-radius:12px; font-size:0.75rem; font-weight:700;">UNPAID</span></td>
         <td style="text-align:right; white-space:nowrap;">
+          <button onclick="openEditPendingOrder(${inv.pos_order_id})" class="sm-btn secondary" style="padding:4px 10px; font-size:0.78rem; margin-right:4px;" title="Edit Order Items">
+            <i class="fa-solid fa-pen-to-square"></i> Edit
+          </button>
           <button onclick="printPendingInvoice(${inv.pos_order_id}, ${inv.total_amount}, '${safeClient}', '${safeServer}', ${inv.invoice_number || 'null'})" class="sm-btn secondary" style="padding:4px 10px; font-size:0.78rem; margin-right:4px;">
             <i class="fa-solid fa-print"></i> Print
           </button>

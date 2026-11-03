@@ -4808,17 +4808,31 @@ app.delete("/api/credits/:id", authenticateToken, (req, res) => {
 });
 
 app.get("/api/buyers", authenticateToken, (req, res) => {
+  // Return one row per distinct credit client, with their latest phone number
+  // and outstanding balance, so the POS can pre-fill phone and show debt context.
   db.all(
     `
-        SELECT DISTINCT buyer_name 
-        FROM credit_records 
+        SELECT
+          buyer_name                          AS name,
+          MAX(buyer_phone)                    AS phone,
+          COALESCE(SUM(balance), 0)           AS outstanding_balance
+        FROM credit_records
         WHERE buyer_name IS NOT NULL AND buyer_name != ''
+        GROUP BY buyer_name
         ORDER BY buyer_name ASC
     `,
     [],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ buyers: rows.map((r) => r.buyer_name) });
+      // Keep legacy `buyers` array for any older callers, plus new rich `clients` array
+      res.json({
+        buyers:  rows.map((r) => r.name),
+        clients: rows.map((r) => ({
+          name:    r.name,
+          phone:   r.phone || "",
+          balance: Math.round(r.outstanding_balance || 0),
+        })),
+      });
     },
   );
 });

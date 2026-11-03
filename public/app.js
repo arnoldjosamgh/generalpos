@@ -4567,6 +4567,12 @@ function closePaymentPanel() {
   _isConfirmingPayment = false;
   _isCollectingPending = false;
 
+  // Hide the credit-client picker so it doesn't show on next panel open
+  const _picker  = document.getElementById("credit-client-picker");
+  const _newForm = document.getElementById("new-credit-client-form");
+  if (_picker)  _picker.style.display  = "none";
+  if (_newForm) _newForm.style.display = "none";
+
   // Always reset payment method back to Cash when payment panel closes
   const payMethodSelect = document.getElementById("payment-method-select");
   if (payMethodSelect) {
@@ -4679,8 +4685,8 @@ window.handlePaymentMethodChange = async function () {
     const payLabel = document.getElementById("pay-amount-label") || (payAmountInput ? payAmountInput.previousElementSibling : null);
     if (payLabel) payLabel.textContent = "Deposit Paid Now (UGX) — Leave 0 for Full Credit";
     if (typeof updateChange === "function") updateChange();
-    const buyerInput = document.getElementById("buyer-name-input");
-    if (buyerInput) buyerInput.focus();
+    // Show the credit client picker instead of the plain text input
+    await openCreditClientPicker();
   } else {
     if (payAmountInput) payAmountInput.removeAttribute("readonly");
     const payLabel = document.getElementById("pay-amount-label") || (payAmountInput ? payAmountInput.previousElementSibling : null);
@@ -4694,6 +4700,7 @@ window.handlePaymentMethodChange = async function () {
       const res = await fetchAuth(`${API_URL}/buyers`);
       if (res.ok) {
         const data = await res.json();
+        // Populate the legacy datalist for COD / fallback
         const datalist = document.getElementById("buyer-names-list");
         if (datalist && Array.isArray(data.buyers)) {
           datalist.innerHTML = "";
@@ -4703,6 +4710,8 @@ window.handlePaymentMethodChange = async function () {
             datalist.appendChild(option);
           });
         }
+        // Cache the rich client list for the credit picker
+        window._creditClients = Array.isArray(data.clients) ? data.clients : [];
       }
     } catch (e) {
       console.error("Failed to load buyers list:", e);
@@ -4711,6 +4720,167 @@ window.handlePaymentMethodChange = async function () {
 };
 
 let _isConfirmingPayment = false;
+
+// ─── Credit Client Picker ──────────────────────────────────────────────────
+// When CREDIT is selected as payment method, instead of a plain text input
+// we show a scrollable list of known credit clients (from credit_records) so
+// cashiers always pick from the canonical list and duplicates are prevented.
+// A "+ New Client" button reveals the plain text fields for truly new clients.
+
+/** Global cache populated by /api/buyers when CREDIT is chosen */
+window._creditClients = window._creditClients || [];
+
+/**
+ * Open the credit-client picker panel, fetch fresh data if needed,
+ * then render the list.  Called when CREDIT is chosen as payment method.
+ */
+async function openCreditClientPicker() {
+  // Fetch latest list (always fresh so we don't show stale data)
+  try {
+    const res = await fetchAuth(`${API_URL}/buyers`);
+    if (res.ok) {
+      const data = await res.json();
+      window._creditClients = Array.isArray(data.clients) ? data.clients : [];
+      // Populate datalist too (for COD / split fallback)
+      const datalist = document.getElementById("buyer-names-list");
+      if (datalist && Array.isArray(data.buyers)) {
+        datalist.innerHTML = "";
+        data.buyers.forEach((b) => {
+          const opt = document.createElement("option");
+          opt.value = b;
+          datalist.appendChild(opt);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[CreditPicker] Failed to fetch buyers:", e.message);
+  }
+
+  // Show picker panel, hide new-client form, clear shared inputs
+  showCreditClientPicker();
+}
+
+/** Show the picker list panel (hide the new-client form) */
+function showCreditClientPicker() {
+  const picker  = document.getElementById("credit-client-picker");
+  const newForm = document.getElementById("new-credit-client-form");
+  if (picker)  picker.style.display  = "block";
+  if (newForm) newForm.style.display = "none";
+
+  // Clear shared name/phone in case we're coming back from new-form
+  const nameInput  = document.getElementById("buyer-name-input");
+  const phoneInput = document.getElementById("buyer-phone-input");
+  if (nameInput)  nameInput.value  = "";
+  if (phoneInput) phoneInput.value = "";
+
+  // Re-render the list with all clients
+  renderCreditClientList(window._creditClients || []);
+  // Clear search box
+  const search = document.getElementById("credit-client-search");
+  if (search) search.value = "";
+}
+
+/** Show the new-client form (hide the picker list) */
+window.showNewCreditClientForm = function () {
+  const picker  = document.getElementById("credit-client-picker");
+  const newForm = document.getElementById("new-credit-client-form");
+  if (picker)  picker.style.display  = "none";
+  if (newForm) newForm.style.display = "block";
+  // Clear inputs so cashier types a fresh name
+  const nameInput  = document.getElementById("buyer-name-input");
+  const phoneInput = document.getElementById("buyer-phone-input");
+  if (nameInput)  { nameInput.value = ""; nameInput.focus(); }
+  if (phoneInput) phoneInput.value = "";
+};
+
+/**
+ * Filter the rendered client list as the cashier types in the search box.
+ * @param {string} query - text typed by cashier
+ */
+window.filterCreditClientList = function (query) {
+  const clients = window._creditClients || [];
+  const q = query.trim().toLowerCase();
+  const filtered = q ? clients.filter(c => c.name.toLowerCase().includes(q)) : clients;
+  renderCreditClientList(filtered);
+};
+
+/**
+ * Render credit client rows into #credit-client-list.
+ * Each row shows the client name, phone, and outstanding balance.
+ * Clicking a row fills the shared buyer-name-input and buyer-phone-input.
+ * @param {Array<{name:string,phone:string,balance:number}>} clients
+ */
+function renderCreditClientList(clients) {
+  const listEl = document.getElementById("credit-client-list");
+  if (!listEl) return;
+
+  if (!clients || clients.length === 0) {
+    listEl.innerHTML = `
+      <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+        No credit clients found.<br>Use "+ New Client" to add one.
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = clients.map((c, idx) => {
+    const balText  = c.balance > 0
+      ? `<span style="color:#F59E0B;font-size:0.72rem;font-weight:600;">UGX ${c.balance.toLocaleString()} owed</span>`
+      : `<span style="color:#10B981;font-size:0.72rem;">Cleared</span>`;
+    const phoneText = c.phone
+      ? `<span style="color:var(--text-muted);font-size:0.72rem;">${c.phone}</span>`
+      : "";
+    return `
+      <div class="credit-client-row"
+           onclick="selectCreditClient(${JSON.stringify(c.name)}, ${JSON.stringify(c.phone || '')})"
+           style="display:flex;justify-content:space-between;align-items:center;
+                  padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);
+                  transition:background 0.15s;"
+           onmouseover="this.style.background='rgba(var(--primary-rgb,99,102,241),0.08)'"
+           onmouseout="this.style.background=''">
+        <div>
+          <div style="font-weight:600;font-size:0.9rem;color:var(--text);">${escapeHtml(c.name)}</div>
+          ${phoneText}
+        </div>
+        <div style="text-align:right;">${balText}</div>
+      </div>`;
+  }).join("");
+}
+
+/**
+ * Called when cashier taps a client row — fills the shared inputs and
+ * hides the picker so the rest of the payment flow sees the selected name.
+ * @param {string} name
+ * @param {string} phone
+ */
+window.selectCreditClient = function (name, phone) {
+  const nameInput  = document.getElementById("buyer-name-input");
+  const phoneInput = document.getElementById("buyer-phone-input");
+  if (nameInput)  nameInput.value  = name;
+  if (phoneInput) phoneInput.value = phone || "";
+
+  // Hide picker, hide new-form (shared inputs are now visible below)
+  const picker  = document.getElementById("credit-client-picker");
+  const newForm = document.getElementById("new-credit-client-form");
+  if (picker)  picker.style.display  = "none";
+  if (newForm) newForm.style.display = "none";
+
+  // Brief visual feedback on the name input
+  if (nameInput) {
+    nameInput.style.borderColor = "#10B981";
+    setTimeout(() => { nameInput.style.borderColor = ""; }, 1500);
+  }
+};
+
+/** Simple HTML-escape helper (prevents XSS from client names with < > & chars) */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ─── End Credit Client Picker ──────────────────────────────────────────────
 
 async function confirmPayment() {
   if (_isConfirmingPayment) {

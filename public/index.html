@@ -581,11 +581,48 @@
                                 </div>
 
                                 <div id="buyer-name-container" style="display:none;margin-bottom:10px;">
+
+                                    <!-- CREDIT CLIENT PICKER: shown only when CREDIT is the payment method -->
+                                    <div id="credit-client-picker" style="display:none;">
+                                        <label style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;display:block;font-weight:600;">
+                                            <i class="fa-solid fa-address-book" style="margin-right:4px;"></i>Select Credit Client
+                                        </label>
+                                        <input type="text" id="credit-client-search" placeholder="Search name…"
+                                            onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()"
+                                            oninput="filterCreditClientList(this.value)"
+                                            style="width:100%;padding:9px 10px;background:var(--background);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:6px;box-sizing:border-box;">
+                                        <div id="credit-client-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:var(--background);margin-bottom:6px;"></div>
+                                        <button type="button" id="btn-new-credit-client"
+                                            onclick="showNewCreditClientForm()"
+                                            style="width:100%;padding:9px;background:transparent;border:1px dashed var(--primary);border-radius:6px;color:var(--primary);font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                            <i class="fa-solid fa-user-plus"></i> New Client
+                                        </button>
+                                    </div>
+
+                                    <!-- NEW CLIENT FORM: hidden until "+ New Client" is tapped -->
+                                    <div id="new-credit-client-form" style="display:none;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                                            <label style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">
+                                                <i class="fa-solid fa-user-plus" style="margin-right:4px;"></i>New Credit Client
+                                            </label>
+                                            <button type="button" onclick="showCreditClientPicker()"
+                                                style="background:none;border:none;color:var(--text-muted);font-size:0.8rem;cursor:pointer;padding:0;">
+                                                ← Back to list
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- SHARED INPUTS: always present; populated by picker selection or new-form typing -->
                                     <label style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;display:block;">Customer Name</label>
-                                    <input type="text" id="buyer-name-input" list="buyer-names-list" placeholder="Enter or select Name" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" style="width:100%;padding:10px;background:var(--background);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:6px;">
+                                    <input type="text" id="buyer-name-input" list="buyer-names-list"
+                                        placeholder="Enter or select Name"
+                                        onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()"
+                                        style="width:100%;padding:10px;background:var(--background);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:6px;box-sizing:border-box;">
                                     <datalist id="buyer-names-list"></datalist>
                                     <label style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;display:block;">Phone Number</label>
-                                    <input type="text" id="buyer-phone-input" placeholder="e.g. 07XXXXXXXX" onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()" style="width:100%;padding:10px;background:var(--background);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:6px;">
+                                    <input type="text" id="buyer-phone-input" placeholder="e.g. 07XXXXXXXX"
+                                        onkeydown="event.stopPropagation()" onkeypress="event.stopPropagation()"
+                                        style="width:100%;padding:10px;background:var(--background);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:6px;box-sizing:border-box;">
                                 </div>
 
                                 <div style="margin:10px 0;">

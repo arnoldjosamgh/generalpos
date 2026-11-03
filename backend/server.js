@@ -17,12 +17,18 @@ const {
   receiptTextToLines,
   printViaNetwork,
 } = require("./ThermalPrinter");
-const {
-  initWhatsApp,
-  getWhatsAppStatus,
-  getWhatsAppQR,
-  sendWhatsAppMessage,
-} = require("./whatsapp");
+// WhatsApp module is lazy-loaded so Puppeteer/Chromium binaries are never
+// required at process startup on cloud containers (saves ~350 MB RAM and
+// prevents OOM crash during the initial module-evaluation phase).
+let _whatsapp = null;
+function _loadWhatsApp() {
+  if (!_whatsapp) _whatsapp = require("./whatsapp");
+  return _whatsapp;
+}
+// Stub helpers — return safe defaults when WhatsApp is not initialised
+const getWhatsAppStatus    = ()           => _whatsapp ? _whatsapp.getWhatsAppStatus()           : { ready: false, qr: null };
+const getWhatsAppQR        = async ()     => _whatsapp ? _whatsapp.getWhatsAppQR()               : null;
+const sendWhatsAppMessage  = async (t, m) => { if (_whatsapp) return _whatsapp.sendWhatsAppMessage(t, m); };
 const archiver = require("./archiver");
 
 // Expose asyncLocalStorage from the db module proxy so all existing references work
@@ -60,15 +66,20 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
-// Initialize WhatsApp (only if explicitly enabled to prevent Puppeteer/Chromium from exhausting 512MB RAM on cloud containers)
+// Initialize WhatsApp — only when explicitly enabled (ENABLE_WHATSAPP=true) or running
+// on a local machine (no RENDER env var and not in production mode).
+// The module is NOT required at all on cloud unless the flag is set, so Puppeteer/Chromium
+// binaries are never loaded, saving ~350 MB of RAM and preventing OOM crashes.
 if (process.env.ENABLE_WHATSAPP === "true" || (!process.env.RENDER && process.env.NODE_ENV !== "production")) {
   try {
-    initWhatsApp(io);
+    const waModule = _loadWhatsApp();
+    waModule.initWhatsApp(io);
+    console.log("[WHATSAPP] WhatsApp client initialised successfully.");
   } catch (err) {
     console.warn("[WHATSAPP] Failed to initialize WhatsApp:", err.message);
   }
 } else {
-  console.log("[WHATSAPP] Headless Chromium disabled in cloud production (saves 350MB RAM). Set ENABLE_WHATSAPP=true to activate.");
+  console.log("[WHATSAPP] Headless Chromium disabled in cloud production (saves ~350 MB RAM). Set ENABLE_WHATSAPP=true to activate.");
 }
 
 // WhatsApp REST API

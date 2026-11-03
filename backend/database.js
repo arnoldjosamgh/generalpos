@@ -44,7 +44,8 @@ const CURRENT_VERSION = 152;
 if (config.dbType === 'postgres') {
     const poolConfig = {
         ...(typeof config.postgres === 'object' ? config.postgres : {}),
-        max: 20, // Increased to 20 to prevent pool starvation under multi-device load
+        max: 8,  // Neon paid Starter = 25 total connections; 8 per Render instance leaves
+                 // headroom for multiple instances, startup migrations, and admin queries.
         connectionTimeoutMillis: 10000, // 10s max wait for acquiring a pool client
         idleTimeoutMillis: 15000, // close idle connections after 15s so dead sockets are dropped
         statement_timeout: 20000, // 20s statement timeout to prevent hung queries from freezing connection

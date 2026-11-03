@@ -13,7 +13,7 @@ services:
     branch: main
     env: node
     region: oregon
-    plan: free
+    plan: starter  # Paid — always-on, no sleep, no cold starts
     buildCommand: npm install --omit=optional
     startCommand: node backend/server.js
     healthCheckPath: /api/system/status
@@ -22,7 +22,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_OPTIONS
-        value: --max-old-space-size=384
+        value: --max-old-space-size=448  # Starter = 512 MB RAM; 448 MB heap leaves ~64 MB for OS/libuv/native modules
       - key: PORT
         value: 3005
       - key: JWT_SECRET
@@ -40,7 +40,7 @@ services:
     branch: staging
     env: node
     region: oregon
-    plan: free
+    plan: starter  # Paid — always-on, no sleep, no cold starts
     buildCommand: npm install --omit=optional
     startCommand: node backend/server.js
     healthCheckPath: /api/system/status
@@ -49,7 +49,7 @@ services:
       - key: NODE_ENV
         value: staging
       - key: NODE_OPTIONS
-        value: --max-old-space-size=384
+        value: --max-old-space-size=448  # Starter = 512 MB RAM; 448 MB heap leaves ~64 MB for OS/libuv/native modules
       - key: PORT
         value: 3005
       - key: JWT_SECRET

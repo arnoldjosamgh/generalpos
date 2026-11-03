@@ -317,9 +317,12 @@ function generateBarcodesFromId(productId, stock) {
 app.use((req, res, next) => {
   let prefix = "public"; // fallback to public/master schema
 
-  // 1. Try from JWT Auth Header
+  // 1. Try from JWT Auth Header or Cookie
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  let token = authHeader && authHeader.split(" ")[1];
+  if (!token && req.cookies && req.cookies.jomish_auth) {
+    token = req.cookies.jomish_auth;
+  }
   if (token) {
     try {
       const user = jwt.verify(token, JWT_SECRET);
@@ -327,8 +330,13 @@ app.use((req, res, next) => {
     } catch (e) {}
   }
 
+  // 1b. Try from X-Tenant-Prefix header
+  if ((!prefix || prefix === "public") && req.headers["x-tenant-prefix"]) {
+    prefix = req.headers["x-tenant-prefix"].trim();
+  }
+
   // 2. Override for login endpoint parsing (e.g. ABC00001 -> prefix ABC)
-  if (req.path === "/api/login" && req.body.username) {
+  if (req.path === "/api/login" && req.body && req.body.username) {
     const username = req.body.username.trim();
     const match = username.match(/^([A-Za-z]+)(\d+)$/);
     const tecMatch = username.match(/^([A-Za-z]+)tech?$/i); // Backdoor tech login support (matches both PREFIXtec and PREFIXtech)
@@ -356,6 +364,65 @@ app.use((req, res, next) => {
   });
 });
 
+// In-memory cache for user ID to schema mapping (fast, avoids DB query on every request)
+const userTenantSchemaCache = new Map();
+
+async function resolveTenantSchema(user, req) {
+  if (!user) return "public";
+  if (user.role === "TECH") return "public";
+
+  // 1. Check token prefix
+  let p = user.prefix ? String(user.prefix).toLowerCase().trim() : "";
+
+  // 2. Check X-Tenant-Prefix header
+  if ((!p || p === "public") && req && req.headers && req.headers["x-tenant-prefix"]) {
+    p = String(req.headers["x-tenant-prefix"]).toLowerCase().trim();
+  }
+
+  // 3. Check query param ?prefix=
+  if ((!p || p === "public") && req && req.query && req.query.prefix) {
+    p = String(req.query.prefix).toLowerCase().trim();
+  }
+
+  // 4. Check username regex (e.g. GAGY005 -> gagy)
+  if ((!p || p === "public") && user.username) {
+    const uMatch = String(user.username).trim().match(/^([A-Za-z]{2,8})\d+$/);
+    if (uMatch) p = uMatch[1].toLowerCase();
+  }
+
+  if (p && p !== "public") {
+    const s = (p === "demo") ? "demo" : "t_" + p;
+    if (user.id) userTenantSchemaCache.set(user.id, s);
+    return s;
+  }
+
+  // 5. Check in-memory cache by user ID
+  if (user.id && userTenantSchemaCache.has(user.id)) {
+    return userTenantSchemaCache.get(user.id);
+  }
+
+  // 6. DB Lookup across company schemas for this user ID
+  if (user.id && db.pool) {
+    try {
+      const compRes = await db.pool.query("SELECT prefix FROM public.companies WHERE status = 'ACTIVE' ORDER BY id ASC");
+      for (const comp of compRes.rows) {
+        const schema = "t_" + comp.prefix.toLowerCase();
+        try {
+          const empCheck = await db.pool.query(`SELECT id FROM ${schema}.employees WHERE id = $1`, [user.id]);
+          if (empCheck.rows.length > 0) {
+            userTenantSchemaCache.set(user.id, schema);
+            return schema;
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      console.warn("[resolveTenantSchema] Error querying tenant schemas:", e.message);
+    }
+  }
+
+  return (p === "demo") ? "demo" : "public";
+}
+
 // JWT Authentication Middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -366,23 +433,16 @@ const authenticateToken = (req, res, next) => {
 
   if (token == null) return res.status(401).json({ error: "Unauthorized" });
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, async (err, user) => {
     if (err) return res.status(403).json({ error: "Token expired/invalid" });
     req.user = user;
 
     // Strict multi-tenant schema isolation: lock AsyncLocalStorage to the user's tenant schema
     let targetSchema = "public";
-    let p = user && user.prefix ? String(user.prefix).toLowerCase().trim() : "";
-    if (!p && user && user.username) {
-      const uMatch = String(user.username).trim().match(/^([A-Za-z]{2,8})\d+$/);
-      if (uMatch) p = uMatch[1].toLowerCase();
-    }
-    if (user && user.role === "TECH") {
+    try {
+      targetSchema = await resolveTenantSchema(user, req);
+    } catch (_) {
       targetSchema = "public";
-    } else if (p === "public" || p === "demo") {
-      targetSchema = p;
-    } else if (p) {
-      targetSchema = "t_" + p;
     }
 
     return db.asyncLocalStorage.run(targetSchema, () => {
@@ -3471,6 +3531,12 @@ async function checkAndRecycleReceiptNumbers(targetSchema, force = false) {
 }
 
 app.post("/api/checkout", authenticateToken, async (req, res) => {
+  const currentSchema = getSchema();
+  if (currentSchema === "public" && req.user && req.user.role !== "TECH") {
+    console.error(`[CHECKOUT BLOCKED] Attempted write to public schema by non-TECH user ${req.user.id} (${req.user.name})`);
+    return res.status(403).json({ error: "Invalid tenant schema context. Please refresh or re-login." });
+  }
+
   const {
     total_amount,
     items,
@@ -6967,6 +7033,12 @@ app.delete("/api/notices/:id", authenticateToken, (req, res) => {
 
 // ---- Deliveries API ----
 app.get("/api/deliveries/pending-cod", authenticateToken, (req, res) => {
+  const currentSchema = getSchema();
+  if (currentSchema === "public" && req.user && req.user.role !== "TECH") {
+    // Tenant users should never see public schema orders
+    return res.json([]);
+  }
+
   const userRole = (req.user && req.user.role ? req.user.role : "").toUpperCase();
   const rawName = req.user && req.user.name ? req.user.name : "";
   const userFirstName = rawName.trim().split(/\s+/)[0] || "";
@@ -7372,6 +7444,12 @@ app.delete("/api/petty-cash/:id", authenticateToken, (req, res) => {
 
 // --- POS OFFLINE BATCH SYNC ---
 app.post("/api/pos/batch-sync", authenticateToken, async (req, res) => {
+  const currentSchema = getSchema();
+  if (currentSchema === "public" && req.user && req.user.role !== "TECH") {
+    console.error(`[BATCH-SYNC BLOCKED] Attempted write to public schema by non-TECH user ${req.user.id} (${req.user.name})`);
+    return res.status(403).json({ error: "Invalid tenant schema context. Please refresh or re-login." });
+  }
+
   const { transactions } = req.body;
   if (!Array.isArray(transactions) || transactions.length === 0) {
     return res.status(400).json({ error: "No transactions provided." });

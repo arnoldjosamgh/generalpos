@@ -2069,11 +2069,13 @@ function initSockets() {
   window._socket = socket; // Expose for sub-modules (Smart Timetable IIFE)
 
   function isMyTenantEvent(data) {
-    if (!data || !data.schema) return true; // Legacy/global broadcast
-    const p = (localStorage.getItem("jomish_prefix") || "public").toLowerCase().trim();
-    const mySchema = (p === "public" || p === "demo") ? p : "t_" + p;
+    if (!data) return false;
     const myRole = (USER_ROLE || localStorage.getItem("jomish_role") || "").toUpperCase();
     if (myRole === "TECH") return true; // Tech user sees all tenants
+    if (!data.schema) return true; // Legacy/global broadcast
+    const p = (localStorage.getItem("jomish_prefix") || "").toLowerCase().trim();
+    if (!p) return false; // Non-tech with no tenant prefix should not accept random events
+    const mySchema = (p === "public" || p === "demo") ? p : "t_" + p;
     return data.schema === mySchema;
   }
 
@@ -2803,6 +2805,10 @@ async function fetchAuth(url, options = {}) {
   const token = localStorage.getItem("jomish_token");
   if (!options.headers) options.headers = {};
   options.headers["Authorization"] = `Bearer ${token}`;
+  const tenantPrefix = localStorage.getItem("jomish_prefix");
+  if (tenantPrefix) {
+    options.headers["X-Tenant-Prefix"] = tenantPrefix.trim();
+  }
 
   // Automatically add JSON header if there is a body and it's not already set
   if (options.body && !options.headers["Content-Type"]) {

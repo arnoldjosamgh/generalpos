@@ -21,6 +21,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=384
       - key: PORT
         value: 3005
       - key: JWT_SECRET
@@ -46,6 +48,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: staging
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=384
       - key: PORT
         value: 3005
       - key: JWT_SECRET

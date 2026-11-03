@@ -60,8 +60,16 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
-// Initialize WhatsApp
-initWhatsApp(io);
+// Initialize WhatsApp (only if explicitly enabled to prevent Puppeteer/Chromium from exhausting 512MB RAM on cloud containers)
+if (process.env.ENABLE_WHATSAPP === "true" || (!process.env.RENDER && process.env.NODE_ENV !== "production")) {
+  try {
+    initWhatsApp(io);
+  } catch (err) {
+    console.warn("[WHATSAPP] Failed to initialize WhatsApp:", err.message);
+  }
+} else {
+  console.log("[WHATSAPP] Headless Chromium disabled in cloud production (saves 350MB RAM). Set ENABLE_WHATSAPP=true to activate.");
+}
 
 // WhatsApp REST API
 app.get("/api/whatsapp/status", (req, res) => {
@@ -227,7 +235,7 @@ app.use((req, res, next) => {
 
 // Periodic background keep-alive ping to prevent Neon compute and Render web instance from sleeping
 if (process.env.DATABASE_URL || process.env.NODE_ENV === "production") {
-  const KEEPALIVE_INTERVAL_MS = 4 * 60 * 1000; // Every 4 minutes (Neon sleeps at 5m, Render at 15m)
+  const KEEPALIVE_INTERVAL_MS = 3 * 60 * 1000; // Every 3 minutes (Neon pauses at 5m, Render sleeps at 15m)
   let _keepaliveRunning = false;
   setInterval(async () => {
     if (_keepaliveRunning) return;
@@ -245,8 +253,12 @@ if (process.env.DATABASE_URL || process.env.NODE_ENV === "production") {
         }
       }
 
-      // 2. Keep Render Web Service active if RENDER_EXTERNAL_URL is available
-      const serviceUrl = process.env.RENDER_EXTERNAL_URL;
+      // 2. Keep Render Web Service active if service URL is available
+      const serviceUrl = process.env.RENDER_EXTERNAL_URL ||
+        process.env.APP_URL ||
+        (process.env.RENDER_SERVICE_NAME ? `https://${process.env.RENDER_SERVICE_NAME}.onrender.com` : null) ||
+        (process.env.NODE_ENV === "production" ? "https://jomish-pos.onrender.com" : null);
+
       if (serviceUrl) {
         try {
           const pingUrl = `${serviceUrl.replace(/\/+$/, "")}/api/system/status`;
@@ -260,7 +272,7 @@ if (process.env.DATABASE_URL || process.env.NODE_ENV === "production") {
       _keepaliveRunning = false;
     }
   }, KEEPALIVE_INTERVAL_MS);
-  console.log("[KEEPALIVE] Background 4-minute keep-alive ping initialized (Neon + Render).");
+  console.log("[KEEPALIVE] Background 3-minute keep-alive ping initialized (Neon + Render).");
 }
 
 // Global API rate limit — 1200 req/min per IP.

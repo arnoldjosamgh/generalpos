@@ -1369,7 +1369,7 @@ app.post("/api/system/initialize", async (req, res) => {
         const hashedPassword = await bcrypt.hash(defaultPassword, 10);
         const emailToSave = (admin_email || `admin@${prefix.toLowerCase()}.pos`).toLowerCase().trim();
 
-        // Create the Admin employee
+        // Create or update the Admin employee (Idempotent to avoid duplicate username errors on retry)
         await new Promise((resolve, reject) => {
           db.run(
             `INSERT INTO employees (first_name, last_name, email, username, role, department, salary, password, employee_code, is_active,
@@ -1377,7 +1377,14 @@ app.post("/api/system/initialize", async (req, res) => {
               can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
               can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount, can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
               can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+            ON CONFLICT (username) DO UPDATE SET
+              first_name = excluded.first_name,
+              last_name = excluded.last_name,
+              email = excluded.email,
+              password = excluded.password,
+              role = excluded.role,
+              is_active = 1`,
             [
               adminFullName.split(" ")[0] || "Admin",
               adminFullName.split(" ").slice(1).join(" ") || "User",

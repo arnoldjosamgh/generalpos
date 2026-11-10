@@ -2218,6 +2218,94 @@ function runMigrations(fromVersion) {
             console.log('Migration to v158 complete: can_see_finance column added.');
         });
     }
+
+    if (fromVersion < 159) {
+        // v159: Business-type-aware category cleanup.
+        // Migration v154 blindly seeded restaurant categories into every tenant.
+        // This migration removes restaurant-only defaults from non-restaurant tenants
+        // (only if no products are assigned to those categories), then seeds
+        // appropriate defaults for the actual business type.
+        const activeSchema = (asyncLocalStorage.getStore() || 'public').toLowerCase();
+        const prefix = activeSchema.startsWith('t_') ? activeSchema.slice(2) : null;
+
+        const RESTAURANT_CATS = ['Breakfast', 'Main Course', 'Salad, Sandwiches and Burgers', 'Dessert', 'Drinks & Coffee', 'Room Service'];
+
+        const supermarketCats = [
+            ['Groceries',     'fa-solid fa-basket-shopping', '#10b981', 1],
+            ['Beverages',     'fa-solid fa-wine-bottle',     '#6366f1', 2],
+            ['Bakery',        'fa-solid fa-bread-slice',     '#d97706', 3],
+            ['Dairy & Eggs',  'fa-solid fa-egg',             '#eab308', 4],
+            ['Snacks',        'fa-solid fa-cookie',          '#14b8a6', 5],
+            ['Household',     'fa-solid fa-house',           '#64748b', 6],
+            ['Personal Care', 'fa-solid fa-pump-soap',       '#a855f7', 7],
+            ['Electronics',   'fa-solid fa-plug',            '#3b82f6', 8],
+            ['Clothing',      'fa-solid fa-shirt',           '#ec4899', 9],
+            ['General',       'fa-solid fa-box',             '#6b7280', 10],
+        ];
+        const restaurantCats = [
+            ['Breakfast',                    'fa-solid fa-mug-hot',              '#f59e0b', 1],
+            ['Main Course',                  'fa-solid fa-bowl-food',            '#ef4444', 2],
+            ['Salad, Sandwiches and Burgers','fa-solid fa-burger',               '#10b981', 3],
+            ['Dessert',                      'fa-solid fa-cake-candles',         '#ec4899', 4],
+            ['Drinks & Coffee',              'fa-solid fa-martini-glass-citrus', '#06b6d4', 5],
+            ['Room Service',                 'fa-solid fa-bell-concierge',       '#8b5cf6', 6],
+        ];
+        const pharmacyCats = [
+            ['Medicines',      'fa-solid fa-pills',       '#ef4444', 1],
+            ['Personal Care',  'fa-solid fa-pump-soap',   '#a855f7', 2],
+            ['Supplements',    'fa-solid fa-capsules',    '#10b981', 3],
+            ['Baby Care',      'fa-solid fa-baby',        '#f59e0b', 4],
+            ['Equipment',      'fa-solid fa-stethoscope', '#6366f1', 5],
+            ['General',        'fa-solid fa-box',         '#6b7280', 6],
+        ];
+
+        const doCleanup = (bizType) => {
+            const isRestaurant = ['restaurant', 'hotel', 'cafe', 'bar'].includes((bizType || '').toLowerCase());
+            if (isRestaurant) {
+                // Already has correct categories — just ensure they all exist
+                restaurantCats.forEach(([name, icon, color, order]) => {
+                    db.run('INSERT INTO product_categories (name, icon, color, display_order) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+                        [name, icon, color, order], () => {});
+                });
+            } else {
+                // Remove restaurant-only categories that have NO products assigned
+                RESTAURANT_CATS.forEach(catName => {
+                    db.run(
+                        `DELETE FROM product_categories WHERE name = ? AND NOT EXISTS (SELECT 1 FROM products WHERE category = ?)`,
+                        [catName, catName], () => {}
+                    );
+                });
+
+                // Seed business-type-appropriate defaults
+                const seedCats = (bizType || '').toLowerCase() === 'pharmacy' ? pharmacyCats : supermarketCats;
+                seedCats.forEach(([name, icon, color, order]) => {
+                    db.run('INSERT INTO product_categories (name, icon, color, display_order) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+                        [name, icon, color, order], () => {});
+                });
+            }
+
+            db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '159'], () => {
+                console.log(`Migration to v159 complete: Business-type-aware categories set for schema ${activeSchema}.`);
+            });
+        };
+
+        if (!prefix) {
+            // public schema — skip category seeding
+            db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '159'], () => {});
+        } else if (config.dbType === 'postgres') {
+            // Look up business_type from public.companies using a direct query
+            db.get(`SELECT business_type FROM public.companies WHERE prefix = $1`, [prefix], (err, row) => {
+                const bizType = (!err && row) ? row.business_type : 'supermarket';
+                doCleanup(bizType);
+            });
+        } else {
+            // SQLite: query the public db for business_type
+            db.get(`SELECT business_type FROM companies WHERE prefix = ?`, [prefix], (err, row) => {
+                const bizType = (!err && row) ? row.business_type : 'supermarket';
+                doCleanup(bizType);
+            });
+        }
+    }
 }
 
 initDb();

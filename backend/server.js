@@ -2399,6 +2399,7 @@ app.post("/api/categories", authenticateToken, (req, res) => {
     [name.trim(), icon || "fa-solid fa-tag", color || "#3b82f6", display_order || 0],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
+      emitAndBust("categories", "categories");
       res.json({ id: this.lastID, name: name.trim(), message: "Category created" });
     }
   );
@@ -2421,6 +2422,7 @@ app.put("/api/categories/:id", authenticateToken, (req, res) => {
     [name, icon, color, display_order, req.params.id],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
+      emitAndBust("categories", "categories");
       res.json({ message: "Category updated" });
     }
   );
@@ -2434,6 +2436,7 @@ app.delete("/api/categories/:id", authenticateToken, (req, res) => {
 
   db.run("DELETE FROM product_categories WHERE id = ?", [req.params.id], function (err) {
     if (err) return res.status(500).json({ error: err.message });
+    emitAndBust("categories", "categories");
     res.json({ message: "Category deleted" });
   });
 });

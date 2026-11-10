@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,13 +14,14 @@
     <script src="lib/jspdf.plugin.autotable.min.js"></script>
     <script src="offline-db.js"></script>
 </head>
+
 <body>
 
     <!-- ======================================================================
          1. SCREEN SAVER (Exact Match to Picture 1)
          ====================================================================== -->
     <div id="pos-screensaver" onclick="dismissScreenSaver()">
-        
+
         <!-- Top bar controls (Pic 1) -->
         <div class="saver-top-bar" onclick="event.stopPropagation()">
             <div class="saver-brand-indicator">
@@ -27,9 +29,13 @@
                 <span>timeanddate</span>
             </div>
             <div class="saver-top-actions">
-                <button class="saver-top-btn" type="button" onclick="window.open(window.location.href, '_blank', 'width=1200,height=800')"><i class="fa-solid fa-window-restore"></i> Popup Window</button>
-                <button class="saver-top-btn" type="button" onclick="toggleFullScreen()"><i class="fa-solid fa-expand"></i> Fullscreen</button>
-                <button class="saver-top-btn" type="button" onclick="dismissScreenSaver()"><i class="fa-solid fa-xmark"></i> Exit</button>
+                <button class="saver-top-btn" type="button"
+                    onclick="window.open(window.location.href, '_blank', 'width=1200,height=800')"><i
+                        class="fa-solid fa-window-restore"></i> Popup Window</button>
+                <button class="saver-top-btn" type="button" onclick="toggleFullScreen()"><i
+                        class="fa-solid fa-expand"></i> Fullscreen</button>
+                <button class="saver-top-btn" type="button" onclick="dismissScreenSaver()"><i
+                        class="fa-solid fa-xmark"></i> Exit</button>
             </div>
         </div>
 
@@ -128,7 +134,8 @@
                 </button>
 
                 <!-- Tech Support Super Admin Tab -->
-                <button class="pos-nav-item" id="nav-btn-tech" style="display:none; color:#38bdf8;" onclick="switchNavTab('tech')">
+                <button class="pos-nav-item" id="nav-btn-tech" style="display:none; color:#38bdf8;"
+                    onclick="switchNavTab('tech')">
                     <i class="fa-solid fa-server"></i>
                     <span>Tech Hub</span>
                 </button>
@@ -141,24 +148,35 @@
             <!-- ── Top Header Bar (Pic 2) ── -->
             <header class="pos-header-bar">
                 <div class="header-left-tools">
-                    <button class="header-hamburger-btn" type="button" onclick="toggleSidebarMenu()"><i class="fa-solid fa-bars"></i></button>
+                    <button class="header-hamburger-btn" type="button" onclick="toggleSidebarMenu()"><i
+                            class="fa-solid fa-bars"></i></button>
 
                     <!-- Online Status Pill with Interactive Dropdown for Offline Mode & Sync -->
-                    <div class="header-status-pill" style="cursor:pointer; position:relative;" onclick="toggleOnlineMenu(event)">
+                    <div class="header-status-pill" style="cursor:pointer; position:relative;"
+                        onclick="toggleOnlineMenu(event)">
                         <span class="status-indicator-dot" id="online-dot"></span>
                         <span id="online-status-text">Online</span>
                         <i class="fa-solid fa-chevron-down" style="font-size:0.65rem; color:#94a3b8;"></i>
                         <span style="color:#cbd5e1; margin:0 2px;">|</span>
-                        <i class="fa-solid fa-circle-info" style="color:#64748b; font-size:0.75rem;" title="System Status OK"></i>
+                        <i class="fa-solid fa-circle-info" style="color:#64748b; font-size:0.75rem;"
+                            title="System Status OK"></i>
 
                         <!-- Online / Offline Quick Dropdown Menu -->
-                        <div id="online-status-dropdown" style="display:none; position:absolute; top:36px; left:0; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:230px; z-index:200; padding:8px 0; color:#1e293b;" onclick="event.stopPropagation()">
-                            <div style="padding:8px 14px; border-bottom:1px solid #f1f5f9; font-size:0.75rem; color:#64748b; font-weight:700;">NETWORK &amp; SYNC</div>
-                            <button type="button" style="width:100%; text-align:left; background:none; border:none; padding:10px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:8px;" onclick="syncOfflineOrders()">
+                        <div id="online-status-dropdown"
+                            style="display:none; position:absolute; top:36px; left:0; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:230px; z-index:200; padding:8px 0; color:#1e293b;"
+                            onclick="event.stopPropagation()">
+                            <div
+                                style="padding:8px 14px; border-bottom:1px solid #f1f5f9; font-size:0.75rem; color:#64748b; font-weight:700;">
+                                NETWORK &amp; SYNC</div>
+                            <button type="button"
+                                style="width:100%; text-align:left; background:none; border:none; padding:10px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:8px;"
+                                onclick="syncOfflineOrders()">
                                 <i class="fa-solid fa-cloud-arrow-up" style="color:var(--primary);"></i>
                                 <span>Sync Offline Data Now</span>
                             </button>
-                            <button type="button" style="width:100%; text-align:left; background:none; border:none; padding:10px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:8px;" onclick="toggleForceOffline()">
+                            <button type="button"
+                                style="width:100%; text-align:left; background:none; border:none; padding:10px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:8px;"
+                                onclick="toggleForceOffline()">
                                 <i class="fa-solid fa-wifi" id="menu-wifi-icon" style="color:#10b981;"></i>
                                 <span id="menu-toggle-offline-text">Switch to Offline Mode</span>
                             </button>
@@ -169,7 +187,8 @@
                     <button class="header-upload-pill" id="offline-upload-btn" onclick="syncOfflineOrders()">
                         <span>Offline Upload</span>
                         <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <span id="offline-sync-badge" style="background:rgba(255,255,255,0.25); padding:1px 6px; border-radius:10px; font-size:0.7rem; display:none;">0</span>
+                        <span id="offline-sync-badge"
+                            style="background:rgba(255,255,255,0.25); padding:1px 6px; border-radius:10px; font-size:0.7rem; display:none;">0</span>
                     </button>
                 </div>
 
@@ -177,11 +196,13 @@
                     <!-- Live Real-Time Date & Time (Pic 2) -->
                     <div class="header-clock-display">
                         <span id="pos-header-time">05/10/2026 20:03:14</span>
-                        <i class="fa-solid fa-headset" title="Technical Support Help Line" style="cursor:pointer;" onclick="openTechSupportModal()"></i>
+                        <i class="fa-solid fa-headset" title="Technical Support Help Line" style="cursor:pointer;"
+                            onclick="openTechSupportModal()"></i>
                     </div>
 
                     <!-- Language Selector -->
-                    <button class="header-lang-btn" type="button" onclick="alert('Language: English (Default). Additional locales can be configured in Tech Settings.')">
+                    <button class="header-lang-btn" type="button"
+                        onclick="alert('Language: English (Default). Additional locales can be configured in Tech Settings.')">
                         <i class="fa-solid fa-globe"></i>
                         <span>English</span>
                         <i class="fa-solid fa-chevron-down" style="font-size:0.65rem;"></i>
@@ -198,13 +219,15 @@
                     </div>
 
                     <!-- Idle Screen Trigger Button -->
-                    <button class="header-idle-btn" type="button" onclick="triggerScreenSaver()" title="Lock Screen / Screensaver">
+                    <button class="header-idle-btn" type="button" onclick="triggerScreenSaver()"
+                        title="Lock Screen / Screensaver">
                         <i class="fa-solid fa-moon"></i>
                         <span>Idle</span>
                     </button>
 
                     <!-- Logout Button -->
-                    <button class="header-idle-btn" type="button" onclick="handleLogout()" title="Logout" style="color:#ef4444;">
+                    <button class="header-idle-btn" type="button" onclick="handleLogout()" title="Logout"
+                        style="color:#ef4444;">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
@@ -212,7 +235,7 @@
 
             <!-- ── Main POS Body (Center Product Grid + Right Order Cart) ── -->
             <div class="pos-body-container">
-                
+
                 <!-- Center Tabs Area -->
                 <main class="pos-main-views">
 
@@ -220,30 +243,20 @@
                          TAB 1: REGISTER (Exact Match to Picture 2)
                          ========================================== -->
                     <section class="pos-view-pane active" id="view-pane-register">
-                        
+
                         <!-- Search Bar on Register Tab -->
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="pos-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Enter dish name or code" 
-                                    oninput="filterRegisterProducts(this.value)"
-                                >
+                                <input type="text" id="pos-search-input" class="tab-search-input"
+                                    placeholder="Enter dish name or code" oninput="filterRegisterProducts(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
                         </div>
 
-                        <!-- Horizontal Category Pills Row (Pic 2) -->
+                        <!-- Horizontal Category Pills Row — populated dynamically by renderCategoryPills() in pos-app.js -->
                         <div class="category-pills-bar" id="register-category-pills">
-                            <button class="cat-pill-btn active" onclick="selectRegisterCategory('ALL', this)">All</button>
-                            <button class="cat-pill-btn" onclick="selectRegisterCategory('Breakfast', this)">Breakfast</button>
-                            <button class="cat-pill-btn" onclick="selectRegisterCategory('Main Course', this)">Main Course</button>
-                            <button class="cat-pill-btn" onclick="selectRegisterCategory('Salad, Sandwiches and Burgers', this)">Salad, Sandwiches and Burgers</button>
-                            <button class="cat-pill-btn" onclick="selectRegisterCategory('Dessert', this)">Dessert</button>
-                            <button class="cat-pill-btn" onclick="selectRegisterCategory('Drinks & Coffee', this)">Drinks & Coffee</button>
-                            <button class="cat-pill-btn" onclick="selectRegisterCategory('Room Service', this)">Room Service</button>
+                            <button class="cat-pill-btn active"
+                                onclick="selectRegisterCategory('ALL', this)">All</button>
                         </div>
 
                         <!-- Product Grid Area (Pic 2) -->
@@ -261,16 +274,13 @@
                     <section class="pos-view-pane" id="view-pane-orders">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="orders-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search orders by receipt #, cashier, worker, customer..." 
-                                    oninput="filterOrdersList(this.value)"
-                                >
+                                <input type="text" id="orders-search-input" class="tab-search-input"
+                                    placeholder="Search orders by receipt #, cashier, worker, customer..."
+                                    oninput="filterOrdersList(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
-                            <button class="header-idle-btn" onclick="loadOrdersList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            <button class="header-idle-btn" onclick="loadOrdersList()"><i
+                                    class="fa-solid fa-rotate"></i> Refresh</button>
                         </div>
 
                         <div class="tab-content-container">
@@ -288,7 +298,10 @@
                                         </tr>
                                     </thead>
                                     <tbody id="orders-table-tbody">
-                                        <tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">Loading sales orders...</td></tr>
+                                        <tr>
+                                            <td colspan="7" style="text-align:center; padding:30px; color:#64748b;">
+                                                Loading sales orders...</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -302,20 +315,18 @@
                     <section class="pos-view-pane" id="view-pane-pending">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="pending-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search pending orders by table, ticket #, or customer..." 
-                                    oninput="filterPendingOrders(this.value)"
-                                >
+                                <input type="text" id="pending-search-input" class="tab-search-input"
+                                    placeholder="Search pending orders by table, ticket #, or customer..."
+                                    oninput="filterPendingOrders(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
-                            <button class="header-idle-btn" onclick="loadPendingOrders()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            <button class="header-idle-btn" onclick="loadPendingOrders()"><i
+                                    class="fa-solid fa-rotate"></i> Refresh</button>
                         </div>
 
                         <div class="tab-content-container">
-                            <div id="pending-cards-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px;">
+                            <div id="pending-cards-grid"
+                                style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px;">
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
@@ -328,13 +339,9 @@
                     <section class="pos-view-pane" id="view-pane-customer">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="customer-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search customers by name, phone number, or ID..." 
-                                    oninput="filterCustomerList(this.value)"
-                                >
+                                <input type="text" id="customer-search-input" class="tab-search-input"
+                                    placeholder="Search customers by name, phone number, or ID..."
+                                    oninput="filterCustomerList(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
                             <button class="header-upload-pill" onclick="openAddCustomerModal()">+ Add Customer</button>
@@ -354,7 +361,10 @@
                                         </tr>
                                     </thead>
                                     <tbody id="customers-table-tbody">
-                                        <tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">Loading customer directory...</td></tr>
+                                        <tr>
+                                            <td colspan="6" style="text-align:center; padding:30px; color:#64748b;">
+                                                Loading customer directory...</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -368,17 +378,15 @@
                     <section class="pos-view-pane" id="view-pane-inventory">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="inventory-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search inventory by product name, barcode, or category..." 
-                                    oninput="filterInventoryList(this.value)"
-                                >
+                                <input type="text" id="inventory-search-input" class="tab-search-input"
+                                    placeholder="Search inventory by product name, barcode, or category..."
+                                    oninput="filterInventoryList(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
-                            <button class="header-idle-btn" onclick="openCategoriesManagerModal()"><i class="fa-solid fa-tags"></i> Manage Categories</button>
-                            <button class="header-upload-pill" id="btn-add-product-perm" onclick="openAddProductModal()">+ Add Product</button>
+                            <button class="header-idle-btn" onclick="openCategoriesManagerModal()"><i
+                                    class="fa-solid fa-tags"></i> Manage Categories</button>
+                            <button class="header-upload-pill" id="btn-add-product-perm"
+                                onclick="openAddProductModal()">+ Add Product</button>
                         </div>
 
                         <div class="tab-content-container">
@@ -397,7 +405,10 @@
                                         </tr>
                                     </thead>
                                     <tbody id="inventory-table-tbody">
-                                        <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading inventory products...</td></tr>
+                                        <tr>
+                                            <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+                                                Loading inventory products...</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -411,46 +422,61 @@
                     <section class="pos-view-pane" id="view-pane-shift">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="shift-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search shift history by cashier or date..." 
-                                    oninput="filterShiftHistory(this.value)"
-                                >
+                                <input type="text" id="shift-search-input" class="tab-search-input"
+                                    placeholder="Search shift history by cashier or date..."
+                                    oninput="filterShiftHistory(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
-                            <button class="header-upload-pill" style="background:#10b981;" onclick="openCashInModal()">+ Cash In (Float)</button>
-                            <button class="header-upload-pill" style="background:#ef4444;" onclick="openExpenseModal()">- Record Expense</button>
-                            <button class="header-upload-pill" style="background:#0f172a;" onclick="openCloseShiftModal()">🔒 Close Shift</button>
+                            <button class="header-upload-pill" style="background:#10b981;" onclick="openCashInModal()">+
+                                Cash In (Float)</button>
+                            <button class="header-upload-pill" style="background:#ef4444;"
+                                onclick="openExpenseModal()">- Record Expense</button>
+                            <button class="header-upload-pill" style="background:#0f172a;"
+                                onclick="openCloseShiftModal()">🔒 Close Shift</button>
                         </div>
 
                         <div class="tab-content-container">
                             <!-- Active Shift Cards -->
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                            <div
+                                style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+                                <div
+                                    style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
                                     <div style="font-size:0.8rem; color:#64748b; font-weight:600;">ACTIVE CASHIER</div>
-                                    <div style="font-size:1.25rem; font-weight:800; color:#0f172a; margin-top:4px;" id="shift-cashier-name">—</div>
+                                    <div style="font-size:1.25rem; font-weight:800; color:#0f172a; margin-top:4px;"
+                                        id="shift-cashier-name">—</div>
                                 </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">STARTING FLOAT (IMPREST)</div>
-                                    <div style="font-size:1.25rem; font-weight:800; color:#0284c7; margin-top:4px;" id="shift-imprest-display">0 Sh</div>
+                                <div
+                                    style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">STARTING FLOAT
+                                        (IMPREST)</div>
+                                    <div style="font-size:1.25rem; font-weight:800; color:#0284c7; margin-top:4px;"
+                                        id="shift-imprest-display">0 Sh</div>
                                 </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">CASH SALES TODAY</div>
-                                    <div style="font-size:1.25rem; font-weight:800; color:#10b981; margin-top:4px;" id="shift-cash-sales-display">0 Sh</div>
+                                <div
+                                    style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">CASH SALES TODAY
+                                    </div>
+                                    <div style="font-size:1.25rem; font-weight:800; color:#10b981; margin-top:4px;"
+                                        id="shift-cash-sales-display">0 Sh</div>
                                 </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">MOMO / CARD SALES</div>
-                                    <div style="font-size:1.25rem; font-weight:800; color:#8b5cf6; margin-top:4px;" id="shift-momo-sales-display">0 Sh</div>
+                                <div
+                                    style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">MOMO / CARD SALES
+                                    </div>
+                                    <div style="font-size:1.25rem; font-weight:800; color:#8b5cf6; margin-top:4px;"
+                                        id="shift-momo-sales-display">0 Sh</div>
                                 </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL EXPECTED IN DRAWER</div>
-                                    <div style="font-size:1.25rem; font-weight:800; color:#f59e0b; margin-top:4px;" id="shift-drawer-expected-display">0 Sh</div>
+                                <div
+                                    style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL EXPECTED IN
+                                        DRAWER</div>
+                                    <div style="font-size:1.25rem; font-weight:800; color:#f59e0b; margin-top:4px;"
+                                        id="shift-drawer-expected-display">0 Sh</div>
                                 </div>
                             </div>
 
-                            <h3 style="margin-bottom:12px; font-size:1rem; color:#0f172a;">Shift Transactions &amp; Float Records</h3>
+                            <h3 style="margin-bottom:12px; font-size:1rem; color:#0f172a;">Shift Transactions &amp;
+                                Float Records</h3>
                             <div class="pos-table-card">
                                 <table class="pos-data-table">
                                     <thead>
@@ -463,7 +489,10 @@
                                         </tr>
                                     </thead>
                                     <tbody id="shift-tx-table-tbody">
-                                        <tr><td colspan="5" style="text-align:center; padding:25px; color:#64748b;">Loading shift logs...</td></tr>
+                                        <tr>
+                                            <td colspan="5" style="text-align:center; padding:25px; color:#64748b;">
+                                                Loading shift logs...</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -480,27 +509,29 @@
                     <section class="pos-view-pane" id="view-pane-kitchen">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="kitchen-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search kitchen tokens by token #, table, waiter, or items..." 
-                                    oninput="filterKitchenTokens(this.value)"
-                                >
+                                <input type="text" id="kitchen-search-input" class="tab-search-input"
+                                    placeholder="Search kitchen tokens by token #, table, waiter, or items..."
+                                    oninput="filterKitchenTokens(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
                             <div class="category-pills-bar" style="margin:0;">
-                                <button class="cat-pill-btn active" onclick="filterKitchenStatus('ALL', this)">All</button>
-                                <button class="cat-pill-btn" onclick="filterKitchenStatus('PENDING', this)">Pending</button>
-                                <button class="cat-pill-btn" onclick="filterKitchenStatus('PREPARING', this)">Preparing</button>
+                                <button class="cat-pill-btn active"
+                                    onclick="filterKitchenStatus('ALL', this)">All</button>
+                                <button class="cat-pill-btn"
+                                    onclick="filterKitchenStatus('PENDING', this)">Pending</button>
+                                <button class="cat-pill-btn"
+                                    onclick="filterKitchenStatus('PREPARING', this)">Preparing</button>
                                 <button class="cat-pill-btn" onclick="filterKitchenStatus('READY', this)">Ready</button>
-                                <button class="cat-pill-btn" onclick="filterKitchenStatus('SERVED', this)">Served</button>
+                                <button class="cat-pill-btn"
+                                    onclick="filterKitchenStatus('SERVED', this)">Served</button>
                             </div>
-                            <button class="header-idle-btn" onclick="loadKitchenTokens()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            <button class="header-idle-btn" onclick="loadKitchenTokens()"><i
+                                    class="fa-solid fa-rotate"></i> Refresh</button>
                         </div>
 
                         <div class="tab-content-container">
-                            <div id="kitchen-tokens-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
+                            <div id="kitchen-tokens-grid"
+                                style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
@@ -515,266 +546,325 @@
                         <!-- Finance Sub-Navigation Bar -->
                         <div class="pos-fin-subnav-bar">
                             <div class="pos-fin-subnav-tabs">
-                                <button type="button" class="pos-fin-subtab-btn active" id="fin-tab-btn-overview" onclick="switchFinanceSubTab('overview')">
+                                <button type="button" class="pos-fin-subtab-btn active" id="fin-tab-btn-overview"
+                                    onclick="switchFinanceSubTab('overview')">
                                     <i class="fa-solid fa-chart-pie"></i>
                                     <span>Overview</span>
                                 </button>
-                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-transactions" onclick="switchFinanceSubTab('transactions')">
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-transactions"
+                                    onclick="switchFinanceSubTab('transactions')">
                                     <i class="fa-solid fa-receipt"></i>
                                     <span>Transactions</span>
                                 </button>
-                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-invoice" onclick="switchFinanceSubTab('invoice')">
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-invoice"
+                                    onclick="switchFinanceSubTab('invoice')">
                                     <i class="fa-solid fa-file-invoice-dollar"></i>
                                     <span>Invoices</span>
                                 </button>
-                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-debtors" onclick="switchFinanceSubTab('debtors')">
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-debtors"
+                                    onclick="switchFinanceSubTab('debtors')">
                                     <i class="fa-solid fa-hand-holding-dollar"></i>
                                     <span>Debtors</span>
                                 </button>
-                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-creditors" onclick="switchFinanceSubTab('creditors')">
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-creditors"
+                                    onclick="switchFinanceSubTab('creditors')">
                                     <i class="fa-solid fa-truck-field"></i>
                                     <span>Creditors</span>
                                 </button>
-                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-returns" onclick="switchFinanceSubTab('returns')">
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-returns"
+                                    onclick="switchFinanceSubTab('returns')">
                                     <i class="fa-solid fa-arrow-rotate-left"></i>
                                     <span>Returns</span>
                                 </button>
                             </div>
                             <div style="display:flex; align-items:center; gap:8px;">
-                                <button type="button" class="pos-fin-icon-btn" title="Refresh Active Tab" onclick="refreshActiveFinanceSubTab()"><i class="fa-solid fa-rotate"></i></button>
+                                <button type="button" class="pos-fin-icon-btn" title="Refresh Active Tab"
+                                    onclick="refreshActiveFinanceSubTab()"><i class="fa-solid fa-rotate"></i></button>
                             </div>
                         </div>
 
                         <!-- 1. OVERVIEW (iBanko Executive Financial Dashboard) -->
                         <div class="pos-fin-subview active" id="fin-subview-overview">
-                        <div class="pos-finance-shell">
-                            <div class="pos-finance-grid">
-                                
-                                <!-- LEFT MAIN COLUMN -->
-                                <div class="pos-fin-left-col">
-                                    
-                                    <!-- Header Row -->
-                                    <div class="pos-fin-header-row">
-                                        <div class="pos-fin-greeting-wrap">
-                                            <h1>Hello <span id="fin-user-name">Steward</span> <span style="font-size:1.6rem;">👋</span></h1>
-                                        </div>
-                                        <div class="pos-fin-header-actions">
-                                            <button type="button" class="pos-fin-select-btn" onclick="openCashInModal()">
-                                                <i class="fa-solid fa-arrows-rotate" style="font-size:0.75rem;"></i>
-                                                <span id="fin-account-label">Main Business Vault</span>
-                                                <i class="fa-solid fa-chevron-down" style="font-size:0.65rem; color:#94a3b8;"></i>
-                                            </button>
-                                            <button type="button" class="pos-fin-icon-btn" title="Refresh Finance" onclick="loadFinanceDashboard()"><i class="fa-solid fa-rotate"></i></button>
-                                            <button type="button" class="pos-fin-icon-btn" title="Notifications" onclick="alert('All financial accounts reconciled and active.')"><i class="fa-regular fa-bell"></i></button>
-                                            <button type="button" class="pos-fin-icon-btn" title="Support" onclick="openTechSupportModal()"><i class="fa-regular fa-comment-dots"></i></button>
-                                            <button type="button" class="pos-fin-icon-btn" title="Settings" onclick="switchNavTab('settings')"><i class="fa-solid fa-gear"></i></button>
-                                        </div>
-                                    </div>
+                            <div class="pos-finance-shell">
+                                <div class="pos-finance-grid">
 
-                                    <!-- My Card Hero Banner -->
-                                    <div class="pos-fin-hero-card">
-                                        <div class="pos-fin-hero-top">
-                                            <span class="pos-fin-hero-title">My Card &amp; Vault</span>
-                                            <span class="pos-fin-hero-badge"><i class="fa-solid fa-arrow-trend-up"></i> 100% Secure</span>
-                                        </div>
-                                        <div class="pos-fin-hero-balance-row">
-                                            <div class="pos-fin-hero-amount" id="fin-hero-balance">0 Sh</div>
-                                            <div class="pos-fin-hero-btns">
-                                                <button type="button" class="pos-fin-hero-btn deposit" onclick="openCashInModal()">
-                                                    <i class="fa-solid fa-arrow-down-left"></i> Deposit
+                                    <!-- LEFT MAIN COLUMN -->
+                                    <div class="pos-fin-left-col">
+
+                                        <!-- Header Row -->
+                                        <div class="pos-fin-header-row">
+                                            <div class="pos-fin-greeting-wrap">
+                                                <h1>Hello <span id="fin-user-name">Steward</span> <span
+                                                        style="font-size:1.6rem;">👋</span></h1>
+                                            </div>
+                                            <div class="pos-fin-header-actions">
+                                                <button type="button" class="pos-fin-select-btn"
+                                                    onclick="openCashInModal()">
+                                                    <i class="fa-solid fa-arrows-rotate" style="font-size:0.75rem;"></i>
+                                                    <span id="fin-account-label">Main Business Vault</span>
+                                                    <i class="fa-solid fa-chevron-down"
+                                                        style="font-size:0.65rem; color:#94a3b8;"></i>
                                                 </button>
-                                                <button type="button" class="pos-fin-hero-btn withdraw" onclick="openExpenseModal()">
-                                                    <i class="fa-solid fa-arrow-up-right"></i> Withdraw
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Financial Record Section -->
-                                    <div class="pos-fin-section-title-row">
-                                        <h2>Financial Record</h2>
-                                        <select class="pos-fin-pill-select" id="fin-record-period" onchange="renderFinanceRecords()">
-                                            <option value="today">Today</option>
-                                            <option value="week">Week</option>
-                                            <option value="month" selected>Month</option>
-                                            <option value="allTime">All Time</option>
-                                        </select>
-                                    </div>
-
-                                    <!-- 3 Stat Cards (Green, Peach, Blue) -->
-                                    <div class="pos-fin-records-row">
-                                        <!-- Card 1: Total Income -->
-                                        <div class="pos-fin-stat-card green">
-                                            <div class="pos-fin-stat-top">
-                                                <span class="pos-fin-stat-label">Total Income</span>
-                                                <i class="fa-solid fa-ellipsis-vertical pos-fin-stat-dots" onclick="switchNavTab('transactions')"></i>
-                                            </div>
-                                            <div class="pos-fin-stat-bottom">
-                                                <span class="pos-fin-stat-val" id="fin-stat-income">0 Sh</span>
-                                                <span class="pos-fin-stat-trend up"><i class="fa-solid fa-arrow-up"></i> Inflow</span>
+                                                <button type="button" class="pos-fin-icon-btn" title="Refresh Finance"
+                                                    onclick="loadFinanceDashboard()"><i
+                                                        class="fa-solid fa-rotate"></i></button>
+                                                <button type="button" class="pos-fin-icon-btn" title="Notifications"
+                                                    onclick="alert('All financial accounts reconciled and active.')"><i
+                                                        class="fa-regular fa-bell"></i></button>
+                                                <button type="button" class="pos-fin-icon-btn" title="Support"
+                                                    onclick="openTechSupportModal()"><i
+                                                        class="fa-regular fa-comment-dots"></i></button>
+                                                <button type="button" class="pos-fin-icon-btn" title="Settings"
+                                                    onclick="switchNavTab('settings')"><i
+                                                        class="fa-solid fa-gear"></i></button>
                                             </div>
                                         </div>
 
-                                        <!-- Card 2: Total Expense -->
-                                        <div class="pos-fin-stat-card peach">
-                                            <div class="pos-fin-stat-top">
-                                                <span class="pos-fin-stat-label">Total Expense</span>
-                                                <i class="fa-solid fa-ellipsis-vertical pos-fin-stat-dots" onclick="openExpenseModal()"></i>
+                                        <!-- My Card Hero Banner -->
+                                        <div class="pos-fin-hero-card">
+                                            <div class="pos-fin-hero-top">
+                                                <span class="pos-fin-hero-title">My Card &amp; Vault</span>
+                                                <span class="pos-fin-hero-badge"><i
+                                                        class="fa-solid fa-arrow-trend-up"></i> 100% Secure</span>
                                             </div>
-                                            <div class="pos-fin-stat-bottom">
-                                                <span class="pos-fin-stat-val" id="fin-stat-expense">0 Sh</span>
-                                                <span class="pos-fin-stat-trend orange"><i class="fa-solid fa-arrow-down"></i> Outflow</span>
+                                            <div class="pos-fin-hero-balance-row">
+                                                <div class="pos-fin-hero-amount" id="fin-hero-balance">0 Sh</div>
+                                                <div class="pos-fin-hero-btns">
+                                                    <button type="button" class="pos-fin-hero-btn deposit"
+                                                        onclick="openCashInModal()">
+                                                        <i class="fa-solid fa-arrow-down-left"></i> Deposit
+                                                    </button>
+                                                    <button type="button" class="pos-fin-hero-btn withdraw"
+                                                        onclick="openExpenseModal()">
+                                                        <i class="fa-solid fa-arrow-up-right"></i> Withdraw
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <!-- Card 3: Total Saving / Net Profit -->
-                                        <div class="pos-fin-stat-card blue">
-                                            <div class="pos-fin-stat-top">
-                                                <span class="pos-fin-stat-label">Total Net Saving</span>
-                                                <i class="fa-solid fa-ellipsis-vertical pos-fin-stat-dots" onclick="switchNavTab('transactions')"></i>
-                                            </div>
-                                            <div class="pos-fin-stat-bottom">
-                                                <span class="pos-fin-stat-val" id="fin-stat-saving">0 Sh</span>
-                                                <span class="pos-fin-stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i> Net</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Money Flow Chart Box -->
-                                    <div class="pos-fin-chart-card">
-                                        <div class="pos-fin-chart-header">
-                                            <div style="font-size:1.1rem; font-weight:800; color:#0f172a;">Money Flow</div>
-                                            <div class="pos-fin-chart-legends">
-                                                <span><span class="pos-fin-legend-dot dark"></span> Total Saving</span>
-                                                <span><span class="pos-fin-legend-dot orange"></span> Total Expense</span>
-                                            </div>
-                                            <select class="pos-fin-pill-select" id="fin-chart-timeframe" onchange="renderMoneyFlowChart()">
-                                                <option value="weekly" selected>Weekly</option>
-                                                <option value="daily">Daily</option>
+                                        <!-- Financial Record Section -->
+                                        <div class="pos-fin-section-title-row">
+                                            <h2>Financial Record</h2>
+                                            <select class="pos-fin-pill-select" id="fin-record-period"
+                                                onchange="renderFinanceRecords()">
+                                                <option value="today">Today</option>
+                                                <option value="week">Week</option>
+                                                <option value="month" selected>Month</option>
+                                                <option value="allTime">All Time</option>
                                             </select>
                                         </div>
 
-                                        <!-- Dynamic SVG Chart Container -->
-                                        <div id="fin-svg-chart-container" style="width:100%; height:220px; position:relative;">
-                                            <!-- SVG Chart injected dynamically -->
+                                        <!-- 3 Stat Cards (Green, Peach, Blue) -->
+                                        <div class="pos-fin-records-row">
+                                            <!-- Card 1: Total Income -->
+                                            <div class="pos-fin-stat-card green">
+                                                <div class="pos-fin-stat-top">
+                                                    <span class="pos-fin-stat-label">Total Income</span>
+                                                    <i class="fa-solid fa-ellipsis-vertical pos-fin-stat-dots"
+                                                        onclick="switchNavTab('transactions')"></i>
+                                                </div>
+                                                <div class="pos-fin-stat-bottom">
+                                                    <span class="pos-fin-stat-val" id="fin-stat-income">0 Sh</span>
+                                                    <span class="pos-fin-stat-trend up"><i
+                                                            class="fa-solid fa-arrow-up"></i> Inflow</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Card 2: Total Expense -->
+                                            <div class="pos-fin-stat-card peach">
+                                                <div class="pos-fin-stat-top">
+                                                    <span class="pos-fin-stat-label">Total Expense</span>
+                                                    <i class="fa-solid fa-ellipsis-vertical pos-fin-stat-dots"
+                                                        onclick="openExpenseModal()"></i>
+                                                </div>
+                                                <div class="pos-fin-stat-bottom">
+                                                    <span class="pos-fin-stat-val" id="fin-stat-expense">0 Sh</span>
+                                                    <span class="pos-fin-stat-trend orange"><i
+                                                            class="fa-solid fa-arrow-down"></i> Outflow</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Card 3: Total Saving / Net Profit -->
+                                            <div class="pos-fin-stat-card blue">
+                                                <div class="pos-fin-stat-top">
+                                                    <span class="pos-fin-stat-label">Total Net Saving</span>
+                                                    <i class="fa-solid fa-ellipsis-vertical pos-fin-stat-dots"
+                                                        onclick="switchNavTab('transactions')"></i>
+                                                </div>
+                                                <div class="pos-fin-stat-bottom">
+                                                    <span class="pos-fin-stat-val" id="fin-stat-saving">0 Sh</span>
+                                                    <span class="pos-fin-stat-trend up"><i
+                                                            class="fa-solid fa-arrow-trend-up"></i> Net</span>
+                                                </div>
+                                            </div>
                                         </div>
+
+                                        <!-- Money Flow Chart Box -->
+                                        <div class="pos-fin-chart-card">
+                                            <div class="pos-fin-chart-header">
+                                                <div style="font-size:1.1rem; font-weight:800; color:#0f172a;">Money
+                                                    Flow</div>
+                                                <div class="pos-fin-chart-legends">
+                                                    <span><span class="pos-fin-legend-dot dark"></span> Total
+                                                        Saving</span>
+                                                    <span><span class="pos-fin-legend-dot orange"></span> Total
+                                                        Expense</span>
+                                                </div>
+                                                <select class="pos-fin-pill-select" id="fin-chart-timeframe"
+                                                    onchange="renderMoneyFlowChart()">
+                                                    <option value="weekly" selected>Weekly</option>
+                                                    <option value="daily">Daily</option>
+                                                </select>
+                                            </div>
+
+                                            <!-- Dynamic SVG Chart Container -->
+                                            <div id="fin-svg-chart-container"
+                                                style="width:100%; height:220px; position:relative;">
+                                                <!-- SVG Chart injected dynamically -->
+                                            </div>
+                                        </div>
+
+                                        <!-- Bottom Dual Cards: Send Money To & Scheduled Payments -->
+                                        <div class="pos-fin-bottom-dual">
+
+                                            <!-- Send Money To (Quick Payout) -->
+                                            <div class="pos-fin-mini-card">
+                                                <div class="pos-fin-section-title-row" style="margin-bottom:8px;">
+                                                    <h3
+                                                        style="font-size:0.95rem; font-weight:800; color:#0f172a; margin:0;">
+                                                        Send Money To</h3>
+                                                    <i class="fa-solid fa-ellipsis-vertical"
+                                                        style="color:#94a3b8; cursor:pointer;"
+                                                        onclick="openExpenseModal()"></i>
+                                                </div>
+                                                <div class="pos-fin-send-list" id="fin-quick-payees-list">
+                                                    <button type="button" class="pos-fin-add-circle"
+                                                        title="Record New Payout" onclick="openExpenseModal()">
+                                                        <i class="fa-solid fa-plus"></i>
+                                                    </button>
+                                                    <!-- Dynamic avatars populated in JS -->
+                                                </div>
+                                            </div>
+
+                                            <!-- Scheduled Payments (Creditors / Bills) -->
+                                            <div class="pos-fin-mini-card">
+                                                <div class="pos-fin-section-title-row" style="margin-bottom:8px;">
+                                                    <h3
+                                                        style="font-size:0.95rem; font-weight:800; color:#0f172a; margin:0;">
+                                                        Scheduled Payments</h3>
+                                                    <i class="fa-solid fa-ellipsis-vertical"
+                                                        style="color:#94a3b8; cursor:pointer;"
+                                                        onclick="switchNavTab('creditors')"></i>
+                                                </div>
+                                                <div class="pos-fin-scheduled-list" id="fin-scheduled-bills-list">
+                                                    <!-- Dynamic bills list -->
+                                                </div>
+                                            </div>
+
+                                        </div>
+
                                     </div>
 
-                                    <!-- Bottom Dual Cards: Send Money To & Scheduled Payments -->
-                                    <div class="pos-fin-bottom-dual">
-                                        
-                                        <!-- Send Money To (Quick Payout) -->
-                                        <div class="pos-fin-mini-card">
-                                            <div class="pos-fin-section-title-row" style="margin-bottom:8px;">
-                                                <h3 style="font-size:0.95rem; font-weight:800; color:#0f172a; margin:0;">Send Money To</h3>
-                                                <i class="fa-solid fa-ellipsis-vertical" style="color:#94a3b8; cursor:pointer;" onclick="openExpenseModal()"></i>
+                                    <!-- RIGHT SIDEBAR COLUMN -->
+                                    <div class="pos-fin-right-col">
+
+                                        <!-- Recent Transactions List -->
+                                        <div class="pos-fin-transactions-card">
+                                            <div class="pos-fin-section-title-row" style="margin-bottom:12px;">
+                                                <h3
+                                                    style="font-size:1.05rem; font-weight:800; color:#0f172a; margin:0;">
+                                                    Transactions</h3>
+                                                <span
+                                                    style="font-size:0.75rem; color:var(--primary); font-weight:700; cursor:pointer;"
+                                                    onclick="switchNavTab('transactions')">View all</span>
                                             </div>
-                                            <div class="pos-fin-send-list" id="fin-quick-payees-list">
-                                                <button type="button" class="pos-fin-add-circle" title="Record New Payout" onclick="openExpenseModal()">
-                                                    <i class="fa-solid fa-plus"></i>
-                                                </button>
-                                                <!-- Dynamic avatars populated in JS -->
+                                            <div class="pos-fin-tx-list" id="fin-recent-tx-container">
+                                                <!-- Dynamic items -->
+                                                <div
+                                                    style="text-align:center; padding:20px; color:#94a3b8; font-size:0.85rem;">
+                                                    Loading recent ledger...</div>
                                             </div>
                                         </div>
 
-                                        <!-- Scheduled Payments (Creditors / Bills) -->
-                                        <div class="pos-fin-mini-card">
-                                            <div class="pos-fin-section-title-row" style="margin-bottom:8px;">
-                                                <h3 style="font-size:0.95rem; font-weight:800; color:#0f172a; margin:0;">Scheduled Payments</h3>
-                                                <i class="fa-solid fa-ellipsis-vertical" style="color:#94a3b8; cursor:pointer;" onclick="switchNavTab('creditors')"></i>
+                                        <!-- Available Cards / Accounts -->
+                                        <div class="pos-fin-cards-wrap">
+                                            <div class="pos-fin-section-title-row" style="margin-bottom:12px;">
+                                                <h3
+                                                    style="font-size:1.05rem; font-weight:800; color:#0f172a; margin:0;">
+                                                    Available Card &amp; Till</h3>
+                                                <span
+                                                    style="font-size:0.75rem; color:var(--primary); font-weight:700; cursor:pointer;"
+                                                    onclick="switchNavTab('shift')">View shift</span>
                                             </div>
-                                            <div class="pos-fin-scheduled-list" id="fin-scheduled-bills-list">
-                                                <!-- Dynamic bills list -->
+
+                                            <!-- Card 1: VISA Till Drawer -->
+                                            <div class="pos-fin-bank-card cyan">
+                                                <div class="pos-fin-bank-card-top">
+                                                    <span class="pos-fin-bank-card-val" id="fin-card-drawer-val">0
+                                                        Sh</span>
+                                                    <span class="pos-fin-bank-card-brand">VISA / CASH</span>
+                                                </div>
+                                                <div class="pos-fin-bank-card-bottom">
+                                                    <div>
+                                                        <div
+                                                            style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">
+                                                            Drawer Till</div>
+                                                        <div>7283 2323 7319 ****</div>
+                                                    </div>
+                                                    <div style="text-align:right;">
+                                                        <div
+                                                            style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">
+                                                            Active</div>
+                                                        <div>24/7</div>
+                                                    </div>
+                                                </div>
                                             </div>
+
+                                            <!-- Card 2: Mobile Money Vault -->
+                                            <div class="pos-fin-bank-card mint">
+                                                <div class="pos-fin-bank-card-top">
+                                                    <span class="pos-fin-bank-card-val" id="fin-card-momo-val">0
+                                                        Sh</span>
+                                                    <span class="pos-fin-bank-card-brand">MOMO / MTN</span>
+                                                </div>
+                                                <div class="pos-fin-bank-card-bottom">
+                                                    <div>
+                                                        <div
+                                                            style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">
+                                                            Merchant Pay</div>
+                                                        <div>3253 8243 1100 ****</div>
+                                                    </div>
+                                                    <div style="text-align:right;">
+                                                        <div
+                                                            style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">
+                                                            Network</div>
+                                                        <div>ONLINE</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                         </div>
 
                                     </div>
 
                                 </div>
-
-                                <!-- RIGHT SIDEBAR COLUMN -->
-                                <div class="pos-fin-right-col">
-                                    
-                                    <!-- Recent Transactions List -->
-                                    <div class="pos-fin-transactions-card">
-                                        <div class="pos-fin-section-title-row" style="margin-bottom:12px;">
-                                            <h3 style="font-size:1.05rem; font-weight:800; color:#0f172a; margin:0;">Transactions</h3>
-                                            <span style="font-size:0.75rem; color:var(--primary); font-weight:700; cursor:pointer;" onclick="switchNavTab('transactions')">View all</span>
-                                        </div>
-                                        <div class="pos-fin-tx-list" id="fin-recent-tx-container">
-                                            <!-- Dynamic items -->
-                                            <div style="text-align:center; padding:20px; color:#94a3b8; font-size:0.85rem;">Loading recent ledger...</div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Available Cards / Accounts -->
-                                    <div class="pos-fin-cards-wrap">
-                                        <div class="pos-fin-section-title-row" style="margin-bottom:12px;">
-                                            <h3 style="font-size:1.05rem; font-weight:800; color:#0f172a; margin:0;">Available Card &amp; Till</h3>
-                                            <span style="font-size:0.75rem; color:var(--primary); font-weight:700; cursor:pointer;" onclick="switchNavTab('shift')">View shift</span>
-                                        </div>
-
-                                        <!-- Card 1: VISA Till Drawer -->
-                                        <div class="pos-fin-bank-card cyan">
-                                            <div class="pos-fin-bank-card-top">
-                                                <span class="pos-fin-bank-card-val" id="fin-card-drawer-val">0 Sh</span>
-                                                <span class="pos-fin-bank-card-brand">VISA / CASH</span>
-                                            </div>
-                                            <div class="pos-fin-bank-card-bottom">
-                                                <div>
-                                                    <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">Drawer Till</div>
-                                                    <div>7283 2323 7319 ****</div>
-                                                </div>
-                                                <div style="text-align:right;">
-                                                    <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">Active</div>
-                                                    <div>24/7</div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Card 2: Mobile Money Vault -->
-                                        <div class="pos-fin-bank-card mint">
-                                            <div class="pos-fin-bank-card-top">
-                                                <span class="pos-fin-bank-card-val" id="fin-card-momo-val">0 Sh</span>
-                                                <span class="pos-fin-bank-card-brand">MOMO / MTN</span>
-                                            </div>
-                                            <div class="pos-fin-bank-card-bottom">
-                                                <div>
-                                                    <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">Merchant Pay</div>
-                                                    <div>3253 8243 1100 ****</div>
-                                                </div>
-                                                <div style="text-align:right;">
-                                                    <div style="font-size:0.65rem; color:#64748b; text-transform:uppercase;">Network</div>
-                                                    <div>ONLINE</div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                    </div>
-
-                                </div>
-
                             </div>
-                        </div>
                         </div>
 
                         <!-- 2. TRANSACTIONS SUB-VIEW -->
                         <div class="pos-fin-subview" id="fin-subview-transactions">
                             <div class="tab-search-bar-wrap" style="flex-wrap:wrap; gap:10px;">
                                 <div class="tab-search-input-box" style="flex:1; min-width:260px;">
-                                    <input 
-                                        type="text" 
-                                        id="tx-search-input" 
-                                        class="tab-search-input" 
-                                        placeholder="Search by receipt #, description, customer, cashier, amount..." 
-                                        oninput="filterTransactionsList()"
-                                    >
+                                    <input type="text" id="tx-search-input" class="tab-search-input"
+                                        placeholder="Search by receipt #, description, customer, cashier, amount..."
+                                        oninput="filterTransactionsList()">
                                     <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                                 </div>
 
                                 <!-- Filter by Type -->
                                 <div style="display:flex; gap:8px; align-items:center;">
-                                    <select id="tx-filter-type" class="pos-input" style="padding:7px 12px; font-size:0.85rem;" onchange="loadTransactionsList()">
+                                    <select id="tx-filter-type" class="pos-input"
+                                        style="padding:7px 12px; font-size:0.85rem;" onchange="loadTransactionsList()">
                                         <option value="ALL">All Types</option>
                                         <option value="INCOME">Income / POS Sales</option>
                                         <option value="GOODS_ON_CREDIT">Goods on Credit</option>
@@ -784,11 +874,14 @@
                                     </select>
 
                                     <!-- Date Pickers -->
-                                    <input type="date" id="tx-filter-start" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
+                                    <input type="date" id="tx-filter-start" class="pos-input"
+                                        style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
                                     <span style="color:#64748b; font-size:0.85rem;">to</span>
-                                    <input type="date" id="tx-filter-end" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
+                                    <input type="date" id="tx-filter-end" class="pos-input"
+                                        style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
 
-                                    <button class="header-idle-btn" style="padding:7px 14px; font-size:0.85rem;" onclick="resetTxFilters()">
+                                    <button class="header-idle-btn" style="padding:7px 14px; font-size:0.85rem;"
+                                        onclick="resetTxFilters()">
                                         <i class="fa-solid fa-rotate-left"></i> Reset
                                     </button>
                                 </div>
@@ -811,7 +904,10 @@
                                             </tr>
                                         </thead>
                                         <tbody id="transactions-table-tbody">
-                                            <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading transactions ledger...</td></tr>
+                                            <tr>
+                                                <td colspan="9" style="text-align:center; padding:30px; color:#64748b;">
+                                                    Loading transactions ledger...</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -822,17 +918,15 @@
                         <div class="pos-fin-subview" id="fin-subview-invoice">
                             <div class="tab-search-bar-wrap">
                                 <div class="tab-search-input-box">
-                                    <input 
-                                        type="text" 
-                                        id="invoice-search-input" 
-                                        class="tab-search-input" 
-                                        placeholder="Search invoices by invoice #, customer name, or phone..." 
-                                        oninput="filterInvoicesList(this.value)"
-                                    >
+                                    <input type="text" id="invoice-search-input" class="tab-search-input"
+                                        placeholder="Search invoices by invoice #, customer name, or phone..."
+                                        oninput="filterInvoicesList(this.value)">
                                     <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                                 </div>
-                                <button class="header-upload-pill" onclick="openCreateInvoiceModal()">+ Create Invoice</button>
-                                <button class="header-idle-btn" onclick="loadInvoicesList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                                <button class="header-upload-pill" onclick="openCreateInvoiceModal()">+ Create
+                                    Invoice</button>
+                                <button class="header-idle-btn" onclick="loadInvoicesList()"><i
+                                        class="fa-solid fa-rotate"></i> Refresh</button>
                             </div>
 
                             <div class="tab-content-container">
@@ -852,7 +946,10 @@
                                             </tr>
                                         </thead>
                                         <tbody id="invoices-table-tbody">
-                                            <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading invoices...</td></tr>
+                                            <tr>
+                                                <td colspan="9" style="text-align:center; padding:30px; color:#64748b;">
+                                                    Loading invoices...</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -863,29 +960,33 @@
                         <div class="pos-fin-subview" id="fin-subview-debtors">
                             <div class="tab-search-bar-wrap">
                                 <div class="tab-search-input-box">
-                                    <input 
-                                        type="text" 
-                                        id="debtors-search-input" 
-                                        class="tab-search-input" 
-                                        placeholder="Search debtors by customer name, phone, or invoice #..." 
-                                        oninput="filterDebtorsList(this.value)"
-                                    >
+                                    <input type="text" id="debtors-search-input" class="tab-search-input"
+                                        placeholder="Search debtors by customer name, phone, or invoice #..."
+                                        oninput="filterDebtorsList(this.value)">
                                     <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                                 </div>
                                 <button class="header-upload-pill" onclick="openAddDebtorModal()">+ Add Debtor</button>
-                                <button class="header-idle-btn" onclick="loadDebtorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                                <button class="header-idle-btn" onclick="loadDebtorsList()"><i
+                                        class="fa-solid fa-rotate"></i> Refresh</button>
                             </div>
 
                             <div class="tab-content-container">
                                 <!-- Debtors Summary Cards -->
-                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
-                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OUTSTANDING DEBT</div>
-                                        <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;" id="debtors-total-amount">0 Sh</div>
+                                <div
+                                    style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+                                    <div
+                                        style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OUTSTANDING
+                                            DEBT</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;"
+                                            id="debtors-total-amount">0 Sh</div>
                                     </div>
-                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL DEBTORS COUNT</div>
-                                        <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;" id="debtors-total-count">0</div>
+                                    <div
+                                        style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL DEBTORS
+                                            COUNT</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;"
+                                            id="debtors-total-count">0</div>
                                     </div>
                                 </div>
 
@@ -904,7 +1005,10 @@
                                             </tr>
                                         </thead>
                                         <tbody id="debtors-table-tbody">
-                                            <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading debtors ledger...</td></tr>
+                                            <tr>
+                                                <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+                                                    Loading debtors ledger...</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -915,29 +1019,34 @@
                         <div class="pos-fin-subview" id="fin-subview-creditors">
                             <div class="tab-search-bar-wrap">
                                 <div class="tab-search-input-box">
-                                    <input 
-                                        type="text" 
-                                        id="creditors-search-input" 
-                                        class="tab-search-input" 
-                                        placeholder="Search creditors by supplier name, contact, phone, or bill #..." 
-                                        oninput="filterCreditorsList(this.value)"
-                                    >
+                                    <input type="text" id="creditors-search-input" class="tab-search-input"
+                                        placeholder="Search creditors by supplier name, contact, phone, or bill #..."
+                                        oninput="filterCreditorsList(this.value)">
                                     <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                                 </div>
-                                <button class="header-upload-pill" onclick="openAddCreditorModal()">+ Add Supplier Bill</button>
-                                <button class="header-idle-btn" onclick="loadCreditorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                                <button class="header-upload-pill" onclick="openAddCreditorModal()">+ Add Supplier
+                                    Bill</button>
+                                <button class="header-idle-btn" onclick="loadCreditorsList()"><i
+                                        class="fa-solid fa-rotate"></i> Refresh</button>
                             </div>
 
                             <div class="tab-content-container">
                                 <!-- Creditors Summary Cards -->
-                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
-                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OWED TO SUPPLIERS</div>
-                                        <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;" id="creditors-total-amount">0 Sh</div>
+                                <div
+                                    style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+                                    <div
+                                        style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OWED TO
+                                            SUPPLIERS</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;"
+                                            id="creditors-total-amount">0 Sh</div>
                                     </div>
-                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">SUPPLIERS COUNT</div>
-                                        <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;" id="creditors-total-count">0</div>
+                                    <div
+                                        style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">SUPPLIERS COUNT
+                                        </div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;"
+                                            id="creditors-total-count">0</div>
                                     </div>
                                 </div>
 
@@ -958,7 +1067,11 @@
                                             </tr>
                                         </thead>
                                         <tbody id="creditors-table-tbody">
-                                            <tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading creditors list...</td></tr>
+                                            <tr>
+                                                <td colspan="10"
+                                                    style="text-align:center; padding:30px; color:#64748b;">Loading
+                                                    creditors list...</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -969,17 +1082,15 @@
                         <div class="pos-fin-subview" id="fin-subview-returns">
                             <div class="tab-search-bar-wrap">
                                 <div class="tab-search-input-box">
-                                    <input 
-                                        type="text" 
-                                        id="returns-search-input" 
-                                        class="tab-search-input" 
-                                        placeholder="Search returns by receipt #, item name, or cashier..." 
-                                        oninput="filterReturnsList(this.value)"
-                                    >
+                                    <input type="text" id="returns-search-input" class="tab-search-input"
+                                        placeholder="Search returns by receipt #, item name, or cashier..."
+                                        oninput="filterReturnsList(this.value)">
                                     <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                                 </div>
-                                <button class="header-upload-pill" onclick="openProcessReturnModal()">+ Process Return</button>
-                                <button class="header-idle-btn" onclick="loadReturnsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                                <button class="header-upload-pill" onclick="openProcessReturnModal()">+ Process
+                                    Return</button>
+                                <button class="header-idle-btn" onclick="loadReturnsList()"><i
+                                        class="fa-solid fa-rotate"></i> Refresh</button>
                             </div>
 
                             <div class="tab-content-container">
@@ -998,7 +1109,10 @@
                                             </tr>
                                         </thead>
                                         <tbody id="returns-table-tbody">
-                                            <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading returns history...</td></tr>
+                                            <tr>
+                                                <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+                                                    Loading returns history...</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -1013,23 +1127,20 @@
                     <section class="pos-view-pane" id="view-pane-settings">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="settings-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search store profile, printer, or role configuration..." 
-                                    oninput="filterSettingsSections(this.value)"
-                                >
+                                <input type="text" id="settings-search-input" class="tab-search-input"
+                                    placeholder="Search store profile, printer, or role configuration..."
+                                    oninput="filterSettingsSections(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
                         </div>
 
                         <div class="tab-content-container">
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-                                
+
                                 <!-- Store Profile & Custom Colors -->
                                 <div class="pos-table-card" style="padding:24px;">
-                                    <h3 style="margin-bottom:16px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                                    <h3
+                                        style="margin-bottom:16px; color:#0f172a; display:flex; align-items:center; gap:8px;">
                                         <i class="fa-solid fa-store" style="color:var(--primary);"></i>
                                         <span>Store Profile &amp; Theme Branding</span>
                                     </h3>
@@ -1042,71 +1153,93 @@
 
                                         <div class="form-field" style="margin-bottom:14px;">
                                             <label class="field-label">Location (City, Country)</label>
-                                            <input type="text" id="setting-company-location" class="pos-input" placeholder="e.g. Kampala, Uganda">
+                                            <input type="text" id="setting-company-location" class="pos-input"
+                                                placeholder="e.g. Kampala, Uganda">
                                         </div>
 
                                         <div class="form-field" style="margin-bottom:14px;">
                                             <label class="field-label">Currency Symbol</label>
-                                            <input type="text" id="setting-company-currency" class="pos-input" placeholder="Sh or UGX">
+                                            <input type="text" id="setting-company-currency" class="pos-input"
+                                                placeholder="Sh or UGX">
                                         </div>
 
                                         <div class="form-field" style="margin-bottom:14px;">
                                             <label class="field-label">Logo Image URL</label>
-                                            <input type="text" id="setting-company-logo" class="pos-input" placeholder="Logo URL or relative path">
+                                            <input type="text" id="setting-company-logo" class="pos-input"
+                                                placeholder="Logo URL or relative path">
                                         </div>
 
-                                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;">
+                                        <div
+                                            style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;">
                                             <div>
                                                 <label class="field-label">Primary Color</label>
-                                                <input type="color" id="setting-theme-primary" style="width:100%; height:40px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;" value="#0284c7">
+                                                <input type="color" id="setting-theme-primary"
+                                                    style="width:100%; height:40px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;"
+                                                    value="#0284c7">
                                             </div>
                                             <div>
                                                 <label class="field-label">Accent Color</label>
-                                                <input type="color" id="setting-theme-accent" style="width:100%; height:40px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;" value="#f59e0b">
+                                                <input type="color" id="setting-theme-accent"
+                                                    style="width:100%; height:40px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;"
+                                                    value="#f59e0b">
                                             </div>
                                         </div>
 
-                                        <button type="submit" class="header-upload-pill" style="width:100%; padding:12px; font-size:0.95rem;">Save Store Settings</button>
+                                        <button type="submit" class="header-upload-pill"
+                                            style="width:100%; padding:12px; font-size:0.95rem;">Save Store
+                                            Settings</button>
                                     </form>
 
                                     <!-- Default Thermal Receipt Printer Configuration -->
                                     <div style="margin-top:24px; padding-top:20px; border-top:1px solid #e2e8f0;">
-                                        <h4 style="margin-bottom:10px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                                        <h4
+                                            style="margin-bottom:10px; color:#0f172a; display:flex; align-items:center; gap:8px;">
                                             <i class="fa-solid fa-print" style="color:var(--primary);"></i>
                                             <span>Default Receipt Printer (Silent Printing)</span>
                                         </h4>
                                         <p style="font-size:0.8rem; color:#64748b; margin-bottom:12px;">
-                                            Select your default thermal printer once. Subsequent receipts will print automatically in the background while displaying the custom animation without showing the Windows printing dialog.
+                                            Select your default thermal printer once. Subsequent receipts will print
+                                            automatically in the background while displaying the custom animation
+                                            without showing the Windows printing dialog.
                                         </p>
                                         <div style="display:flex; gap:10px; align-items:center;">
-                                            <select id="setting-default-printer-select" class="pos-input" style="flex:1;">
+                                            <select id="setting-default-printer-select" class="pos-input"
+                                                style="flex:1;">
                                                 <option value="">Detecting Windows printers...</option>
                                             </select>
-                                            <button type="button" class="header-upload-pill" style="padding:9px 16px; font-size:0.85rem;" onclick="saveSelectedPrinterPreference()">
+                                            <button type="button" class="header-upload-pill"
+                                                style="padding:9px 16px; font-size:0.85rem;"
+                                                onclick="saveSelectedPrinterPreference()">
                                                 Set Default
                                             </button>
                                         </div>
-                                        <div id="printer-save-status" style="font-size:0.78rem; color:#10b981; margin-top:6px; display:none;">
-                                            <i class="fa-solid fa-check"></i> Default printer saved! Silent printing enabled.
+                                        <div id="printer-save-status"
+                                            style="font-size:0.78rem; color:#10b981; margin-top:6px; display:none;">
+                                            <i class="fa-solid fa-check"></i> Default printer saved! Silent printing
+                                            enabled.
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- Custom Typed Roles Builder -->
                                 <div class="pos-table-card" style="padding:24px;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                                         <h3 style="color:#0f172a; display:flex; align-items:center; gap:8px;">
                                             <i class="fa-solid fa-users-gear" style="color:var(--primary);"></i>
                                             <span>Custom Typed Roles</span>
                                         </h3>
-                                        <button class="header-upload-pill" style="font-size:0.8rem;" onclick="openAddRoleModal()">+ Add New Role</button>
+                                        <button class="header-upload-pill" style="font-size:0.8rem;"
+                                            onclick="openAddRoleModal()">+ Add New Role</button>
                                     </div>
 
                                     <p style="font-size:0.82rem; color:#64748b; margin-bottom:14px;">
-                                        Define custom roles (Manager, Supervisor, Cashier, Attendant, etc.) with granular tab visibility and capability permissions.
+                                        Define custom roles (Manager, Supervisor, Cashier, Attendant, etc.) with
+                                        granular tab visibility and capability permissions.
                                     </p>
 
-                                    <div id="settings-roles-list" style="display:flex; flex-direction:column; gap:10px;">
+                                    <div id="settings-roles-list"
+                                        style="display:flex; flex-direction:column; gap:10px;">
                                         <!-- Populated dynamically -->
                                     </div>
                                 </div>
@@ -1121,25 +1254,26 @@
                     <section class="pos-view-pane" id="view-pane-tech">
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="tech-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search companies by name, prefix, or location..." 
-                                    oninput="filterTechCompanies(this.value)"
-                                >
+                                <input type="text" id="tech-search-input" class="tab-search-input"
+                                    placeholder="Search companies by name, prefix, or location..."
+                                    oninput="filterTechCompanies(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
-                            <button class="header-upload-pill" style="background:#0f172a;" onclick="openCreateCompanyModal()">+ Add New Company</button>
+                            <button class="header-upload-pill" style="background:#0f172a;"
+                                onclick="openCreateCompanyModal()">+ Add New Company</button>
                         </div>
 
                         <div class="tab-content-container">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                                 <div>
-                                    <h2 style="font-size:1.25rem; font-weight:800; color:#0f172a;">Company Databases &amp; Portals</h2>
-                                    <p style="font-size:0.85rem; color:#64748b;">Each company has an independent isolated database and custom typed roles.</p>
+                                    <h2 style="font-size:1.25rem; font-weight:800; color:#0f172a;">Company Databases
+                                        &amp; Portals</h2>
+                                    <p style="font-size:0.85rem; color:#64748b;">Each company has an independent
+                                        isolated database and custom typed roles.</p>
                                 </div>
-                                <button class="header-idle-btn" onclick="loadTechCompanies()"><i class="fa-solid fa-rotate"></i> Refresh Portals</button>
+                                <button class="header-idle-btn" onclick="loadTechCompanies()"><i
+                                        class="fa-solid fa-rotate"></i> Refresh Portals</button>
                             </div>
 
                             <div class="pos-table-card">
@@ -1156,7 +1290,10 @@
                                         </tr>
                                     </thead>
                                     <tbody id="tech-companies-tbody">
-                                        <tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">Loading company registry...</td></tr>
+                                        <tr>
+                                            <td colspan="7" style="text-align:center; padding:30px; color:#64748b;">
+                                                Loading company registry...</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1170,10 +1307,11 @@
                      RIGHT CHECKOUT / ORDER PANEL (Exact Match to Picture 2)
                      ========================================== -->
                 <aside class="pos-order-panel">
-                    
+
                     <!-- Panel Top Header (Pic 2) -->
                     <div class="order-panel-header">
-                        <button class="order-back-btn" type="button" onclick="collapseCheckoutPanel()" title="Minimize checkout and expand product catalog">
+                        <button class="order-back-btn" type="button" onclick="collapseCheckoutPanel()"
+                            title="Minimize checkout and expand product catalog">
                             <i class="fa-solid fa-chevron-left"></i>
                             <span>Back</span>
                         </button>
@@ -1181,20 +1319,22 @@
                             <i class="fa-solid fa-location-dot" style="color:var(--primary); font-size:0.8rem;"></i>
                             <span>First Floor -- First Floor No. 1</span>
                         </div>
-                        <div style="font-size:0.75rem; color:#94a3b8; cursor:pointer;" onclick="clearCurrentOrder()" title="Clear cart items"><i class="fa-solid fa-trash-can"></i></div>
+                        <div style="font-size:0.75rem; color:#94a3b8; cursor:pointer;" onclick="clearCurrentOrder()"
+                            title="Clear cart items"><i class="fa-solid fa-trash-can"></i></div>
                     </div>
 
                     <!-- Cart Items List (Pic 2) -->
                     <div class="order-items-container" id="pos-order-items-list">
                         <div class="order-empty-state">
-                            <i class="fa-solid fa-cart-shopping" style="font-size:2.5rem; opacity:0.3; margin-bottom:12px; display:block;"></i>
+                            <i class="fa-solid fa-cart-shopping"
+                                style="font-size:2.5rem; opacity:0.3; margin-bottom:12px; display:block;"></i>
                             Select dishes on the left to add to this order
                         </div>
                     </div>
 
                     <!-- Order Footer Controls (Pic 2) -->
                     <div class="order-panel-footer">
-                        
+
                         <!-- Print to Kitchen Toggle Switch (Restaurant only) -->
                         <div class="kitchen-toggle-row" id="kitchen-toggle-row" style="display:none;">
                             <span>Print to kitchen</span>
@@ -1219,12 +1359,14 @@
                         <!-- Order Action Buttons (Supports Waiter Add Order & Cashier Pay) -->
                         <div id="order-action-buttons-wrap" style="display:flex; flex-direction:column; gap:8px;">
                             <!-- Huge Blue Action Button (Pic 2) -->
-                            <button class="place-order-btn" type="button" id="btn-place-order" onclick="openPaymentModal()">
+                            <button class="place-order-btn" type="button" id="btn-place-order"
+                                onclick="openPaymentModal()">
                                 <span>Place order</span>
                             </button>
 
                             <!-- Waiter "Send to Kitchen & Save Order" button (shown when can_sell is 0 but can_add_order is 1) -->
-                            <button class="place-order-btn" type="button" id="btn-waiter-send-kitchen" style="display:none; background:#10b981;" onclick="executeWaiterSendOrder()">
+                            <button class="place-order-btn" type="button" id="btn-waiter-send-kitchen"
+                                style="display:none; background:#10b981;" onclick="executeWaiterSendOrder()">
                                 <i class="fa-solid fa-bell-concierge"></i>
                                 <span>Send to Kitchen (Token)</span>
                             </button>
@@ -1236,7 +1378,9 @@
                 <button type="button" class="pos-expand-cart-btn" id="btn-expand-cart" onclick="expandCheckoutPanel()">
                     <i class="fa-solid fa-cart-shopping"></i>
                     <span>Show Cart (<span id="expand-cart-count">0</span>)</span>
-                    <span id="expand-cart-total" style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:12px; font-size:0.8rem;">0 Sh</span>
+                    <span id="expand-cart-total"
+                        style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:12px; font-size:0.8rem;">0
+                        Sh</span>
                 </button>
 
             </div>
@@ -1264,16 +1408,21 @@
             <div style="margin-bottom:16px;">
                 <label class="field-label">Payment Method</label>
                 <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-top:6px;">
-                    <button type="button" class="cat-pill-btn active" id="pay-method-cash" onclick="setPaymentMethod('CASH', this)">Cash</button>
-                    <button type="button" class="cat-pill-btn" id="pay-method-momo" onclick="setPaymentMethod('MOMO', this)">Mobile Money</button>
-                    <button type="button" class="cat-pill-btn" id="pay-method-card" onclick="setPaymentMethod('CARD', this)">Visa / Card</button>
-                    <button type="button" class="cat-pill-btn" id="pay-method-split" onclick="setPaymentMethod('SPLIT', this)">Split Pay</button>
+                    <button type="button" class="cat-pill-btn active" id="pay-method-cash"
+                        onclick="setPaymentMethod('CASH', this)">Cash</button>
+                    <button type="button" class="cat-pill-btn" id="pay-method-momo"
+                        onclick="setPaymentMethod('MOMO', this)">Mobile Money</button>
+                    <button type="button" class="cat-pill-btn" id="pay-method-card"
+                        onclick="setPaymentMethod('CARD', this)">Visa / Card</button>
+                    <button type="button" class="cat-pill-btn" id="pay-method-split"
+                        onclick="setPaymentMethod('SPLIT', this)">Split Pay</button>
                 </div>
             </div>
 
             <div class="form-field" style="margin-bottom:14px;">
                 <label class="field-label">Amount Tendered</label>
-                <input type="number" id="pay-tendered-input" class="pos-input" style="font-size:1.2rem; font-weight:700;" oninput="calculateChange()">
+                <input type="number" id="pay-tendered-input" class="pos-input"
+                    style="font-size:1.2rem; font-weight:700;" oninput="calculateChange()">
             </div>
 
             <!-- Quick Cash Denomination Buttons -->
@@ -1287,7 +1436,8 @@
                 <button type="button" class="cat-pill-btn" onclick="setExactTender()">Exact</button>
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
                 <span style="font-weight:600; color:#475569;">Change to return:</span>
                 <span style="font-size:1.3rem; font-weight:800; color:#10b981;" id="pay-change-display">0 Sh</span>
             </div>
@@ -1309,11 +1459,13 @@
             </div>
 
             <form onsubmit="handleCreateCategory(event)" style="display:flex; gap:10px; margin-bottom:20px;">
-                <input type="text" id="new-cat-name-input" class="pos-input" placeholder="New Category Name (e.g. Groceries)" required style="flex:1;">
+                <input type="text" id="new-cat-name-input" class="pos-input"
+                    placeholder="New Category Name (e.g. Groceries)" required style="flex:1;">
                 <button type="submit" class="header-upload-pill" style="padding:10px 16px;">+ Add</button>
             </form>
 
-            <div id="modal-categories-list" style="display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;">
+            <div id="modal-categories-list"
+                style="display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto;">
                 <!-- Populated dynamically -->
             </div>
         </div>
@@ -1333,7 +1485,8 @@
 
                 <div class="form-field" style="margin-bottom:12px;">
                     <label class="field-label">Product Name</label>
-                    <input type="text" id="prod-form-name" class="pos-input" placeholder="e.g. Buffalo Chicken Pizza" required>
+                    <input type="text" id="prod-form-name" class="pos-input" placeholder="e.g. Buffalo Chicken Pizza"
+                        required>
                 </div>
 
                 <div class="form-field" style="margin-bottom:12px;">
@@ -1344,13 +1497,17 @@
                 </div>
 
                 <!-- Unlimited / No Inventory Tracking Toggle -->
-                <div class="form-field" style="margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px;">
-                    <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; color:#0f172a; margin:0;">
+                <div class="form-field"
+                    style="margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px;">
+                    <label
+                        style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; color:#0f172a; margin:0;">
                         <span style="display:flex; align-items:center; gap:8px;">
                             <i class="fa-solid fa-infinity" style="color:var(--primary);"></i>
                             <span>Unlimited Stock (No Inventory Tracking)</span>
                         </span>
-                        <input type="checkbox" id="prod-form-no-tracking" onchange="toggleProductStockTracking(this.checked)" style="width:18px; height:18px; cursor:pointer; accent-color:var(--primary);">
+                        <input type="checkbox" id="prod-form-no-tracking"
+                            onchange="toggleProductStockTracking(this.checked)"
+                            style="width:18px; height:18px; cursor:pointer; accent-color:var(--primary);">
                     </label>
                     <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">
                         Enable for cooked meals, services, custom orders, or products that do not need stock management.
@@ -1366,7 +1523,8 @@
                         <label class="field-label">Stock Quantity</label>
                         <input type="number" id="prod-form-stock" class="pos-input" placeholder="100" min="0" required>
                     </div>
-                    <div id="prod-form-unlimited-badge" style="display:none; align-items:center; justify-content:center; background:#f0fdf4; border:1px dashed #86efac; border-radius:8px; padding:10px; color:#16a34a; font-weight:700; font-size:0.85rem; gap:6px;">
+                    <div id="prod-form-unlimited-badge"
+                        style="display:none; align-items:center; justify-content:center; background:#f0fdf4; border:1px dashed #86efac; border-radius:8px; padding:10px; color:#16a34a; font-weight:700; font-size:0.85rem; gap:6px;">
                         <i class="fa-solid fa-infinity"></i> Unlimited Stock
                     </div>
                 </div>
@@ -1391,7 +1549,8 @@
     <div class="pos-modal-overlay" id="return-modal">
         <div class="pos-modal-box">
             <div class="pos-modal-header">
-                <h3 class="pos-modal-title"><i class="fa-solid fa-arrow-rotate-left"></i> Process Return &amp; Refund</h3>
+                <h3 class="pos-modal-title"><i class="fa-solid fa-arrow-rotate-left"></i> Process Return &amp; Refund
+                </h3>
                 <button class="pos-modal-close" onclick="closeModal('return-modal')">&times;</button>
             </div>
 
@@ -1403,7 +1562,8 @@
 
                 <div class="form-field" style="margin-bottom:12px;">
                     <label class="field-label">Returned Product Name</label>
-                    <input type="text" id="return-prod-name" class="pos-input" placeholder="e.g. Buffalo Chicken Pizza" required>
+                    <input type="text" id="return-prod-name" class="pos-input" placeholder="e.g. Buffalo Chicken Pizza"
+                        required>
                 </div>
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
@@ -1413,7 +1573,8 @@
                     </div>
                     <div>
                         <label class="field-label">Refund Amount</label>
-                        <input type="number" id="return-refund-amt" class="pos-input" placeholder="8000" min="0" required>
+                        <input type="number" id="return-refund-amt" class="pos-input" placeholder="8000" min="0"
+                            required>
                     </div>
                 </div>
 
@@ -1428,10 +1589,12 @@
 
                 <div class="form-field" style="margin-bottom:20px;">
                     <label class="field-label">Reason for Return</label>
-                    <input type="text" id="return-reason" class="pos-input" placeholder="e.g. Expired / Wrong Item / Damaged" required>
+                    <input type="text" id="return-reason" class="pos-input"
+                        placeholder="e.g. Expired / Wrong Item / Damaged" required>
                 </div>
 
-                <button type="submit" class="place-order-btn" style="background:#e11d48;">Issue Refund &amp; Restock Item</button>
+                <button type="submit" class="place-order-btn" style="background:#e11d48;">Issue Refund &amp; Restock
+                    Item</button>
             </form>
         </div>
     </div>
@@ -1441,7 +1604,8 @@
     <div class="pos-modal-overlay" id="company-modal">
         <div class="pos-modal-box" style="max-width:680px;">
             <div class="pos-modal-header">
-                <h3 class="pos-modal-title"><i class="fa-solid fa-building"></i> Add New Company (Independent Database)</h3>
+                <h3 class="pos-modal-title"><i class="fa-solid fa-building"></i> Add New Company (Independent Database)
+                </h3>
                 <button class="pos-modal-close" onclick="closeModal('company-modal')">&times;</button>
             </div>
 
@@ -1449,11 +1613,13 @@
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
                     <div>
                         <label class="field-label">Company Name (e.g. Josam Shoppers)</label>
-                        <input type="text" id="new-comp-name" class="pos-input" placeholder="Josam Shoppers" required oninput="autoSuggestPrefix(this.value)">
+                        <input type="text" id="new-comp-name" class="pos-input" placeholder="Josam Shoppers" required
+                            oninput="autoSuggestPrefix(this.value)">
                     </div>
                     <div>
                         <label class="field-label">Database Prefix (e.g. JOSAM)</label>
-                        <input type="text" id="new-comp-prefix" class="pos-input" placeholder="JOSAM" required uppercase maxlength="8">
+                        <input type="text" id="new-comp-prefix" class="pos-input" placeholder="JOSAM" required uppercase
+                            maxlength="8">
                     </div>
                 </div>
 
@@ -1488,21 +1654,26 @@
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
                     <div>
                         <label class="field-label">Theme Primary Color</label>
-                        <input type="color" id="new-comp-col-primary" value="#10b981" style="width:100%; height:38px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">
+                        <input type="color" id="new-comp-col-primary" value="#10b981"
+                            style="width:100%; height:38px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">
                     </div>
                     <div>
                         <label class="field-label">Theme Accent Color</label>
-                        <input type="color" id="new-comp-col-accent" value="#f59e0b" style="width:100%; height:38px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">
+                        <input type="color" id="new-comp-col-accent" value="#f59e0b"
+                            style="width:100%; height:38px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">
                     </div>
                     <div>
                         <label class="field-label">Sidebar Dark Color</label>
-                        <input type="color" id="new-comp-col-sidebar" value="#0f172a" style="width:100%; height:38px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">
+                        <input type="color" id="new-comp-col-sidebar" value="#0f172a"
+                            style="width:100%; height:38px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">
                     </div>
                 </div>
 
                 <!-- Tab Permissions for Company (Hides Pending for Supermarket) -->
-                <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
-                    <label class="field-label" style="margin-bottom:8px; display:block;">Visible Tabs for this Business (Tech can customise / hide tabs):</label>
+                <div
+                    style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
+                    <label class="field-label" style="margin-bottom:8px; display:block;">Visible Tabs for this Business
+                        (Tech can customise / hide tabs):</label>
                     <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; font-size:0.85rem;">
                         <label><input type="checkbox" id="tab-chk-register" checked> Register</label>
                         <label><input type="checkbox" id="tab-chk-orders" checked> Orders</label>
@@ -1529,7 +1700,8 @@
                     </div>
                     <div>
                         <label class="field-label">Admin Email</label>
-                        <input type="email" id="new-comp-admin-email" class="pos-input" placeholder="admin@josam.pos" required>
+                        <input type="email" id="new-comp-admin-email" class="pos-input" placeholder="admin@josam.pos"
+                            required>
                     </div>
                     <div>
                         <label class="field-label">Set Password</label>
@@ -1556,13 +1728,16 @@
 
             <form onsubmit="handleSaveCustomRole(event)">
                 <div class="form-field" style="margin-bottom:14px;">
-                    <label class="field-label">Role Title (Type any custom role name, e.g. Supervisor, Cashier, Attendant)</label>
+                    <label class="field-label">Role Title (Type any custom role name, e.g. Supervisor, Cashier,
+                        Attendant)</label>
                     <input type="text" id="role-form-name" class="pos-input" placeholder="e.g. Attendants" required>
                 </div>
 
                 <!-- Tab Access -->
-                <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:14px;">
-                    <label class="field-label" style="margin-bottom:8px; display:block; font-weight:700;">Tabs This Role Can See:</label>
+                <div
+                    style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:14px;">
+                    <label class="field-label" style="margin-bottom:8px; display:block; font-weight:700;">Tabs This Role
+                        Can See:</label>
                     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; font-size:0.85rem;">
                         <label><input type="checkbox" id="role-tab-register" checked> Register</label>
                         <label><input type="checkbox" id="role-tab-orders" checked> Orders</label>
@@ -1583,12 +1758,16 @@
                 </div>
 
                 <!-- Granular Capabilities -->
-                <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:20px;">
-                    <label class="field-label" style="margin-bottom:8px; display:block; font-weight:700;">Granular Permissions (Customise to the small bits):</label>
+                <div
+                    style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:20px;">
+                    <label class="field-label" style="margin-bottom:8px; display:block; font-weight:700;">Granular
+                        Permissions (Customise to the small bits):</label>
                     <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; font-size:0.85rem;">
                         <label><input type="checkbox" id="role-act-sell" checked> Can Ring Up Sales / Checkout</label>
-                        <label><input type="checkbox" id="role-act-add-order" checked> Can Add / Place Orders (e.g. Waiter)</label>
-                        <label><input type="checkbox" id="role-act-view-inv" checked> Can View Inventory Levels (Supervisor)</label>
+                        <label><input type="checkbox" id="role-act-add-order" checked> Can Add / Place Orders (e.g.
+                            Waiter)</label>
+                        <label><input type="checkbox" id="role-act-view-inv" checked> Can View Inventory Levels
+                            (Supervisor)</label>
                         <label><input type="checkbox" id="role-act-add-inv"> Can Add New Inventory / Edit Items</label>
                         <label><input type="checkbox" id="role-act-reduce-inv"> Can Adjust / Reduce Stock</label>
                         <label><input type="checkbox" id="role-act-prices"> Can Modify Product Prices</label>
@@ -1600,8 +1779,10 @@
                         <label><input type="checkbox" id="role-act-settings"> Can Edit Store Settings</label>
                         <label><input type="checkbox" id="role-act-invoices"> Can Issue &amp; Manage Invoices</label>
                         <label><input type="checkbox" id="role-act-kitchen"> Can Manage Kitchen Orders / Tokens</label>
-                        <label><input type="checkbox" id="role-act-debtors"> Can Manage Debtors &amp; Collect Debts</label>
-                        <label><input type="checkbox" id="role-act-creditors"> Can Manage Creditors &amp; Pay Suppliers</label>
+                        <label><input type="checkbox" id="role-act-debtors"> Can Manage Debtors &amp; Collect
+                            Debts</label>
+                        <label><input type="checkbox" id="role-act-creditors"> Can Manage Creditors &amp; Pay
+                            Suppliers</label>
                     </div>
                 </div>
 
@@ -1642,7 +1823,8 @@
     <div class="pos-modal-overlay" id="debtor-modal">
         <div class="pos-modal-box">
             <div class="pos-modal-header">
-                <h3 class="pos-modal-title"><i class="fa-solid fa-hand-holding-dollar"></i> Add Customer Debt Record</h3>
+                <h3 class="pos-modal-title"><i class="fa-solid fa-hand-holding-dollar"></i> Add Customer Debt Record
+                </h3>
                 <button class="pos-modal-close" onclick="closeModal('debtor-modal')">&times;</button>
             </div>
 
@@ -1658,7 +1840,8 @@
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
                     <div>
                         <label class="field-label">Total Debt Amount</label>
-                        <input type="number" id="debtor-form-total" class="pos-input" placeholder="50000" min="0" required>
+                        <input type="number" id="debtor-form-total" class="pos-input" placeholder="50000" min="0"
+                            required>
                     </div>
                     <div>
                         <label class="field-label">Amount Paid</label>
@@ -1688,15 +1871,18 @@
                 <div style="margin-bottom:14px;">
                     <div style="font-size:0.85rem; color:#64748b;">Customer</div>
                     <div style="font-size:1.15rem; font-weight:700; color:#0f172a;" id="pay-debtor-name-display">—</div>
-                    <div style="font-size:0.85rem; color:#e11d48; margin-top:2px;">Current Balance: <span id="pay-debtor-balance-display">0 Sh</span></div>
+                    <div style="font-size:0.85rem; color:#e11d48; margin-top:2px;">Current Balance: <span
+                            id="pay-debtor-balance-display">0 Sh</span></div>
                 </div>
                 <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Amount Being Paid</label>
-                    <input type="number" id="pay-debtor-amount" class="pos-input" style="font-size:1.2rem; font-weight:700;" min="1" required>
+                    <input type="number" id="pay-debtor-amount" class="pos-input"
+                        style="font-size:1.2rem; font-weight:700;" min="1" required>
                 </div>
                 <div class="form-field" style="margin-bottom:20px;">
                     <label class="field-label">Notes (Optional)</label>
-                    <input type="text" id="pay-debtor-note" class="pos-input" placeholder="e.g. Paid in cash at counter">
+                    <input type="text" id="pay-debtor-note" class="pos-input"
+                        placeholder="e.g. Paid in cash at counter">
                 </div>
                 <button type="submit" class="place-order-btn" style="background:#10b981;">Confirm Debt Payment</button>
             </form>
@@ -1715,7 +1901,8 @@
             <form onsubmit="handleSaveCreditor(event)">
                 <div class="form-field" style="margin-bottom:12px;">
                     <label class="field-label">Supplier / Creditor Name</label>
-                    <input type="text" id="creditor-form-name" class="pos-input" placeholder="e.g. Mukwano Industries" required>
+                    <input type="text" id="creditor-form-name" class="pos-input" placeholder="e.g. Mukwano Industries"
+                        required>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
                     <div>
@@ -1734,7 +1921,8 @@
                     </div>
                     <div>
                         <label class="field-label">Total Bill Amount</label>
-                        <input type="number" id="creditor-form-total" class="pos-input" placeholder="150000" min="0" required>
+                        <input type="number" id="creditor-form-total" class="pos-input" placeholder="150000" min="0"
+                            required>
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
@@ -1757,7 +1945,8 @@
     <div class="pos-modal-overlay" id="pay-creditor-modal">
         <div class="pos-modal-box">
             <div class="pos-modal-header">
-                <h3 class="pos-modal-title"><i class="fa-solid fa-money-bill-transfer"></i> Record Payment to Supplier</h3>
+                <h3 class="pos-modal-title"><i class="fa-solid fa-money-bill-transfer"></i> Record Payment to Supplier
+                </h3>
                 <button class="pos-modal-close" onclick="closeModal('pay-creditor-modal')">&times;</button>
             </div>
 
@@ -1765,18 +1954,23 @@
                 <input type="hidden" id="pay-creditor-id">
                 <div style="margin-bottom:14px;">
                     <div style="font-size:0.85rem; color:#64748b;">Supplier</div>
-                    <div style="font-size:1.15rem; font-weight:700; color:#0f172a;" id="pay-creditor-name-display">—</div>
-                    <div style="font-size:0.85rem; color:#e11d48; margin-top:2px;">Owed Balance: <span id="pay-creditor-balance-display">0 Sh</span></div>
+                    <div style="font-size:1.15rem; font-weight:700; color:#0f172a;" id="pay-creditor-name-display">—
+                    </div>
+                    <div style="font-size:0.85rem; color:#e11d48; margin-top:2px;">Owed Balance: <span
+                            id="pay-creditor-balance-display">0 Sh</span></div>
                 </div>
                 <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Payment Amount</label>
-                    <input type="number" id="pay-creditor-amount" class="pos-input" style="font-size:1.2rem; font-weight:700;" min="1" required>
+                    <input type="number" id="pay-creditor-amount" class="pos-input"
+                        style="font-size:1.2rem; font-weight:700;" min="1" required>
                 </div>
                 <div class="form-field" style="margin-bottom:20px;">
                     <label class="field-label">Payment Reference / Note</label>
-                    <input type="text" id="pay-creditor-note" class="pos-input" placeholder="e.g. Cheque / Cash voucher #12">
+                    <input type="text" id="pay-creditor-note" class="pos-input"
+                        placeholder="e.g. Cheque / Cash voucher #12">
                 </div>
-                <button type="submit" class="place-order-btn" style="background:#10b981;">Confirm Supplier Payment</button>
+                <button type="submit" class="place-order-btn" style="background:#10b981;">Confirm Supplier
+                    Payment</button>
             </form>
         </div>
     </div>
@@ -1786,19 +1980,22 @@
     <div class="pos-modal-overlay" id="cash-in-modal">
         <div class="pos-modal-box">
             <div class="pos-modal-header">
-                <h3 class="pos-modal-title"><i class="fa-solid fa-arrow-down-left"></i> Record Cash In / Deposit Float</h3>
+                <h3 class="pos-modal-title"><i class="fa-solid fa-arrow-down-left"></i> Record Cash In / Deposit Float
+                </h3>
                 <button class="pos-modal-close" onclick="closeModal('cash-in-modal')">&times;</button>
             </div>
 
             <form onsubmit="handleSaveCashIn(event)">
                 <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Deposit Amount</label>
-                    <input type="number" id="cash-in-amount" class="pos-input" style="font-size:1.25rem; font-weight:800;" placeholder="50000" min="1" required>
+                    <input type="number" id="cash-in-amount" class="pos-input"
+                        style="font-size:1.25rem; font-weight:800;" placeholder="50000" min="1" required>
                 </div>
 
                 <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Purpose / Description</label>
-                    <input type="text" id="cash-in-purpose" class="pos-input" placeholder="e.g. Morning Float, Till Addition, Vault Injection" required>
+                    <input type="text" id="cash-in-purpose" class="pos-input"
+                        placeholder="e.g. Morning Float, Till Addition, Vault Injection" required>
                 </div>
 
                 <div class="form-field" style="margin-bottom:20px;">
@@ -1825,17 +2022,20 @@
             <form onsubmit="handleSaveExpense(event)">
                 <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Expense Amount</label>
-                    <input type="number" id="expense-amount" class="pos-input" style="font-size:1.25rem; font-weight:800;" placeholder="20000" min="1" required>
+                    <input type="number" id="expense-amount" class="pos-input"
+                        style="font-size:1.25rem; font-weight:800;" placeholder="20000" min="1" required>
                 </div>
 
                 <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Expense Description / Payee</label>
-                    <input type="text" id="expense-desc" class="pos-input" placeholder="e.g. Lunch for staff, Electricity tokens, Transport" required>
+                    <input type="text" id="expense-desc" class="pos-input"
+                        placeholder="e.g. Lunch for staff, Electricity tokens, Transport" required>
                 </div>
 
                 <div class="form-field" style="margin-bottom:20px;">
                     <label class="field-label">Category / Note (Optional)</label>
-                    <input type="text" id="expense-category" class="pos-input" placeholder="e.g. Utilities, Operational, Maintenance">
+                    <input type="text" id="expense-category" class="pos-input"
+                        placeholder="e.g. Utilities, Operational, Maintenance">
                 </div>
 
                 <button type="submit" class="place-order-btn" style="background:#ef4444;">
@@ -1855,7 +2055,8 @@
             </div>
 
             <form onsubmit="handleSaveCloseShift(event)">
-                <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
+                <div
+                    style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.88rem;">
                         <span style="color:#64748b;">Expected Cash in Drawer:</span>
                         <strong id="close-shift-expected-val" style="color:#0f172a;">0 Sh</strong>
@@ -1864,7 +2065,8 @@
 
                 <div class="form-field" style="margin-bottom:20px;">
                     <label class="field-label">Counted Physical Cash in Drawer</label>
-                    <input type="number" id="close-shift-counted" class="pos-input" style="font-size:1.3rem; font-weight:800;" placeholder="Enter counted amount" min="0" required>
+                    <input type="number" id="close-shift-counted" class="pos-input"
+                        style="font-size:1.3rem; font-weight:800;" placeholder="Enter counted amount" min="0" required>
                 </div>
 
                 <button type="submit" class="place-order-btn" style="background:#0f172a;">
@@ -1884,7 +2086,8 @@
             </div>
 
             <!-- Thermal Receipt Design Preview -->
-            <div id="receipt-preview-content" style="background:#fff; border:1px dashed #cbd5e1; border-radius:8px; padding:20px; font-family:'Courier New', Courier, monospace; color:#1e293b; font-size:0.88rem; line-height:1.45;">
+            <div id="receipt-preview-content"
+                style="background:#fff; border:1px dashed #cbd5e1; border-radius:8px; padding:20px; font-family:'Courier New', Courier, monospace; color:#1e293b; font-size:0.88rem; line-height:1.45;">
                 <div style="text-align:center; padding:20px; color:#94a3b8;">Loading receipt details...</div>
             </div>
 
@@ -1892,7 +2095,8 @@
                 <button type="button" class="place-order-btn" style="flex:1;" onclick="printPreviewedReceipt()">
                     <i class="fa-solid fa-print"></i> Print Receipt
                 </button>
-                <button type="button" class="header-idle-btn" style="padding:10px 16px;" onclick="closeModal('view-receipt-modal')">
+                <button type="button" class="header-idle-btn" style="padding:10px 16px;"
+                    onclick="closeModal('view-receipt-modal')">
                     Close
                 </button>
             </div>
@@ -1905,21 +2109,24 @@
         <div class="pos-printer-machine-card">
             <div class="pos-printer-head">
                 <span class="pos-printer-led"></span>
-                <span style="font-size:0.7rem; font-weight:700; color:#94a3b8; letter-spacing:1px;">JOMISH THERMAL</span>
+                <span style="font-size:0.7rem; font-weight:700; color:#94a3b8; letter-spacing:1px;">JOMISH
+                    THERMAL</span>
                 <span class="pos-printer-led blue"></span>
                 <div class="pos-printer-head-slot"></div>
             </div>
 
             <div class="pos-paper-viewport">
                 <div class="pos-printing-paper" id="pos-anim-paper-content">
-                    <div style="text-align:center; font-weight:800; border-bottom:1px dashed #cbd5e1; padding-bottom:4px; margin-bottom:4px;" id="anim-receipt-header">
+                    <div style="text-align:center; font-weight:800; border-bottom:1px dashed #cbd5e1; padding-bottom:4px; margin-bottom:4px;"
+                        id="anim-receipt-header">
                         JOMISH POS
                     </div>
                     <div style="font-size:7px; color:#64748b;" id="anim-receipt-meta">
                         #RCPT-001<br>
                         Printing...
                     </div>
-                    <div style="margin:4px 0; border-top:1px dashed #e2e8f0; border-bottom:1px dashed #e2e8f0; padding:2px 0;">
+                    <div
+                        style="margin:4px 0; border-top:1px dashed #e2e8f0; border-bottom:1px dashed #e2e8f0; padding:2px 0;">
                         ================
                     </div>
                     <div style="text-align:right; font-weight:700;" id="anim-receipt-total">
@@ -1939,4 +2146,5 @@
     <!-- Application Script -->
     <script src="pos-app.js?v=2"></script>
 </body>
+
 </html>

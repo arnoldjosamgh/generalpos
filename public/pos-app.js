@@ -7,16 +7,16 @@
 let currentUser = null;
 let userPermissions = {};
 let companyData = {
-    name: 'iGourd Demo Restaurant',
+    name: 'Jomish POS Supermarket & Store',
     prefix: 'IGOURD',
-    business_type: 'restaurant',
+    business_type: 'supermarket',
     location: 'Kampala, Uganda',
     currency: 'Sh',
     logo_url: 'favicon.png',
     theme_color: '#0284c7',
     theme_accent: '#f59e0b',
     theme_sidebar: '#0f172a',
-    enabled_tabs: ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'settings']
+    enabled_tabs: ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'settings']
 };
 
 let allProducts = [];
@@ -138,8 +138,8 @@ function applyCompanyBranding() {
     }
 
     // 3. Tab Visibility (e.g. Hide 'Pending' tab for Supermarkets!)
-    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'settings'];
-    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'settings'];
+    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'settings'];
+    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'settings'];
     tabs.forEach(tab => {
         const btn = document.getElementById(`nav-btn-${tab}`);
         if (btn) {
@@ -190,6 +190,10 @@ function enforceRolePermissions() {
         'inventory': perms.can_see_inventory === 1,
         'shift': perms.can_see_shift !== 0,
         'returns': perms.can_see_returns === 1,
+        'invoice': perms.can_see_invoice !== 0,
+        'kitchen': perms.can_see_kitchen === 1,
+        'debtors': perms.can_see_debtors !== 0,
+        'creditors': perms.can_see_creditors !== 0,
         'settings': perms.can_see_settings === 1
     };
 
@@ -201,17 +205,37 @@ function enforceRolePermissions() {
     }
 
     // 2. Granular Action Capabilities
-    // Can Add Inventory
+    // Can Add / Edit Inventory
     const btnAddProd = document.getElementById('btn-add-product-perm');
-    if (btnAddProd && perms.can_add_inventory === 0) {
-        btnAddProd.style.display = 'none';
+    if (btnAddProd) {
+        if (perms.can_add_inventory === 0) {
+            btnAddProd.style.display = 'none';
+        } else {
+            btnAddProd.style.display = 'inline-flex';
+        }
     }
 
-    // Can Sell / Checkout
+    // Waiter & Cashier Ordering / Selling distinction:
+    // e.g. "waiter can add order but cant pay"
     const btnPlaceOrder = document.getElementById('btn-place-order');
-    if (btnPlaceOrder && perms.can_sell === 0) {
-        btnPlaceOrder.disabled = true;
-        btnPlaceOrder.title = 'Your role does not have permission to place orders.';
+    const btnWaiterSend = document.getElementById('btn-waiter-send-kitchen');
+
+    if (perms.can_sell === 0) {
+        // Cannot pay/sell directly
+        if (btnPlaceOrder) btnPlaceOrder.style.display = 'none';
+        // If they can add orders (e.g. Waiter), show Send to Kitchen / Save Order button!
+        if (perms.can_add_order !== 0 && btnWaiterSend) {
+            btnWaiterSend.style.display = 'flex';
+        }
+    } else {
+        // Can sell / pay
+        if (btnPlaceOrder) {
+            btnPlaceOrder.style.display = 'flex';
+            btnPlaceOrder.disabled = false;
+        }
+        if (btnWaiterSend) {
+            btnWaiterSend.style.display = 'none';
+        }
     }
 
     // If currently active tab was hidden, jump to first available visible tab
@@ -254,6 +278,10 @@ function switchNavTab(tabName) {
     if (tabName === 'inventory') loadProducts();
     if (tabName === 'shift') loadActiveShiftInfo();
     if (tabName === 'returns') loadReturnsList();
+    if (tabName === 'invoice') loadInvoicesList();
+    if (tabName === 'kitchen') loadKitchenTokens();
+    if (tabName === 'debtors') loadDebtorsList();
+    if (tabName === 'creditors') loadCreditorsList();
     if (tabName === 'settings') loadCustomRolesSettings();
     if (tabName === 'tech') loadTechCompanies();
 }
@@ -637,6 +665,54 @@ async function executeOrderCheckout() {
     } catch (e) {
         console.error('Checkout error:', e);
         alert('Order saved locally. Will sync once connection stabilizes.');
+        clearCurrentOrder();
+    }
+}
+
+// Waiter Send Order Controller (Waiters add orders with kitchen token, but don't pay)
+async function executeWaiterSendOrder() {
+    if (currentCart.length === 0) {
+        alert('Please select at least one item first.');
+        return;
+    }
+
+    const remarks = document.getElementById('order-remarks-input').value.trim();
+    const tableLabel = document.getElementById('order-station-label')?.textContent?.trim() || 'Floor 1';
+    const total = calculateCartTotal();
+
+    const payload = {
+        cart: currentCart,
+        total_amount: total,
+        amount_paid: 0,
+        payment_method: 'PENDING',
+        remarks: remarks,
+        print_kitchen: true,
+        save_order_only: true,
+        send_kitchen_only: true,
+        table_label: tableLabel
+    };
+
+    try {
+        const res = await fetch('/api/pos/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            alert('Failed to send order: ' + (data.error || 'Server error'));
+            return;
+        }
+
+        alert(`Order sent to kitchen successfully! Kitchen Token generated. Cashier will collect payment.`);
+        clearCurrentOrder();
+    } catch (e) {
+        console.error('Send order error:', e);
+        alert('Order saved and dispatched.');
         clearCurrentOrder();
     }
 }
@@ -1256,6 +1332,19 @@ function openEditRoleModal(roleName) {
     document.getElementById('role-act-users').checked = r.can_manage_users === 1;
     document.getElementById('role-act-settings').checked = r.can_edit_settings === 1;
 
+    // Additional granular flags
+    if (document.getElementById('role-tab-invoice')) document.getElementById('role-tab-invoice').checked = r.can_see_invoice !== 0;
+    if (document.getElementById('role-tab-kitchen')) document.getElementById('role-tab-kitchen').checked = r.can_see_kitchen === 1;
+    if (document.getElementById('role-tab-debtors')) document.getElementById('role-tab-debtors').checked = r.can_see_debtors !== 0;
+    if (document.getElementById('role-tab-creditors')) document.getElementById('role-tab-creditors').checked = r.can_see_creditors !== 0;
+
+    if (document.getElementById('role-act-add-order')) document.getElementById('role-act-add-order').checked = r.can_add_order !== 0;
+    if (document.getElementById('role-act-reduce-inv')) document.getElementById('role-act-reduce-inv').checked = r.can_reduce_inventory === 1;
+    if (document.getElementById('role-act-invoices')) document.getElementById('role-act-invoices').checked = r.can_manage_invoices === 1;
+    if (document.getElementById('role-act-kitchen')) document.getElementById('role-act-kitchen').checked = r.can_manage_kitchen === 1;
+    if (document.getElementById('role-act-debtors')) document.getElementById('role-act-debtors').checked = r.can_manage_debtors === 1;
+    if (document.getElementById('role-act-creditors')) document.getElementById('role-act-creditors').checked = r.can_manage_creditors === 1;
+
     openModal('role-modal');
 }
 
@@ -1275,9 +1364,15 @@ async function handleSaveCustomRole(e) {
         can_see_returns: document.getElementById('role-tab-returns').checked ? 1 : 0,
         can_see_settings: document.getElementById('role-tab-settings').checked ? 1 : 0,
         can_see_dashboard: document.getElementById('role-tab-dashboard').checked ? 1 : 0,
+        can_see_invoice: document.getElementById('role-tab-invoice')?.checked ? 1 : 0,
+        can_see_kitchen: document.getElementById('role-tab-kitchen')?.checked ? 1 : 0,
+        can_see_debtors: document.getElementById('role-tab-debtors')?.checked ? 1 : 0,
+        can_see_creditors: document.getElementById('role-tab-creditors')?.checked ? 1 : 0,
 
         can_sell: document.getElementById('role-act-sell').checked ? 1 : 0,
+        can_add_order: document.getElementById('role-act-add-order')?.checked ? 1 : 0,
         can_add_inventory: document.getElementById('role-act-add-inv').checked ? 1 : 0,
+        can_reduce_inventory: document.getElementById('role-act-reduce-inv')?.checked ? 1 : 0,
         can_view_inventory: document.getElementById('role-act-view-inv').checked ? 1 : 0,
         can_manage_prices: document.getElementById('role-act-prices').checked ? 1 : 0,
         can_give_discount: document.getElementById('role-act-discount').checked ? 1 : 0,
@@ -1285,7 +1380,11 @@ async function handleSaveCustomRole(e) {
         can_process_returns: document.getElementById('role-act-returns').checked ? 1 : 0,
         can_manage_shifts: document.getElementById('role-act-shifts').checked ? 1 : 0,
         can_manage_users: document.getElementById('role-act-users').checked ? 1 : 0,
-        can_edit_settings: document.getElementById('role-act-settings').checked ? 1 : 0
+        can_edit_settings: document.getElementById('role-act-settings').checked ? 1 : 0,
+        can_manage_invoices: document.getElementById('role-act-invoices')?.checked ? 1 : 0,
+        can_manage_kitchen: document.getElementById('role-act-kitchen')?.checked ? 1 : 0,
+        can_manage_debtors: document.getElementById('role-act-debtors')?.checked ? 1 : 0,
+        can_manage_creditors: document.getElementById('role-act-creditors')?.checked ? 1 : 0
     };
 
     try {
@@ -1429,6 +1528,10 @@ async function handleCreateNewCompany(e) {
     if (document.getElementById('tab-chk-inventory').checked) enabled_tabs.push('inventory');
     if (document.getElementById('tab-chk-shift').checked) enabled_tabs.push('shift');
     if (document.getElementById('tab-chk-returns').checked) enabled_tabs.push('returns');
+    if (document.getElementById('tab-chk-invoice')?.checked) enabled_tabs.push('invoice');
+    if (document.getElementById('tab-chk-kitchen')?.checked) enabled_tabs.push('kitchen');
+    if (document.getElementById('tab-chk-debtors')?.checked) enabled_tabs.push('debtors');
+    if (document.getElementById('tab-chk-creditors')?.checked) enabled_tabs.push('creditors');
     if (document.getElementById('tab-chk-settings').checked) enabled_tabs.push('settings');
 
     const payload = {
@@ -1517,6 +1620,462 @@ async function handleSaveScheduledPause(e) {
             closeModal('schedule-pause-modal');
             alert('Pause schedule saved.');
             await loadTechCompanies();
+        }
+    } catch (_) {}
+}
+
+// ============================================================================
+// TAB: INVOICES CONTROLLER
+// ============================================================================
+let allInvoicesList = [];
+
+async function loadInvoicesList() {
+    try {
+        const res = await fetch('/api/invoices', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            allInvoicesList = data.invoices || [];
+            renderInvoicesTable(allInvoicesList);
+        }
+    } catch (_) {}
+}
+
+function renderInvoicesTable(invoices) {
+    const tbody = document.getElementById('invoices-table-tbody');
+    if (!tbody) return;
+    if (!invoices || invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No invoices issued yet.</td></tr>';
+        return;
+    }
+
+    const curr = companyData.currency || 'Sh';
+    tbody.innerHTML = invoices.map(inv => {
+        const balance = Math.max(0, (inv.total_amount || 0) - (inv.amount_paid || 0));
+        const statusBadge = balance <= 0
+            ? '<span class="cat-pill-btn" style="background:#dcfce7; color:#10b981; font-size:0.75rem;">PAID</span>'
+            : '<span class="cat-pill-btn" style="background:#fee2e2; color:#ef4444; font-size:0.75rem;">UNPAID</span>';
+
+        return `
+            <tr>
+                <td><strong>#INV-${inv.invoice_number || inv.id}</strong></td>
+                <td>${new Date(inv.order_date).toLocaleString()}</td>
+                <td>${escapeHtml(inv.buyer_name || 'Customer')}</td>
+                <td>${escapeHtml(inv.buyer_phone || '—')}</td>
+                <td><strong>${Number(inv.total_amount || 0).toLocaleString()} ${curr}</strong></td>
+                <td>${Number(inv.amount_paid || 0).toLocaleString()} ${curr}</td>
+                <td><strong style="color:${balance > 0 ? '#e11d48' : '#10b981'};">${balance.toLocaleString()} ${curr}</strong></td>
+                <td>${statusBadge}</td>
+                <td>
+                    <button class="header-idle-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="reprintReceipt(${inv.id})">
+                        <i class="fa-solid fa-print"></i> Print
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterInvoicesList(q) {
+    const s = q.toLowerCase().trim();
+    if (!s) return renderInvoicesTable(allInvoicesList);
+    const filtered = allInvoicesList.filter(i =>
+        String(i.invoice_number || i.id).toLowerCase().includes(s) ||
+        (i.buyer_name || '').toLowerCase().includes(s) ||
+        (i.buyer_phone || '').toLowerCase().includes(s)
+    );
+    renderInvoicesTable(filtered);
+}
+
+function openCreateInvoiceModal() {
+    // Switch to register so staff can add items and checkout using INVOICE payment method
+    switchNavTab('register');
+    alert('Select products from the catalog, then click "Place Order" and choose "Split/Credit" or specify Invoice in Remarks.');
+}
+
+// ============================================================================
+// TAB: KITCHEN TOKENS CONTROLLER
+// ============================================================================
+let allKitchenTokens = [];
+let activeKitchenFilter = 'ALL';
+
+async function loadKitchenTokens() {
+    try {
+        const res = await fetch('/api/kitchen/tokens', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            allKitchenTokens = data.tokens || [];
+            renderKitchenTokens(allKitchenTokens);
+        }
+    } catch (_) {}
+}
+
+function renderKitchenTokens(tokens) {
+    const grid = document.getElementById('kitchen-tokens-grid');
+    if (!grid) return;
+
+    let filtered = tokens;
+    if (activeKitchenFilter !== 'ALL') {
+        filtered = filtered.filter(t => t.status === activeKitchenFilter);
+    }
+
+    if (!filtered || filtered.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:#64748b;">No kitchen tokens in this status.</div>';
+        return;
+    }
+
+    grid.innerHTML = filtered.map(t => {
+        let statusCol = '#f59e0b';
+        if (t.status === 'PREPARING') statusCol = '#0284c7';
+        if (t.status === 'READY') statusCol = '#10b981';
+        if (t.status === 'SERVED') statusCol = '#64748b';
+
+        return `
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:10px; margin-bottom:10px;">
+                    <div>
+                        <span style="font-size:1.4rem; font-weight:800; color:#0f172a;">${escapeHtml(t.token_code || '#' + t.token_number)}</span>
+                        <div style="font-size:0.75rem; color:#64748b;">${escapeHtml(t.table_label || 'Counter')} • ${escapeHtml(t.server_name || 'Staff')}</div>
+                    </div>
+                    <span class="cat-pill-btn" style="background:${statusCol}; color:#fff; font-size:0.75rem; font-weight:700;">${t.status}</span>
+                </div>
+                <div style="font-size:0.95rem; font-weight:600; color:#1e293b; margin-bottom:12px; line-height:1.4;">
+                    ${escapeHtml(t.items_summary || 'Order Items')}
+                </div>
+                ${t.notes ? `<div style="font-size:0.8rem; color:#d97706; margin-bottom:12px; background:#fffbeb; padding:6px 10px; border-radius:6px;"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(t.notes)}</div>` : ''}
+                <div style="display:flex; gap:8px;">
+                    ${t.status === 'PENDING' ? `<button class="header-upload-pill" style="flex:1; padding:6px; font-size:0.8rem; background:#0284c7;" onclick="updateKitchenTokenStatus(${t.id}, 'PREPARING')">Start Prep</button>` : ''}
+                    ${t.status === 'PREPARING' ? `<button class="header-upload-pill" style="flex:1; padding:6px; font-size:0.8rem; background:#10b981;" onclick="updateKitchenTokenStatus(${t.id}, 'READY')">Mark Ready</button>` : ''}
+                    ${t.status === 'READY' ? `<button class="header-upload-pill" style="flex:1; padding:6px; font-size:0.8rem; background:#0f172a;" onclick="updateKitchenTokenStatus(${t.id}, 'SERVED')">Mark Served</button>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function filterKitchenStatus(status, btn) {
+    activeKitchenFilter = status;
+    document.querySelectorAll('#view-pane-kitchen .cat-pill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderKitchenTokens(allKitchenTokens);
+}
+
+function filterKitchenTokens(q) {
+    const s = q.toLowerCase().trim();
+    if (!s) return renderKitchenTokens(allKitchenTokens);
+    const filtered = allKitchenTokens.filter(t =>
+        (t.token_code || '').toLowerCase().includes(s) ||
+        String(t.token_number).includes(s) ||
+        (t.items_summary || '').toLowerCase().includes(s) ||
+        (t.server_name || '').toLowerCase().includes(s) ||
+        (t.table_label || '').toLowerCase().includes(s)
+    );
+    renderKitchenTokens(filtered);
+}
+
+async function updateKitchenTokenStatus(id, newStatus) {
+    try {
+        await fetch(`/api/kitchen/tokens/${id}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+        await loadKitchenTokens();
+    } catch (_) {}
+}
+
+// ============================================================================
+// TAB: DEBTORS (Accounts Receivable) CONTROLLER
+// ============================================================================
+let allDebtorsList = [];
+
+async function loadDebtorsList() {
+    try {
+        const res = await fetch('/api/debtors', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            allDebtorsList = data.debtors || [];
+            renderDebtorsTable(allDebtorsList);
+        }
+    } catch (_) {}
+}
+
+function renderDebtorsTable(debtors) {
+    const tbody = document.getElementById('debtors-table-tbody');
+    if (!tbody) return;
+
+    const curr = companyData.currency || 'Sh';
+    let totalDebt = 0;
+
+    debtors.forEach(d => {
+        totalDebt += Math.max(0, parseFloat(d.balance) || 0);
+    });
+
+    const totAmtEl = document.getElementById('debtors-total-amount');
+    const totCountEl = document.getElementById('debtors-total-count');
+    if (totAmtEl) totAmtEl.textContent = `${totalDebt.toLocaleString()} ${curr}`;
+    if (totCountEl) totCountEl.textContent = debtors.length;
+
+    if (!debtors || debtors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">No debtors on record. All accounts clear!</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = debtors.map(d => {
+        const balance = Math.max(0, parseFloat(d.balance) || 0);
+        const statusBadge = balance <= 0
+            ? '<span class="cat-pill-btn" style="background:#dcfce7; color:#10b981; font-size:0.75rem;">CLEARED</span>'
+            : '<span class="cat-pill-btn" style="background:#fee2e2; color:#ef4444; font-size:0.75rem;">OWING</span>';
+
+        return `
+            <tr>
+                <td><strong>${escapeHtml(d.buyer_name || 'Customer')}</strong></td>
+                <td>${escapeHtml(d.buyer_phone || '—')}</td>
+                <td>${Number(d.total_amount || 0).toLocaleString()} ${curr}</td>
+                <td>${Number(d.amount_paid || 0).toLocaleString()} ${curr}</td>
+                <td><strong style="color:${balance > 0 ? '#e11d48' : '#10b981'};">${balance.toLocaleString()} ${curr}</strong></td>
+                <td>${d.promised_date || '—'}</td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${balance > 0 ? `
+                        <button class="header-upload-pill" style="padding:4px 8px; font-size:0.75rem; background:#10b981;" onclick="openPayDebtorModal('${escapeHtml(d.buyer_name)}', ${balance})">
+                            <i class="fa-solid fa-coins"></i> Record Pay
+                        </button>
+                    ` : '—'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterDebtorsList(q) {
+    const s = q.toLowerCase().trim();
+    if (!s) return renderDebtorsTable(allDebtorsList);
+    const filtered = allDebtorsList.filter(d =>
+        (d.buyer_name || '').toLowerCase().includes(s) ||
+        (d.buyer_phone || '').toLowerCase().includes(s)
+    );
+    renderDebtorsTable(filtered);
+}
+
+function openAddDebtorModal() {
+    openModal('debtor-modal');
+}
+
+async function handleSaveDebtor(e) {
+    e.preventDefault();
+    const buyer_name = document.getElementById('debtor-form-name').value.trim();
+    const buyer_phone = document.getElementById('debtor-form-phone').value.trim();
+    const total_amount = parseFloat(document.getElementById('debtor-form-total').value) || 0;
+    const amount_paid = parseFloat(document.getElementById('debtor-form-paid').value) || 0;
+    const promised_date = document.getElementById('debtor-form-due').value;
+
+    try {
+        const res = await fetch('/api/debtors', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ buyer_name, buyer_phone, total_amount, amount_paid, promised_date })
+        });
+        if (res.ok) {
+            closeModal('debtor-modal');
+            alert('Debtor registered successfully.');
+            await loadDebtorsList();
+        }
+    } catch (_) {}
+}
+
+function openPayDebtorModal(buyerName, balance) {
+    const curr = companyData.currency || 'Sh';
+    document.getElementById('pay-debtor-buyer-name').value = buyerName;
+    document.getElementById('pay-debtor-name-display').textContent = buyerName;
+    document.getElementById('pay-debtor-balance-display').textContent = `${balance.toLocaleString()} ${curr}`;
+    document.getElementById('pay-debtor-amount').value = balance;
+    openModal('pay-debtor-modal');
+}
+
+async function handleSaveDebtorPayment(e) {
+    e.preventDefault();
+    const buyer_name = document.getElementById('pay-debtor-buyer-name').value;
+    const amount_paid = parseFloat(document.getElementById('pay-debtor-amount').value) || 0;
+    const note = document.getElementById('pay-debtor-note').value.trim();
+
+    try {
+        const res = await fetch('/api/credits/pay', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ buyer_name, amount_paid, note })
+        });
+
+        if (res.ok) {
+            closeModal('pay-debtor-modal');
+            alert('Payment recorded successfully.');
+            await loadDebtorsList();
+            await loadActiveShiftInfo();
+        } else {
+            const d = await res.json();
+            alert('Error: ' + d.error);
+        }
+    } catch (_) {}
+}
+
+// ============================================================================
+// TAB: CREDITORS (Suppliers / Accounts Payable) CONTROLLER
+// ============================================================================
+let allCreditorsList = [];
+
+async function loadCreditorsList() {
+    try {
+        const res = await fetch('/api/creditors', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            allCreditorsList = data.creditors || [];
+            renderCreditorsTable(allCreditorsList);
+        }
+    } catch (_) {}
+}
+
+function renderCreditorsTable(creditors) {
+    const tbody = document.getElementById('creditors-table-tbody');
+    if (!tbody) return;
+
+    const curr = companyData.currency || 'Sh';
+    let totalOwed = 0;
+
+    creditors.forEach(c => {
+        totalOwed += Math.max(0, parseFloat(c.balance) || 0);
+    });
+
+    const totAmtEl = document.getElementById('creditors-total-amount');
+    const totCountEl = document.getElementById('creditors-total-count');
+    if (totAmtEl) totAmtEl.textContent = `${totalOwed.toLocaleString()} ${curr}`;
+    if (totCountEl) totCountEl.textContent = creditors.length;
+
+    if (!creditors || creditors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No creditor / supplier bills on file.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = creditors.map(c => {
+        const balance = Math.max(0, parseFloat(c.balance) || 0);
+        const statusBadge = balance <= 0
+            ? '<span class="cat-pill-btn" style="background:#dcfce7; color:#10b981; font-size:0.75rem;">PAID</span>'
+            : '<span class="cat-pill-btn" style="background:#fee2e2; color:#ef4444; font-size:0.75rem;">PENDING</span>';
+
+        return `
+            <tr>
+                <td><strong>${escapeHtml(c.supplier_name)}</strong></td>
+                <td>${escapeHtml(c.contact_person || '—')}</td>
+                <td>${escapeHtml(c.phone || '—')}</td>
+                <td><code>${escapeHtml(c.invoice_no || '—')}</code></td>
+                <td>${Number(c.total_amount || 0).toLocaleString()} ${curr}</td>
+                <td>${Number(c.amount_paid || 0).toLocaleString()} ${curr}</td>
+                <td><strong style="color:${balance > 0 ? '#e11d48' : '#10b981'};">${balance.toLocaleString()} ${curr}</strong></td>
+                <td>${c.due_date || '—'}</td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${balance > 0 ? `
+                        <button class="header-upload-pill" style="padding:4px 8px; font-size:0.75rem; background:#0f172a;" onclick="openPayCreditorModal(${c.id}, '${escapeHtml(c.supplier_name)}', ${balance})">
+                            <i class="fa-solid fa-money-bill"></i> Pay
+                        </button>
+                    ` : '—'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterCreditorsList(q) {
+    const s = q.toLowerCase().trim();
+    if (!s) return renderCreditorsTable(allCreditorsList);
+    const filtered = allCreditorsList.filter(c =>
+        (c.supplier_name || '').toLowerCase().includes(s) ||
+        (c.contact_person || '').toLowerCase().includes(s) ||
+        (c.phone || '').toLowerCase().includes(s) ||
+        (c.invoice_no || '').toLowerCase().includes(s)
+    );
+    renderCreditorsTable(filtered);
+}
+
+function openAddCreditorModal() {
+    openModal('creditor-modal');
+}
+
+async function handleSaveCreditor(e) {
+    e.preventDefault();
+    const supplier_name = document.getElementById('creditor-form-name').value.trim();
+    const contact_person = document.getElementById('creditor-form-contact').value.trim();
+    const phone = document.getElementById('creditor-form-phone').value.trim();
+    const invoice_no = document.getElementById('creditor-form-inv').value.trim();
+    const total_amount = parseFloat(document.getElementById('creditor-form-total').value) || 0;
+    const amount_paid = parseFloat(document.getElementById('creditor-form-paid').value) || 0;
+    const due_date = document.getElementById('creditor-form-due').value;
+
+    try {
+        const res = await fetch('/api/creditors', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ supplier_name, contact_person, phone, invoice_no, total_amount, amount_paid, due_date })
+        });
+        if (res.ok) {
+            closeModal('creditor-modal');
+            alert('Supplier bill recorded successfully.');
+            await loadCreditorsList();
+        }
+    } catch (_) {}
+}
+
+function openPayCreditorModal(id, supplierName, balance) {
+    const curr = companyData.currency || 'Sh';
+    document.getElementById('pay-creditor-id').value = id;
+    document.getElementById('pay-creditor-name-display').textContent = supplierName;
+    document.getElementById('pay-creditor-balance-display').textContent = `${balance.toLocaleString()} ${curr}`;
+    document.getElementById('pay-creditor-amount').value = balance;
+    openModal('pay-creditor-modal');
+}
+
+async function handleSaveCreditorPayment(e) {
+    e.preventDefault();
+    const creditor_id = document.getElementById('pay-creditor-id').value;
+    const amount_paid = parseFloat(document.getElementById('pay-creditor-amount').value) || 0;
+    const note = document.getElementById('pay-creditor-note').value.trim();
+
+    try {
+        const res = await fetch('/api/creditors/pay', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ creditor_id, amount_paid, note })
+        });
+
+        if (res.ok) {
+            closeModal('pay-creditor-modal');
+            alert('Supplier payment recorded successfully.');
+            await loadCreditorsList();
+            await loadActiveShiftInfo();
+        } else {
+            const d = await res.json();
+            alert('Error: ' + d.error);
         }
     } catch (_) {}
 }

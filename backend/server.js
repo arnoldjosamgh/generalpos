@@ -688,7 +688,8 @@ app.post("/api/login", async (req, res) => {
     if (isTech) {
       const techPerms = {
         can_see_register: 1, can_see_orders: 1, can_see_pending: 1, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 1, can_see_dashboard: 1, can_see_tech: 1,
-        can_sell: 1, can_add_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1
+        can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1,
+        can_sell: 1, can_add_order: 1, can_add_inventory: 1, can_reduce_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1, can_manage_invoices: 1, can_manage_kitchen: 1, can_manage_debtors: 1, can_manage_creditors: 1
       };
       const token = jwt.sign(
         { id: 9999, role: "TECH", name: techName, permissions: techPerms, prefix },
@@ -826,10 +827,16 @@ app.post("/api/login", async (req, res) => {
     can_see_returns: COALESCE(foundUser.can_see_returns, (roleConfig ? roleConfig.can_see_returns : 0)),
     can_see_settings: COALESCE(foundUser.can_see_settings, (roleConfig ? roleConfig.can_see_settings : 0)),
     can_see_dashboard: COALESCE(foundUser.can_see_dashboard, (roleConfig ? roleConfig.can_see_dashboard : 0)),
+    can_see_invoice: COALESCE(foundUser.can_see_invoice, (roleConfig ? roleConfig.can_see_invoice : 1)),
+    can_see_kitchen: COALESCE(foundUser.can_see_kitchen, (roleConfig ? roleConfig.can_see_kitchen : 1)),
+    can_see_debtors: COALESCE(foundUser.can_see_debtors, (roleConfig ? roleConfig.can_see_debtors : 1)),
+    can_see_creditors: COALESCE(foundUser.can_see_creditors, (roleConfig ? roleConfig.can_see_creditors : 1)),
 
     // Granular Actions
     can_sell: COALESCE(foundUser.can_sell, (roleConfig ? roleConfig.can_sell : 1)),
+    can_add_order: COALESCE(foundUser.can_add_order, (roleConfig ? roleConfig.can_add_order : 1)),
     can_add_inventory: COALESCE(foundUser.can_add_inventory, (roleConfig ? roleConfig.can_add_inventory : 0)),
+    can_reduce_inventory: COALESCE(foundUser.can_reduce_inventory, (roleConfig ? roleConfig.can_reduce_inventory : 0)),
     can_view_inventory: COALESCE(foundUser.can_view_inventory, (roleConfig ? roleConfig.can_view_inventory : 0)),
     can_manage_prices: COALESCE(foundUser.can_manage_prices, (roleConfig ? roleConfig.can_manage_prices : 0)),
     can_give_discount: COALESCE(foundUser.can_give_discount, (roleConfig ? roleConfig.can_give_discount : 0)),
@@ -839,6 +846,10 @@ app.post("/api/login", async (req, res) => {
     can_manage_users: COALESCE(foundUser.can_manage_users, (roleConfig ? roleConfig.can_manage_users : 0)),
     can_edit_settings: COALESCE(foundUser.can_edit_settings, (roleConfig ? roleConfig.can_edit_settings : 0)),
     can_manage_categories: COALESCE(foundUser.can_manage_categories, (roleConfig ? roleConfig.can_manage_categories : 0)),
+    can_manage_invoices: COALESCE(foundUser.can_manage_invoices, (roleConfig ? roleConfig.can_manage_invoices : 0)),
+    can_manage_kitchen: COALESCE(foundUser.can_manage_kitchen, (roleConfig ? roleConfig.can_manage_kitchen : 1)),
+    can_manage_debtors: COALESCE(foundUser.can_manage_debtors, (roleConfig ? roleConfig.can_manage_debtors : 0)),
+    can_manage_creditors: COALESCE(foundUser.can_manage_creditors, (roleConfig ? roleConfig.can_manage_creditors : 0)),
 
     // Legacy module fallbacks
     can_see_hr: COALESCE(foundUser.can_see_hr, 0),
@@ -847,7 +858,7 @@ app.post("/api/login", async (req, res) => {
     can_see_pos: 1
   };
 
-  let enabledTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "settings"];
+  let enabledTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "settings"];
   if (companyMeta && companyMeta.enabled_tabs) {
     try {
       enabledTabs = typeof companyMeta.enabled_tabs === "string" ? JSON.parse(companyMeta.enabled_tabs) : companyMeta.enabled_tabs;
@@ -1065,8 +1076,14 @@ app.post(
       can_see_returns,
       can_see_settings,
       can_see_dashboard,
+      can_see_invoice,
+      can_see_kitchen,
+      can_see_debtors,
+      can_see_creditors,
       can_sell,
+      can_add_order,
       can_add_inventory,
+      can_reduce_inventory,
       can_view_inventory,
       can_manage_prices,
       can_give_discount,
@@ -1075,7 +1092,11 @@ app.post(
       can_manage_shifts,
       can_manage_users,
       can_edit_settings,
-      can_manage_categories
+      can_manage_categories,
+      can_manage_invoices,
+      can_manage_kitchen,
+      can_manage_debtors,
+      can_manage_creditors
     } = req.body;
 
     if (!role_name || !role_name.trim()) {
@@ -1087,9 +1108,11 @@ app.post(
         `INSERT INTO roles_config (
           role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
           can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-          can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount,
-          can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+          can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+          can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
+          can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(role_name) DO UPDATE SET
           can_see_register=excluded.can_see_register,
           can_see_orders=excluded.can_see_orders,
@@ -1100,8 +1123,14 @@ app.post(
           can_see_returns=excluded.can_see_returns,
           can_see_settings=excluded.can_see_settings,
           can_see_dashboard=excluded.can_see_dashboard,
+          can_see_invoice=excluded.can_see_invoice,
+          can_see_kitchen=excluded.can_see_kitchen,
+          can_see_debtors=excluded.can_see_debtors,
+          can_see_creditors=excluded.can_see_creditors,
           can_sell=excluded.can_sell,
+          can_add_order=excluded.can_add_order,
           can_add_inventory=excluded.can_add_inventory,
+          can_reduce_inventory=excluded.can_reduce_inventory,
           can_view_inventory=excluded.can_view_inventory,
           can_manage_prices=excluded.can_manage_prices,
           can_give_discount=excluded.can_give_discount,
@@ -1110,7 +1139,11 @@ app.post(
           can_manage_shifts=excluded.can_manage_shifts,
           can_manage_users=excluded.can_manage_users,
           can_edit_settings=excluded.can_edit_settings,
-          can_manage_categories=excluded.can_manage_categories`,
+          can_manage_categories=excluded.can_manage_categories,
+          can_manage_invoices=excluded.can_manage_invoices,
+          can_manage_kitchen=excluded.can_manage_kitchen,
+          can_manage_debtors=excluded.can_manage_debtors,
+          can_manage_creditors=excluded.can_manage_creditors`,
         [
           role_name.trim(),
           can_see_register !== undefined ? can_see_register : 1,
@@ -1122,8 +1155,14 @@ app.post(
           can_see_returns !== undefined ? can_see_returns : 0,
           can_see_settings !== undefined ? can_see_settings : 0,
           can_see_dashboard !== undefined ? can_see_dashboard : 0,
+          can_see_invoice !== undefined ? can_see_invoice : 1,
+          can_see_kitchen !== undefined ? can_see_kitchen : 1,
+          can_see_debtors !== undefined ? can_see_debtors : 1,
+          can_see_creditors !== undefined ? can_see_creditors : 1,
           can_sell !== undefined ? can_sell : 1,
+          can_add_order !== undefined ? can_add_order : 1,
           can_add_inventory !== undefined ? can_add_inventory : 0,
+          can_reduce_inventory !== undefined ? can_reduce_inventory : 0,
           can_view_inventory !== undefined ? can_view_inventory : 0,
           can_manage_prices !== undefined ? can_manage_prices : 0,
           can_give_discount !== undefined ? can_give_discount : 0,
@@ -1132,7 +1171,11 @@ app.post(
           can_manage_shifts !== undefined ? can_manage_shifts : 0,
           can_manage_users !== undefined ? can_manage_users : 0,
           can_edit_settings !== undefined ? can_edit_settings : 0,
-          can_manage_categories !== undefined ? can_manage_categories : 0
+          can_manage_categories !== undefined ? can_manage_categories : 0,
+          can_manage_invoices !== undefined ? can_manage_invoices : 0,
+          can_manage_kitchen !== undefined ? can_manage_kitchen : 1,
+          can_manage_debtors !== undefined ? can_manage_debtors : 0,
+          can_manage_creditors !== undefined ? can_manage_creditors : 0
         ],
         function(err) {
           if (err) return res.status(500).json({ error: err.message });
@@ -1331,8 +1374,10 @@ app.post("/api/system/initialize", async (req, res) => {
           db.run(
             `INSERT INTO employees (first_name, last_name, email, username, role, department, salary, password, employee_code, is_active,
               can_see_register, can_see_orders, can_see_pending, can_see_customer, can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-              can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount, can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)`,
+              can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+              can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount, can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
+              can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)`,
             [
               adminFullName.split(" ")[0] || "Admin",
               adminFullName.split(" ").slice(1).join(" ") || "User",
@@ -1357,27 +1402,42 @@ app.post("/api/system/initialize", async (req, res) => {
           rolesToSeed = custom_roles;
         } else {
           // Provide realistic configurable roles matching the requested scenario:
-          // Manager, Supervisor, Cashier, Attendants
+          // Manager, Supervisor, Cashier, Attendants, Waiter
           rolesToSeed = [
             {
               role_name: "Manager",
               can_see_register: 1, can_see_orders: 1, can_see_pending: tabs.includes("pending") ? 1 : 0, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 1, can_see_dashboard: 1,
-              can_sell: 1, can_add_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1
+              can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1,
+              can_sell: 1, can_add_order: 1, can_add_inventory: 1, can_reduce_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1,
+              can_manage_invoices: 1, can_manage_kitchen: 1, can_manage_debtors: 1, can_manage_creditors: 1
             },
             {
               role_name: "Supervisor",
               can_see_register: 1, can_see_orders: 1, can_see_pending: tabs.includes("pending") ? 1 : 0, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 0, can_see_dashboard: 0,
-              can_sell: 1, can_add_inventory: 0, can_view_inventory: 1, can_manage_prices: 0, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0
+              can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1,
+              can_sell: 1, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 1, can_manage_prices: 0, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
+              can_manage_invoices: 1, can_manage_kitchen: 1, can_manage_debtors: 1, can_manage_creditors: 0
             },
             {
               role_name: "Cashier",
               can_see_register: 1, can_see_orders: 1, can_see_pending: 0, can_see_customer: 1, can_see_inventory: 0, can_see_shift: 1, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
-              can_sell: 1, can_add_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0
+              can_see_invoice: 1, can_see_kitchen: 0, can_see_debtors: 1, can_see_creditors: 0,
+              can_sell: 1, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
+              can_manage_invoices: 0, can_manage_kitchen: 0, can_manage_debtors: 0, can_manage_creditors: 0
             },
             {
               role_name: "Attendants",
               can_see_register: 1, can_see_orders: 0, can_see_pending: 0, can_see_customer: 1, can_see_inventory: 0, can_see_shift: 0, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
-              can_sell: 1, can_add_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 0, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0
+              can_see_invoice: 0, can_see_kitchen: 0, can_see_debtors: 0, can_see_creditors: 0,
+              can_sell: 1, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 0, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
+              can_manage_invoices: 0, can_manage_kitchen: 0, can_manage_debtors: 0, can_manage_creditors: 0
+            },
+            {
+              role_name: "Waiter",
+              can_see_register: 1, can_see_orders: 1, can_see_pending: 1, can_see_customer: 0, can_see_inventory: 0, can_see_shift: 0, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
+              can_see_invoice: 0, can_see_kitchen: 1, can_see_debtors: 0, can_see_creditors: 0,
+              can_sell: 0, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 0, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
+              can_manage_invoices: 0, can_manage_kitchen: 1, can_manage_debtors: 0, can_manage_creditors: 0
             }
           ];
         }
@@ -1387,13 +1447,18 @@ app.post("/api/system/initialize", async (req, res) => {
             db.run(
               `INSERT INTO roles_config (
                 role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer, can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-                can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount, can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+                can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+                can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
+                can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ON CONFLICT(role_name) DO UPDATE SET
                 can_see_register=excluded.can_see_register, can_see_orders=excluded.can_see_orders, can_see_pending=excluded.can_see_pending, can_see_customer=excluded.can_see_customer,
                 can_see_inventory=excluded.can_see_inventory, can_see_shift=excluded.can_see_shift, can_see_returns=excluded.can_see_returns, can_see_settings=excluded.can_see_settings, can_see_dashboard=excluded.can_see_dashboard,
-                can_sell=excluded.can_sell, can_add_inventory=excluded.can_add_inventory, can_view_inventory=excluded.can_view_inventory, can_manage_prices=excluded.can_manage_prices, can_give_discount=excluded.can_give_discount,
-                can_void_orders=excluded.can_void_orders, can_process_returns=excluded.can_process_returns, can_manage_shifts=excluded.can_manage_shifts, can_manage_users=excluded.can_manage_users, can_edit_settings=excluded.can_edit_settings, can_manage_categories=excluded.can_manage_categories`,
+                can_see_invoice=excluded.can_see_invoice, can_see_kitchen=excluded.can_see_kitchen, can_see_debtors=excluded.can_see_debtors, can_see_creditors=excluded.can_see_creditors,
+                can_sell=excluded.can_sell, can_add_order=excluded.can_add_order, can_add_inventory=excluded.can_add_inventory, can_reduce_inventory=excluded.can_reduce_inventory, can_view_inventory=excluded.can_view_inventory, can_manage_prices=excluded.can_manage_prices, can_give_discount=excluded.can_give_discount,
+                can_void_orders=excluded.can_void_orders, can_process_returns=excluded.can_process_returns, can_manage_shifts=excluded.can_manage_shifts, can_manage_users=excluded.can_manage_users, can_edit_settings=excluded.can_edit_settings, can_manage_categories=excluded.can_manage_categories,
+                can_manage_invoices=excluded.can_manage_invoices, can_manage_kitchen=excluded.can_manage_kitchen, can_manage_debtors=excluded.can_manage_debtors, can_manage_creditors=excluded.can_manage_creditors`,
               [
                 r.role_name,
                 r.can_see_register !== undefined ? r.can_see_register : 1,
@@ -1405,8 +1470,14 @@ app.post("/api/system/initialize", async (req, res) => {
                 r.can_see_returns !== undefined ? r.can_see_returns : 0,
                 r.can_see_settings !== undefined ? r.can_see_settings : 0,
                 r.can_see_dashboard !== undefined ? r.can_see_dashboard : 0,
+                r.can_see_invoice !== undefined ? r.can_see_invoice : 1,
+                r.can_see_kitchen !== undefined ? r.can_see_kitchen : 1,
+                r.can_see_debtors !== undefined ? r.can_see_debtors : 1,
+                r.can_see_creditors !== undefined ? r.can_see_creditors : 1,
                 r.can_sell !== undefined ? r.can_sell : 1,
+                r.can_add_order !== undefined ? r.can_add_order : 1,
                 r.can_add_inventory !== undefined ? r.can_add_inventory : 0,
+                r.can_reduce_inventory !== undefined ? r.can_reduce_inventory : 0,
                 r.can_view_inventory !== undefined ? r.can_view_inventory : 0,
                 r.can_manage_prices !== undefined ? r.can_manage_prices : 0,
                 r.can_give_discount !== undefined ? r.can_give_discount : 0,
@@ -1415,7 +1486,11 @@ app.post("/api/system/initialize", async (req, res) => {
                 r.can_manage_shifts !== undefined ? r.can_manage_shifts : 0,
                 r.can_manage_users !== undefined ? r.can_manage_users : 0,
                 r.can_edit_settings !== undefined ? r.can_edit_settings : 0,
-                r.can_manage_categories !== undefined ? r.can_manage_categories : 0
+                r.can_manage_categories !== undefined ? r.can_manage_categories : 0,
+                r.can_manage_invoices !== undefined ? r.can_manage_invoices : 0,
+                r.can_manage_kitchen !== undefined ? r.can_manage_kitchen : 1,
+                r.can_manage_debtors !== undefined ? r.can_manage_debtors : 0,
+                r.can_manage_creditors !== undefined ? r.can_manage_creditors : 0
               ],
               () => resolve()
             );
@@ -1901,8 +1976,14 @@ app.post("/api/roles", authenticateToken, (req, res) => {
     can_see_returns,
     can_see_settings,
     can_see_dashboard,
+    can_see_invoice,
+    can_see_kitchen,
+    can_see_debtors,
+    can_see_creditors,
     can_sell,
+    can_add_order,
     can_add_inventory,
+    can_reduce_inventory,
     can_view_inventory,
     can_manage_prices,
     can_give_discount,
@@ -1911,7 +1992,11 @@ app.post("/api/roles", authenticateToken, (req, res) => {
     can_manage_shifts,
     can_manage_users,
     can_edit_settings,
-    can_manage_categories
+    can_manage_categories,
+    can_manage_invoices,
+    can_manage_kitchen,
+    can_manage_debtors,
+    can_manage_creditors
   } = req.body;
 
   const targetName = (role_name || name || "").trim();
@@ -1921,9 +2006,11 @@ app.post("/api/roles", authenticateToken, (req, res) => {
     `INSERT INTO roles_config (
       role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
       can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-      can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount,
-      can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+      can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+      can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
+      can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(role_name) DO UPDATE SET
       can_see_register=excluded.can_see_register,
       can_see_orders=excluded.can_see_orders,
@@ -1934,8 +2021,14 @@ app.post("/api/roles", authenticateToken, (req, res) => {
       can_see_returns=excluded.can_see_returns,
       can_see_settings=excluded.can_see_settings,
       can_see_dashboard=excluded.can_see_dashboard,
+      can_see_invoice=excluded.can_see_invoice,
+      can_see_kitchen=excluded.can_see_kitchen,
+      can_see_debtors=excluded.can_see_debtors,
+      can_see_creditors=excluded.can_see_creditors,
       can_sell=excluded.can_sell,
+      can_add_order=excluded.can_add_order,
       can_add_inventory=excluded.can_add_inventory,
+      can_reduce_inventory=excluded.can_reduce_inventory,
       can_view_inventory=excluded.can_view_inventory,
       can_manage_prices=excluded.can_manage_prices,
       can_give_discount=excluded.can_give_discount,
@@ -1944,7 +2037,11 @@ app.post("/api/roles", authenticateToken, (req, res) => {
       can_manage_shifts=excluded.can_manage_shifts,
       can_manage_users=excluded.can_manage_users,
       can_edit_settings=excluded.can_edit_settings,
-      can_manage_categories=excluded.can_manage_categories`,
+      can_manage_categories=excluded.can_manage_categories,
+      can_manage_invoices=excluded.can_manage_invoices,
+      can_manage_kitchen=excluded.can_manage_kitchen,
+      can_manage_debtors=excluded.can_manage_debtors,
+      can_manage_creditors=excluded.can_manage_creditors`,
     [
       targetName,
       can_see_register !== undefined ? (can_see_register ? 1 : 0) : 1,
@@ -1956,8 +2053,14 @@ app.post("/api/roles", authenticateToken, (req, res) => {
       can_see_returns !== undefined ? (can_see_returns ? 1 : 0) : 0,
       can_see_settings !== undefined ? (can_see_settings ? 1 : 0) : 0,
       can_see_dashboard !== undefined ? (can_see_dashboard ? 1 : 0) : 0,
+      can_see_invoice !== undefined ? (can_see_invoice ? 1 : 0) : 1,
+      can_see_kitchen !== undefined ? (can_see_kitchen ? 1 : 0) : 1,
+      can_see_debtors !== undefined ? (can_see_debtors ? 1 : 0) : 1,
+      can_see_creditors !== undefined ? (can_see_creditors ? 1 : 0) : 1,
       can_sell !== undefined ? (can_sell ? 1 : 0) : 1,
+      can_add_order !== undefined ? (can_add_order ? 1 : 0) : 1,
       can_add_inventory !== undefined ? (can_add_inventory ? 1 : 0) : 0,
+      can_reduce_inventory !== undefined ? (can_reduce_inventory ? 1 : 0) : 0,
       can_view_inventory !== undefined ? (can_view_inventory ? 1 : 0) : 0,
       can_manage_prices !== undefined ? (can_manage_prices ? 1 : 0) : 0,
       can_give_discount !== undefined ? (can_give_discount ? 1 : 0) : 0,
@@ -1967,6 +2070,10 @@ app.post("/api/roles", authenticateToken, (req, res) => {
       can_manage_users !== undefined ? (can_manage_users ? 1 : 0) : 0,
       can_edit_settings !== undefined ? (can_edit_settings ? 1 : 0) : 0,
       can_manage_categories !== undefined ? (can_manage_categories ? 1 : 0) : 0,
+      can_manage_invoices !== undefined ? (can_manage_invoices ? 1 : 0) : 0,
+      can_manage_kitchen !== undefined ? (can_manage_kitchen ? 1 : 0) : 1,
+      can_manage_debtors !== undefined ? (can_manage_debtors ? 1 : 0) : 0,
+      can_manage_creditors !== undefined ? (can_manage_creditors ? 1 : 0) : 0
     ],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
@@ -1994,8 +2101,14 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
     can_see_returns,
     can_see_settings,
     can_see_dashboard,
+    can_see_invoice,
+    can_see_kitchen,
+    can_see_debtors,
+    can_see_creditors,
     can_sell,
+    can_add_order,
     can_add_inventory,
+    can_reduce_inventory,
     can_view_inventory,
     can_manage_prices,
     can_give_discount,
@@ -2004,7 +2117,11 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
     can_manage_shifts,
     can_manage_users,
     can_edit_settings,
-    can_manage_categories
+    can_manage_categories,
+    can_manage_invoices,
+    can_manage_kitchen,
+    can_manage_debtors,
+    can_manage_creditors
   } = req.body;
 
   db.run(
@@ -2012,10 +2129,12 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
       INSERT INTO roles_config (
         role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
         can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-        can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount,
-        can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
+        can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+        can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+        can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
+        can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(role_name) DO UPDATE SET
         can_see_register=excluded.can_see_register,
         can_see_orders=excluded.can_see_orders,
@@ -2026,8 +2145,14 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
         can_see_returns=excluded.can_see_returns,
         can_see_settings=excluded.can_see_settings,
         can_see_dashboard=excluded.can_see_dashboard,
+        can_see_invoice=excluded.can_see_invoice,
+        can_see_kitchen=excluded.can_see_kitchen,
+        can_see_debtors=excluded.can_see_debtors,
+        can_see_creditors=excluded.can_see_creditors,
         can_sell=excluded.can_sell,
+        can_add_order=excluded.can_add_order,
         can_add_inventory=excluded.can_add_inventory,
+        can_reduce_inventory=excluded.can_reduce_inventory,
         can_view_inventory=excluded.can_view_inventory,
         can_manage_prices=excluded.can_manage_prices,
         can_give_discount=excluded.can_give_discount,
@@ -2036,7 +2161,11 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
         can_manage_shifts=excluded.can_manage_shifts,
         can_manage_users=excluded.can_manage_users,
         can_edit_settings=excluded.can_edit_settings,
-        can_manage_categories=excluded.can_manage_categories
+        can_manage_categories=excluded.can_manage_categories,
+        can_manage_invoices=excluded.can_manage_invoices,
+        can_manage_kitchen=excluded.can_manage_kitchen,
+        can_manage_debtors=excluded.can_manage_debtors,
+        can_manage_creditors=excluded.can_manage_creditors
     `,
     [
       name,
@@ -2049,8 +2178,14 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
       can_see_returns !== undefined ? (can_see_returns ? 1 : 0) : 0,
       can_see_settings !== undefined ? (can_see_settings ? 1 : 0) : 0,
       can_see_dashboard !== undefined ? (can_see_dashboard ? 1 : 0) : 0,
+      can_see_invoice !== undefined ? (can_see_invoice ? 1 : 0) : 1,
+      can_see_kitchen !== undefined ? (can_see_kitchen ? 1 : 0) : 1,
+      can_see_debtors !== undefined ? (can_see_debtors ? 1 : 0) : 1,
+      can_see_creditors !== undefined ? (can_see_creditors ? 1 : 0) : 1,
       can_sell !== undefined ? (can_sell ? 1 : 0) : 1,
+      can_add_order !== undefined ? (can_add_order ? 1 : 0) : 1,
       can_add_inventory !== undefined ? (can_add_inventory ? 1 : 0) : 0,
+      can_reduce_inventory !== undefined ? (can_reduce_inventory ? 1 : 0) : 0,
       can_view_inventory !== undefined ? (can_view_inventory ? 1 : 0) : 0,
       can_manage_prices !== undefined ? (can_manage_prices ? 1 : 0) : 0,
       can_give_discount !== undefined ? (can_give_discount ? 1 : 0) : 0,
@@ -2060,6 +2195,10 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
       can_manage_users !== undefined ? (can_manage_users ? 1 : 0) : 0,
       can_edit_settings !== undefined ? (can_edit_settings ? 1 : 0) : 0,
       can_manage_categories !== undefined ? (can_manage_categories ? 1 : 0) : 0,
+      can_manage_invoices !== undefined ? (can_manage_invoices ? 1 : 0) : 0,
+      can_manage_kitchen !== undefined ? (can_manage_kitchen ? 1 : 0) : 1,
+      can_manage_debtors !== undefined ? (can_manage_debtors ? 1 : 0) : 0,
+      can_manage_creditors !== undefined ? (can_manage_creditors ? 1 : 0) : 0
     ],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
@@ -2068,11 +2207,15 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
       db.run(
         `UPDATE employees SET 
           can_see_register=?, can_see_orders=?, can_see_pending=?, can_see_customer=?, can_see_inventory=?, can_see_shift=?, can_see_returns=?, can_see_settings=?, can_see_dashboard=?,
-          can_sell=?, can_add_inventory=?, can_view_inventory=?, can_manage_prices=?, can_give_discount=?, can_void_orders=?, can_process_returns=?, can_manage_shifts=?, can_manage_users=?, can_edit_settings=?, can_manage_categories=?
+          can_see_invoice=?, can_see_kitchen=?, can_see_debtors=?, can_see_creditors=?,
+          can_sell=?, can_add_order=?, can_add_inventory=?, can_reduce_inventory=?, can_view_inventory=?, can_manage_prices=?, can_give_discount=?, can_void_orders=?, can_process_returns=?, can_manage_shifts=?, can_manage_users=?, can_edit_settings=?, can_manage_categories=?,
+          can_manage_invoices=?, can_manage_kitchen=?, can_manage_debtors=?, can_manage_creditors=?
          WHERE role = ?`,
         [
           can_see_register ? 1 : 0, can_see_orders ? 1 : 0, can_see_pending ? 1 : 0, can_see_customer ? 1 : 0, can_see_inventory ? 1 : 0, can_see_shift ? 1 : 0, can_see_returns ? 1 : 0, can_see_settings ? 1 : 0, can_see_dashboard ? 1 : 0,
-          can_sell ? 1 : 0, can_add_inventory ? 1 : 0, can_view_inventory ? 1 : 0, can_manage_prices ? 1 : 0, can_give_discount ? 1 : 0, can_void_orders ? 1 : 0, can_process_returns ? 1 : 0, can_manage_shifts ? 1 : 0, can_manage_users ? 1 : 0, can_edit_settings ? 1 : 0, can_manage_categories ? 1 : 0,
+          can_see_invoice ? 1 : 0, can_see_kitchen ? 1 : 0, can_see_debtors ? 1 : 0, can_see_creditors ? 1 : 0,
+          can_sell ? 1 : 0, can_add_order ? 1 : 0, can_add_inventory ? 1 : 0, can_reduce_inventory ? 1 : 0, can_view_inventory ? 1 : 0, can_manage_prices ? 1 : 0, can_give_discount ? 1 : 0, can_void_orders ? 1 : 0, can_process_returns ? 1 : 0, can_manage_shifts ? 1 : 0, can_manage_users ? 1 : 0, can_edit_settings ? 1 : 0, can_manage_categories ? 1 : 0,
+          can_manage_invoices ? 1 : 0, can_manage_kitchen ? 1 : 0, can_manage_debtors ? 1 : 0, can_manage_creditors ? 1 : 0,
           name,
         ],
         function () {
@@ -2335,6 +2478,359 @@ app.get("/api/orders/list", authenticateToken, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ orders: rows || [] });
   });
+});
+
+// ==== INVOICES API ====
+app.get("/api/invoices", authenticateToken, (req, res) => {
+  const { search, status } = req.query;
+  let sql = `
+    SELECT o.id, o.invoice_number, o.order_date, o.total_amount, o.amount_paid, o.payment_method,
+           o.buyer_name, o.buyer_phone, o.served_by,
+           (o.total_amount - o.amount_paid) as balance_due
+    FROM pos_orders o
+    WHERE (o.invoice_number IS NOT NULL OR o.payment_method IN ('INVOICE', 'COD', 'CREDIT'))
+  `;
+  const params = [];
+  if (search && search.trim()) {
+    const s = `%${search.trim()}%`;
+    sql += ` AND (CAST(o.invoice_number AS TEXT) LIKE ? OR o.buyer_name LIKE ? OR o.buyer_phone LIKE ? OR CAST(o.id AS TEXT) LIKE ?)`;
+    params.push(s, s, s, s);
+  }
+  sql += ` ORDER BY o.order_date DESC LIMIT 150`;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ invoices: rows || [] });
+  });
+});
+
+// ==== KITCHEN TOKENS API ====
+app.get("/api/kitchen/tokens", authenticateToken, (req, res) => {
+  const { status, search } = req.query;
+  let sql = `SELECT * FROM kitchen_tokens WHERE 1=1`;
+  const params = [];
+  if (status && status !== "ALL") {
+    sql += ` AND status = ?`;
+    params.push(status);
+  }
+  if (search && search.trim()) {
+    const s = `%${search.trim()}%`;
+    sql += ` AND (token_code LIKE ? OR CAST(token_number AS TEXT) LIKE ? OR table_label LIKE ? OR server_name LIKE ? OR items_summary LIKE ?)`;
+    params.push(s, s, s, s, s);
+  }
+  sql += ` ORDER BY id DESC LIMIT 100`;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ tokens: rows || [] });
+  });
+});
+
+app.post("/api/kitchen/tokens", authenticateToken, (req, res) => {
+  const { pos_order_id, table_label, server_name, items_summary, items_json, notes } = req.body;
+  const staff = server_name || (req.user ? (req.user.name || req.user.username) : "Staff");
+
+  db.get("SELECT COALESCE(MAX(token_number), 0) + 1 as next_token FROM kitchen_tokens WHERE DATE(created_at) = CURRENT_DATE", [], (err, row) => {
+    const tokenNum = (row && row.next_token) ? parseInt(row.next_token) : 1;
+    const tokenCode = `KT-${String(tokenNum).padStart(3, "0")}`;
+
+    db.run(
+      `INSERT INTO kitchen_tokens (token_number, token_code, pos_order_id, table_label, server_name, items_summary, items_json, notes, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+      [tokenNum, tokenCode, pos_order_id || null, table_label || "Takeaway", staff, items_summary || "", items_json || "[]", notes || ""],
+      function (insErr) {
+        if (insErr) return res.status(500).json({ error: insErr.message });
+        res.json({
+          id: this.lastID,
+          token_number: tokenNum,
+          token_code: tokenCode,
+          message: `Kitchen Token #${tokenCode} generated successfully!`
+        });
+      }
+    );
+  });
+});
+
+app.patch("/api/kitchen/tokens/:id/status", authenticateToken, (req, res) => {
+  const { status } = req.body; // 'PENDING', 'PREPARING', 'READY', 'SERVED', 'CANCELLED'
+  const id = req.params.id;
+  db.run("UPDATE kitchen_tokens SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [status, id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: `Token status updated to ${status}` });
+  });
+});
+
+// ==== DEBTORS API (Accounts Receivable) ====
+app.get("/api/debtors", authenticateToken, (req, res) => {
+  const { search } = req.query;
+  let sql = `
+    SELECT 
+      c.id, c.buyer_name, c.buyer_phone, c.pos_order_id, c.total_amount, c.amount_paid, c.balance,
+      c.promised_date, c.created_at, p.invoice_number, p.order_date
+    FROM credit_records c
+    LEFT JOIN pos_orders p ON c.pos_order_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (search && search.trim()) {
+    const s = `%${search.trim()}%`;
+    sql += ` AND (c.buyer_name LIKE ? OR c.buyer_phone LIKE ? OR CAST(p.invoice_number AS TEXT) LIKE ?)`;
+    params.push(s, s, s);
+  }
+  sql += ` ORDER BY c.created_at DESC LIMIT 200`;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ debtors: rows || [] });
+  });
+});
+
+app.post("/api/debtors", authenticateToken, (req, res) => {
+  const { buyer_name, buyer_phone, total_amount, amount_paid, promised_date, notes } = req.body;
+  if (!buyer_name || !buyer_name.trim()) return res.status(400).json({ error: "Customer/Debtor name is required" });
+
+  const total = parseFloat(total_amount) || 0;
+  const paid = parseFloat(amount_paid) || 0;
+  const balance = total - paid;
+
+  db.run(
+    `INSERT INTO credit_records (buyer_name, buyer_phone, pos_order_id, total_amount, amount_paid, balance, promised_date)
+     VALUES (?, ?, 0, ?, ?, ?, ?)`,
+    [buyer_name.trim(), buyer_phone || "", total, paid, balance, promised_date || null],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: this.lastID, message: "Debtor record created successfully" });
+    }
+  );
+});
+
+// ==== CREDITORS API (Accounts Payable / Suppliers) ====
+app.get("/api/creditors", authenticateToken, (req, res) => {
+  const { search, status } = req.query;
+  let sql = `SELECT * FROM creditors WHERE 1=1`;
+  const params = [];
+  if (status && status !== "ALL") {
+    sql += ` AND status = ?`;
+    params.push(status);
+  }
+  if (search && search.trim()) {
+    const s = `%${search.trim()}%`;
+    sql += ` AND (supplier_name LIKE ? OR contact_person LIKE ? OR phone LIKE ? OR invoice_no LIKE ?)`;
+    params.push(s, s, s, s);
+  }
+  sql += ` ORDER BY created_at DESC LIMIT 150`;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ creditors: rows || [] });
+  });
+});
+
+app.post("/api/creditors", authenticateToken, (req, res) => {
+  const { supplier_name, contact_person, phone, invoice_no, total_amount, amount_paid, due_date, notes } = req.body;
+  if (!supplier_name || !supplier_name.trim()) {
+    return res.status(400).json({ error: "Supplier name is required" });
+  }
+
+  const total = parseFloat(total_amount) || 0;
+  const paid = parseFloat(amount_paid) || 0;
+  const balance = Math.max(0, total - paid);
+  const status = balance <= 0 ? "PAID" : "PENDING";
+
+  db.run(
+    `INSERT INTO creditors (supplier_name, contact_person, phone, invoice_no, total_amount, amount_paid, balance, due_date, status, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [supplier_name.trim(), contact_person || "", phone || "", invoice_no || "", total, paid, balance, due_date || null, status, notes || ""],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: this.lastID, message: "Creditor / Supplier bill registered successfully" });
+    }
+  );
+});
+
+app.post("/api/creditors/pay", authenticateToken, (req, res) => {
+  const { creditor_id, amount_paid, note } = req.body;
+  const payAmt = parseFloat(amount_paid) || 0;
+  if (!creditor_id || payAmt <= 0) {
+    return res.status(400).json({ error: "Creditor ID and valid payment amount required" });
+  }
+
+  db.get("SELECT * FROM creditors WHERE id = ?", [creditor_id], (err, row) => {
+    if (err || !row) return res.status(404).json({ error: "Creditor not found" });
+
+    const newPaid = (parseFloat(row.amount_paid) || 0) + payAmt;
+    const newBalance = Math.max(0, (parseFloat(row.total_amount) || 0) - newPaid);
+    const newStatus = newBalance <= 0 ? "PAID" : "PARTIAL";
+
+    db.run(
+      "UPDATE creditors SET amount_paid = ?, balance = ?, status = ? WHERE id = ?",
+      [newPaid, newBalance, newStatus, creditor_id],
+      function (updErr) {
+        if (updErr) return res.status(500).json({ error: updErr.message });
+
+        // Record expense in transactions
+        db.run(
+          "INSERT INTO transactions (amount, type, description, recorded_by) VALUES (?, 'EXPENSE', ?, ?)",
+          [payAmt, `Supplier Payment to ${row.supplier_name}${note ? ' - ' + note : ''}`, req.user ? req.user.id : null],
+          () => {}
+        );
+
+        res.json({ message: `Payment of ${payAmt.toLocaleString()} recorded for ${row.supplier_name}`, balance: newBalance });
+      }
+    );
+  });
+});
+
+// ==== POS CHECKOUT COMPATIBILITY WRAPPER ====
+app.post("/api/pos/orders", authenticateToken, async (req, res) => {
+  // If the user's role cannot sell (e.g. Waiter who can only add orders), check if save/kitchen only
+  const userPerms = req.user.permissions || {};
+  const isSaveOnly = req.body.save_order_only || req.body.send_kitchen_only;
+
+  if (!isSaveOnly && userPerms.can_sell === 0 && !["admin", "manager", "cashier", "ceo", "tech"].includes((req.user.role || "").toLowerCase())) {
+    return res.status(403).json({ error: "Access Denied: Your assigned role cannot process payments or complete sales." });
+  }
+
+  const {
+    cart,
+    total_amount,
+    payment_method = "CASH",
+    amount_paid,
+    buyer_name,
+    buyer_phone,
+    remarks,
+    print_kitchen,
+    table_label
+  } = req.body;
+
+  const items = (cart || []).map(item => ({
+    id: item.id,
+    product_id: item.id,
+    name: item.name,
+    product_name: item.name,
+    price: item.price,
+    qty: item.qty || 1,
+    quantity: item.qty || 1,
+    total: (item.price || 0) * (item.qty || 1)
+  }));
+
+  const checkoutReq = {
+    ...req,
+    body: {
+      total_amount: total_amount || items.reduce((sum, i) => sum + (i.price * i.qty), 0),
+      items: items,
+      payment_method: payment_method,
+      amount_paid: amount_paid || total_amount,
+      buyer_name: buyer_name || "Walk-in Customer",
+      buyer_phone: buyer_phone || "",
+      served_by: req.user ? (req.user.name || req.user.username) : "Staff",
+      waiter_id: req.user ? req.user.id : null,
+      client_uuid: req.body.client_uuid || `pos-${Date.now()}`
+    }
+  };
+
+  // If send to kitchen was requested, generate kitchen token
+  if (print_kitchen && items.length > 0) {
+    const summary = items.map(i => `${i.qty}x ${i.name}`).join(", ");
+    db.get("SELECT COALESCE(MAX(token_number), 0) + 1 as next_token FROM kitchen_tokens WHERE DATE(created_at) = CURRENT_DATE", [], (err, row) => {
+      const tokenNum = (row && row.next_token) ? parseInt(row.next_token) : 1;
+      const tokenCode = `KT-${String(tokenNum).padStart(3, "0")}`;
+      db.run(
+        `INSERT INTO kitchen_tokens (token_number, token_code, table_label, server_name, items_summary, notes, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'PENDING')`,
+        [tokenNum, tokenCode, table_label || "Terminal 1", checkoutReq.body.served_by, summary, remarks || ""],
+        () => {}
+      );
+    });
+  }
+
+  // Forward to checkout
+  try {
+    const fakeRes = {
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        if (this.statusCode && this.statusCode >= 400) {
+          return res.status(this.statusCode).json(data);
+        }
+        return res.json(data);
+      }
+    };
+
+    // Forward to app.post("/api/checkout") handler
+    const checkoutHandler = app._router.stack.find(r => r.route && r.route.path === "/api/checkout" && r.route.methods.post);
+    if (checkoutHandler) {
+      return checkoutHandler.handle(checkoutReq, res);
+    } else {
+      return res.json({ message: "Order processed successfully", invoice_number: Date.now() });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==== ACTIVE SHIFT FOR POS APP ====
+app.get("/api/active-shift", authenticateToken, (req, res) => {
+  ensureCashierShiftsSchema(() => {
+    db.get(
+      "SELECT * FROM cashier_shifts WHERE status = 'OPEN' AND end_time IS NULL ORDER BY id DESC LIMIT 1",
+      [],
+      async (err, openShift) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!openShift) {
+          return res.json({
+            has_active_shift: false,
+            start_cash: 0,
+            cash_sales: 0,
+            momo_sales: 0,
+            cash_in: 0,
+            expenses: 0,
+            cashier_name: req.user.name || "Cashier"
+          });
+        }
+
+        try {
+          const summary = await computeShiftSummary(openShift.start_time, null, openShift.start_cash, null);
+          res.json({
+            has_active_shift: true,
+            id: openShift.id,
+            start_time: openShift.start_time,
+            cashier_id: openShift.cashier_id,
+            cashier_name: req.user.name || "Cashier",
+            ...summary
+          });
+        } catch (e) {
+          res.json({
+            has_active_shift: true,
+            id: openShift.id,
+            start_cash: openShift.start_cash || 0,
+            cash_sales: openShift.cash_sales || 0,
+            momo_sales: openShift.momo_sales || 0,
+            cash_in: openShift.cash_in || 0,
+            expenses: openShift.expenses || 0,
+            cashier_name: req.user.name || "Cashier"
+          });
+        }
+      }
+    );
+  });
+});
+
+app.get("/api/orders/pending", authenticateToken, (req, res) => {
+  db.all(
+    `SELECT p.*, e.username as cashier_username, e.first_name as cashier_first_name
+     FROM pos_orders p
+     LEFT JOIN employees e ON p.cashier_id = e.id
+     WHERE p.payment_method IN ('COD', 'INVOICE', 'PENDING')
+     ORDER BY p.order_date DESC LIMIT 50`,
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ orders: rows || [] });
+    }
+  );
 });
 
 // 3. Attendance

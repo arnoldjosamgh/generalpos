@@ -39,7 +39,7 @@ if (process.env.DATABASE_URL) {
 }
 
 let db;
-const CURRENT_VERSION = 155;
+const CURRENT_VERSION = 156;
 
 if (config.dbType === 'postgres') {
     const poolConfig = {
@@ -893,6 +893,34 @@ const schema = [
         reason TEXT,
         processed_by TEXT,
         return_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS creditors (
+        id SERIAL PRIMARY KEY,
+        supplier_name TEXT NOT NULL,
+        contact_person TEXT,
+        phone TEXT,
+        invoice_no TEXT,
+        total_amount REAL DEFAULT 0,
+        amount_paid REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        due_date TEXT,
+        status TEXT DEFAULT 'PENDING',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS kitchen_tokens (
+        id SERIAL PRIMARY KEY,
+        token_number INTEGER NOT NULL,
+        token_code TEXT,
+        pos_order_id INTEGER,
+        table_label TEXT,
+        server_name TEXT,
+        items_summary TEXT,
+        items_json TEXT,
+        notes TEXT,
+        status TEXT DEFAULT 'PENDING',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`
 ];
 
@@ -2063,6 +2091,102 @@ function runMigrations(fromVersion) {
             db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '155'], () => {
                 console.log('Migration to v155 complete: Products seeded.');
             });
+        });
+    }
+
+    if (fromVersion < 156) {
+        // v156: Add granular capability columns and new tabs to roles_config and employees
+        const newCols = [
+            'can_see_invoice INTEGER DEFAULT 1',
+            'can_see_kitchen INTEGER DEFAULT 1',
+            'can_see_debtors INTEGER DEFAULT 1',
+            'can_see_creditors INTEGER DEFAULT 1',
+            'can_add_order INTEGER DEFAULT 1',
+            'can_reduce_inventory INTEGER DEFAULT 0',
+            'can_manage_invoices INTEGER DEFAULT 0',
+            'can_manage_kitchen INTEGER DEFAULT 1',
+            'can_manage_debtors INTEGER DEFAULT 0',
+            'can_manage_creditors INTEGER DEFAULT 0'
+        ];
+
+        newCols.forEach(col => {
+            const sql = config.dbType === 'postgres'
+                ? `ALTER TABLE roles_config ADD COLUMN IF NOT EXISTS ${col}`
+                : `ALTER TABLE roles_config ADD COLUMN ${col}`;
+            db.run(sql, () => {});
+
+            const empSql = config.dbType === 'postgres'
+                ? `ALTER TABLE employees ADD COLUMN IF NOT EXISTS ${col}`
+                : `ALTER TABLE employees ADD COLUMN ${col}`;
+            db.run(empSql, () => {});
+        });
+
+        // Ensure creditors table exists
+        const credSql = config.dbType === 'postgres'
+            ? `CREATE TABLE IF NOT EXISTS creditors (
+                id SERIAL PRIMARY KEY,
+                supplier_name TEXT NOT NULL,
+                contact_person TEXT,
+                phone TEXT,
+                invoice_no TEXT,
+                total_amount REAL DEFAULT 0,
+                amount_paid REAL DEFAULT 0,
+                balance REAL DEFAULT 0,
+                due_date TEXT,
+                status TEXT DEFAULT 'PENDING',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+            : `CREATE TABLE IF NOT EXISTS creditors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_name TEXT NOT NULL,
+                contact_person TEXT,
+                phone TEXT,
+                invoice_no TEXT,
+                total_amount REAL DEFAULT 0,
+                amount_paid REAL DEFAULT 0,
+                balance REAL DEFAULT 0,
+                due_date TEXT,
+                status TEXT DEFAULT 'PENDING',
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`;
+        db.run(credSql, () => {});
+
+        // Ensure kitchen_tokens table exists
+        const kitchSql = config.dbType === 'postgres'
+            ? `CREATE TABLE IF NOT EXISTS kitchen_tokens (
+                id SERIAL PRIMARY KEY,
+                token_number INTEGER NOT NULL,
+                token_code TEXT,
+                pos_order_id INTEGER,
+                table_label TEXT,
+                server_name TEXT,
+                items_summary TEXT,
+                items_json TEXT,
+                notes TEXT,
+                status TEXT DEFAULT 'PENDING',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`
+            : `CREATE TABLE IF NOT EXISTS kitchen_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token_number INTEGER NOT NULL,
+                token_code TEXT,
+                pos_order_id INTEGER,
+                table_label TEXT,
+                server_name TEXT,
+                items_summary TEXT,
+                items_json TEXT,
+                notes TEXT,
+                status TEXT DEFAULT 'PENDING',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`;
+        db.run(kitchSql, () => {});
+
+        db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '156'], () => {
+            console.log('Migration to v156 complete: Creditors, Kitchen Tokens, Invoice, Debtors & Granular Role permissions ready.');
         });
     }
 }

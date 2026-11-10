@@ -835,6 +835,28 @@
 
                                         <button type="submit" class="header-upload-pill" style="width:100%; padding:12px; font-size:0.95rem;">Save Store Settings</button>
                                     </form>
+
+                                    <!-- Default Thermal Receipt Printer Configuration -->
+                                    <div style="margin-top:24px; padding-top:20px; border-top:1px solid #e2e8f0;">
+                                        <h4 style="margin-bottom:10px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                                            <i class="fa-solid fa-print" style="color:var(--primary);"></i>
+                                            <span>Default Receipt Printer (Silent Printing)</span>
+                                        </h4>
+                                        <p style="font-size:0.8rem; color:#64748b; margin-bottom:12px;">
+                                            Select your default thermal printer once. Subsequent receipts will print automatically in the background while displaying the custom animation without showing the Windows printing dialog.
+                                        </p>
+                                        <div style="display:flex; gap:10px; align-items:center;">
+                                            <select id="setting-default-printer-select" class="pos-input" style="flex:1;">
+                                                <option value="">Detecting Windows printers...</option>
+                                            </select>
+                                            <button type="button" class="header-upload-pill" style="padding:9px 16px; font-size:0.85rem;" onclick="saveSelectedPrinterPreference()">
+                                                Set Default
+                                            </button>
+                                        </div>
+                                        <div id="printer-save-status" style="font-size:0.78rem; color:#10b981; margin-top:6px; display:none;">
+                                            <i class="fa-solid fa-check"></i> Default printer saved! Silent printing enabled.
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Custom Typed Roles Builder -->

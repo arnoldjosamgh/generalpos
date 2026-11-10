@@ -3629,6 +3629,45 @@ app.post("/api/system/set-static-ip", authenticateToken, (req, res) => {
   });
 });
 
+// ==== GET DETECTED SYSTEM PRINTERS (WINDOWS & POS) ====
+app.get("/api/system/printers", authenticateToken, (req, res) => {
+  const platform = os.platform();
+  if (platform === "win32") {
+    // Run PowerShell to get list of installed printers and identify default
+    const psCmd = `powershell -NoProfile -Command "Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default, PortName | ConvertTo-Json -Compress"`;
+    exec(psCmd, { timeout: 8000 }, (err, stdout) => {
+      if (err) {
+        return res.json({ printers: [], defaultPrinter: null, error: err.message });
+      }
+      try {
+        let parsed = JSON.parse(stdout || "[]");
+        if (!Array.isArray(parsed)) parsed = [parsed];
+        const printers = parsed.map(p => ({
+          name: p.Name,
+          isDefault: Boolean(p.Default),
+          port: p.PortName
+        }));
+        const defaultP = printers.find(p => p.isDefault) || printers[0] || null;
+        res.json({ printers, defaultPrinter: defaultP ? defaultP.name : null });
+      } catch (e) {
+        res.json({ printers: [], defaultPrinter: null, error: e.message });
+      }
+    });
+  } else {
+    // Linux CUPS or USB
+    exec("lpstat -a 2>/dev/null", (err, stdout) => {
+      const printers = [];
+      if (!err && stdout) {
+        stdout.split("\n").forEach(line => {
+          const parts = line.split(" ");
+          if (parts[0]) printers.push({ name: parts[0], isDefault: false });
+        });
+      }
+      res.json({ printers, defaultPrinter: printers[0] ? printers[0].name : null });
+    });
+  }
+});
+
 app.post("/api/system/print-raw", authenticateToken, (req, res) => {
   const { receiptText, receiptData, printerName } = req.body;
   if (!receiptText && !receiptData)

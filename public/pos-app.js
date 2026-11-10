@@ -1302,6 +1302,56 @@ async function loadCustomRolesSettings() {
             renderCustomRolesList(allRolesList);
         }
     } catch (_) {}
+
+    // Also populate available system printers in settings
+    await loadSystemPrintersList();
+}
+
+async function loadSystemPrintersList() {
+    const select = document.getElementById('setting-default-printer-select');
+    if (!select) return;
+
+    try {
+        const res = await fetch('/api/system/printers', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const printers = data.printers || [];
+            const savedPref = localStorage.getItem('jomish_default_printer') || data.defaultPrinter || '';
+
+            if (printers.length === 0) {
+                select.innerHTML = '<option value="">No local printers detected (Will use browser default)</option>';
+                return;
+            }
+
+            select.innerHTML = printers.map(p => {
+                const isSelected = p.name === savedPref;
+                return `<option value="${escapeHtml(p.name)}" ${isSelected ? 'selected' : ''}>${escapeHtml(p.name)} ${p.port ? `(${p.port})` : ''} ${p.isDefault ? '• Windows Default' : ''}</option>`;
+            }).join('');
+
+            // If nothing saved yet, remember the detected default
+            if (!localStorage.getItem('jomish_default_printer') && savedPref) {
+                localStorage.setItem('jomish_default_printer', savedPref);
+            }
+        }
+    } catch (_) {
+        select.innerHTML = '<option value="">Standard Windows Default Printer</option>';
+    }
+}
+
+function saveSelectedPrinterPreference() {
+    const select = document.getElementById('setting-default-printer-select');
+    if (!select) return;
+    const chosen = select.value;
+    if (chosen) {
+        localStorage.setItem('jomish_default_printer', chosen);
+    }
+    const statusEl = document.getElementById('printer-save-status');
+    if (statusEl) {
+        statusEl.style.display = 'block';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+    }
 }
 
 function renderCustomRolesList(roles) {
@@ -2348,16 +2398,80 @@ function hidePrintAnimation() {
     }
 }
 
-// Generic print receipt helper using custom animation + default window.print()
-function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
-    // 1. Trigger the custom thermal printer animation
+// Generic print receipt helper using custom animation + silent direct Windows spooler printing
+async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
+    // 1. Trigger the custom thermal printer dispensing animation
     showPrintAnimation(
         companyData.name || 'JOMISH POS',
         receiptMeta.receipt_no || title,
         receiptMeta.total || ''
     );
 
-    // 2. Prepare iframe for standard Windows default printer dialog
+    const printerName = localStorage.getItem('jomish_default_printer') || '';
+
+    // 2. Format plain text for silent direct Windows spooler printing
+    const textLines = [
+        `\x1B\x40`, // ESC @ Init
+        `\x1B\x61\x01`, // Center
+        companyData.name || 'JOMISH POS',
+        companyData.location || 'Kampala, Uganda',
+        `RECEIPT: #${receiptMeta.receipt_no || 'N/A'}`,
+        new Date().toLocaleString(),
+        `--------------------------------`,
+        `\x1B\x61\x00` // Left
+    ];
+
+    if (receiptMeta.items && Array.isArray(receiptMeta.items) && receiptMeta.items.length > 0) {
+        receiptMeta.items.forEach(it => {
+            const name = (it.product_name || it.name || 'Item').padEnd(16).slice(0, 16);
+            const qty = String(it.qty || 1).padStart(3);
+            const tot = String(parseFloat(it.total || (it.price * it.qty) || 0).toLocaleString()).padStart(10);
+            textLines.push(`${name} ${qty} ${tot}`);
+        });
+    } else {
+        textLines.push(receiptMeta.description || 'POS SALE');
+    }
+
+    textLines.push(`--------------------------------`);
+    textLines.push(`\x1B\x61\x02`); // Right
+    textLines.push(`TOTAL: ${receiptMeta.total || '0'}`);
+    textLines.push(`\x1B\x61\x01`); // Center
+    textLines.push(`Thank you for your business!`);
+    textLines.push(`\n\n\n\x1D\x56\x41\x00`); // Cut paper
+
+    const plainReceiptText = textLines.join('\n');
+
+    // 3. Attempt silent printing via /api/system/print-raw to the chosen default printer
+    let printedSilently = false;
+    try {
+        const printRes = await fetch('/api/system/print-raw', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({
+                receiptText: plainReceiptText,
+                printerName: printerName
+            })
+        });
+
+        if (printRes.ok) {
+            printedSilently = true;
+            console.log('[SILENT PRINT] Direct Windows print sent successfully to:', printerName);
+        }
+    } catch (e) {
+        console.warn('[SILENT PRINT] Backend spooler print failed, checking fallback:', e);
+    }
+
+    // 4. If silent spooler succeeded, let the animation finish and close cleanly without any dialog!
+    if (printedSilently) {
+        setTimeout(hidePrintAnimation, 2200);
+        return;
+    }
+
+    // 5. Fallback (e.g. running on cloud Render without local print server):
+    // Use an invisible iframe for window.print()
     let iframe = document.getElementById('receipt-print-frame');
     if (!iframe) {
         iframe = document.createElement('iframe');
@@ -2380,31 +2494,17 @@ function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
                 <meta charset="utf-8">
                 <title>${title || 'Receipt'}</title>
                 <style>
-                    @page {
-                        size: 80mm auto;
-                        margin: 2mm 3mm;
-                    }
-                    @media print {
-                        body {
-                            width: 100%;
-                            margin: 0;
-                            padding: 0;
-                        }
-                    }
+                    @page { size: 80mm auto; margin: 2mm 3mm; }
+                    @media print { body { width: 100%; margin: 0; padding: 0; } }
                     body {
-                        font-family: 'Courier New', Courier, monospace, monospace;
+                        font-family: 'Courier New', Courier, monospace;
                         font-size: 12px;
                         line-height: 1.4;
                         color: #000;
                         padding: 6px;
                     }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    th, td {
-                        padding: 2px 0;
-                    }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 2px 0; }
                 </style>
             </head>
             <body>
@@ -2414,22 +2514,12 @@ function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
     `);
     doc.close();
 
-    // 3. Trigger standard default window printing timed with animation
     setTimeout(() => {
         try {
             iframe.contentWindow.focus();
             iframe.contentWindow.print();
-        } catch (e) {
-            // Fallback to window.open if iframe printing is blocked
-            const win = window.open('', '', 'width=420,height=600');
-            if (win) {
-                win.document.write(doc.documentElement.outerHTML);
-                win.document.close();
-                win.focus();
-                win.print();
-            }
+        } catch (_) {
         } finally {
-            // Automatically close the animation overlay once print command completes
             setTimeout(hidePrintAnimation, 1200);
         }
     }, 1100);
@@ -2445,7 +2535,8 @@ function printPreviewedReceipt() {
 
     printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`, {
         receipt_no: rcptNo,
-        total: total
+        total: total,
+        items: currentPreviewedReceipt.items || []
     });
 }
 
@@ -2471,7 +2562,8 @@ async function printReceiptByTransaction(idOrReceipt) {
             const total = `${parseFloat(r.order_total_amount || r.amount || 0).toLocaleString()} ${curr}`;
             printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`, {
                 receipt_no: rcptNo,
-                total: total
+                total: total,
+                items: r.items || []
             });
         }
     } catch (err) {

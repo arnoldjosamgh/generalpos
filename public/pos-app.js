@@ -277,11 +277,19 @@ function switchNavTab(tabName) {
 
     // Right checkout panel is visible only in Register and Pending tabs
     const orderPanel = document.querySelector('.pos-order-panel');
+    const expandBtn = document.getElementById('btn-expand-cart');
     if (orderPanel) {
         if (tabName === 'register' || tabName === 'pending') {
-            orderPanel.style.display = 'flex';
+            if (!orderPanel.classList.contains('collapsed')) {
+                orderPanel.style.display = 'flex';
+                if (expandBtn) expandBtn.style.display = 'none';
+            } else {
+                orderPanel.style.display = 'none';
+                if (expandBtn) expandBtn.style.display = 'inline-flex';
+            }
         } else {
             orderPanel.style.display = 'none';
+            if (expandBtn) expandBtn.style.display = 'none';
         }
     }
 
@@ -307,6 +315,42 @@ function toggleSidebarMenu() {
     if (sidebar) {
         sidebar.classList.toggle('collapsed');
     }
+}
+
+function collapseCheckoutPanel() {
+    const orderPanel = document.querySelector('.pos-order-panel');
+    const expandBtn = document.getElementById('btn-expand-cart');
+    if (orderPanel) {
+        orderPanel.classList.add('collapsed');
+        orderPanel.style.display = 'none';
+    }
+    if (expandBtn) {
+        expandBtn.style.display = 'inline-flex';
+        updateFloatingCartBadge();
+    }
+}
+
+function expandCheckoutPanel() {
+    const orderPanel = document.querySelector('.pos-order-panel');
+    const expandBtn = document.getElementById('btn-expand-cart');
+    if (orderPanel) {
+        orderPanel.classList.remove('collapsed');
+        orderPanel.style.display = 'flex';
+    }
+    if (expandBtn) {
+        expandBtn.style.display = 'none';
+    }
+}
+
+function updateFloatingCartBadge() {
+    const countEl = document.getElementById('expand-cart-count');
+    const totalEl = document.getElementById('expand-cart-total');
+    if (!countEl || !totalEl) return;
+    const curr = companyData.currency || 'Sh';
+    const totalItems = currentCart.reduce((acc, it) => acc + (it.qty || 1), 0);
+    const totalAmount = calculateCartTotal();
+    countEl.textContent = totalItems;
+    totalEl.textContent = `${totalAmount.toLocaleString()} ${curr}`;
 }
 
 // ============================================================================
@@ -582,6 +626,7 @@ function renderOrderCart() {
     }).join('');
 
     totalDisplay.textContent = `${subtotal.toLocaleString()} ${curr}`;
+    updateFloatingCartBadge();
 }
 
 // Payment Modal Controller
@@ -2709,8 +2754,106 @@ function handleLogout() {
     window.location.replace('login.html');
 }
 
-function syncOfflineOrders() {
-    alert('All offline orders synced with server.');
+function toggleOnlineMenu(e) {
+    if (e) e.stopPropagation();
+    const dropdown = document.getElementById('online-status-dropdown');
+    if (!dropdown) return;
+    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+}
+
+document.addEventListener('click', () => {
+    const dropdown = document.getElementById('online-status-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+});
+
+let isForceOffline = false;
+
+function toggleForceOffline() {
+    isForceOffline = !isForceOffline;
+    const dot = document.getElementById('online-dot');
+    const text = document.getElementById('online-status-text');
+    const menuTxt = document.getElementById('menu-toggle-offline-text');
+    const menuIcon = document.getElementById('menu-wifi-icon');
+    const dropdown = document.getElementById('online-status-dropdown');
+
+    if (dropdown) dropdown.style.display = 'none';
+
+    if (isForceOffline) {
+        if (dot) dot.style.background = '#ef4444';
+        if (text) text.textContent = 'Offline (Working Offline)';
+        if (menuTxt) menuTxt.textContent = 'Switch to Online Mode';
+        if (menuIcon) {
+            menuIcon.className = 'fa-solid fa-plane';
+            menuIcon.style.color = '#ef4444';
+        }
+        alert('Switched to Offline Mode. All orders and operations will be queued locally in IndexedDB and can be synced anytime.');
+    } else {
+        if (dot) dot.style.background = '#10b981';
+        if (text) text.textContent = 'Online';
+        if (menuTxt) menuTxt.textContent = 'Switch to Offline Mode';
+        if (menuIcon) {
+            menuIcon.className = 'fa-solid fa-wifi';
+            menuIcon.style.color = '#10b981';
+        }
+        syncOfflineOrders();
+    }
+}
+
+async function syncOfflineOrders() {
+    const badge = document.getElementById('offline-sync-badge');
+    const uploadBtn = document.getElementById('offline-upload-btn');
+    const dropdown = document.getElementById('online-status-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    try {
+        let pendingSales = [];
+        if (typeof getPendingOfflineSales === 'function') {
+            pendingSales = await getPendingOfflineSales();
+        }
+
+        if (!pendingSales || pendingSales.length === 0) {
+            if (badge) badge.style.display = 'none';
+            alert('Offline Sync: All orders and data are already up to date with the server!');
+            return;
+        }
+
+        if (uploadBtn) uploadBtn.innerHTML = `<span>Syncing ${pendingSales.length}...</span> <i class="fa-solid fa-spinner fa-spin"></i>`;
+
+        const res = await fetch('/api/pos/batch-sync', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ transactions: pendingSales })
+        });
+
+        if (res.ok) {
+            const result = await res.json();
+            const syncedUuids = pendingSales.map(s => s.client_uuid);
+            if (typeof removeSyncedSales === 'function') {
+                await removeSyncedSales(syncedUuids);
+            }
+            if (badge) badge.style.display = 'none';
+            alert(`Sync Successful: ${result.synced_count || pendingSales.length} offline orders synchronized with server.`);
+            if (activeNavTab === 'orders') loadOrdersList();
+            if (activeNavTab === 'transactions') loadTransactionsList();
+            if (activeNavTab === 'finance') loadFinanceDashboard();
+        } else {
+            const err = await res.json();
+            alert('Sync error: ' + (err.error || 'Server rejected batch'));
+        }
+    } catch (e) {
+        alert('Sync error: Unable to reach server. Please check your internet connection.');
+    } finally {
+        if (uploadBtn) {
+            uploadBtn.innerHTML = `
+                <span>Offline Upload</span>
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span id="offline-sync-badge" style="background:rgba(255,255,255,0.25); padding:1px 6px; border-radius:10px; font-size:0.7rem; display:none;">0</span>
+            `;
+        }
+    }
 }
 
 function escapeHtml(str) {

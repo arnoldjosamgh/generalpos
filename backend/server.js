@@ -860,12 +860,16 @@ app.post("/api/login", async (req, res) => {
     can_see_pos: 1
   };
 
-  let enabledTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "settings"];
+  let enabledTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "transactions", "finance", "settings"];
   if (companyMeta && companyMeta.enabled_tabs) {
     try {
       enabledTabs = typeof companyMeta.enabled_tabs === "string" ? JSON.parse(companyMeta.enabled_tabs) : companyMeta.enabled_tabs;
     } catch (_) {}
   }
+  const coreTabs = ["invoice", "debtors", "creditors", "transactions", "finance"];
+  coreTabs.forEach(t => {
+    if (!enabledTabs.includes(t)) enabledTabs.push(t);
+  });
 
   const token = jwt.sign(
     {
@@ -2310,10 +2314,10 @@ app.get("/api/company/info", authenticateToken, (req, res) => {
           theme_color: "#0284c7",
           theme_accent: "#f59e0b",
           theme_sidebar: "#0f172a",
-          enabled_tabs: ["register", "orders", "pending", "customer", "inventory", "shift", "returns", "settings"]
+          enabled_tabs: ["register", "orders", "pending", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "transactions", "finance", "settings"]
         });
       }
-      let parsedTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "settings"];
+      let parsedTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "transactions", "finance", "settings"];
       try {
         if (typeof row.enabled_tabs === "string") {
           parsedTabs = JSON.parse(row.enabled_tabs);
@@ -2321,6 +2325,13 @@ app.get("/api/company/info", authenticateToken, (req, res) => {
           parsedTabs = row.enabled_tabs;
         }
       } catch (_) {}
+
+      // Ensure newly added core tabs (finance, transactions, debtors, creditors, invoice) are included unless explicitly removed
+      const coreTabs = ["invoice", "debtors", "creditors", "transactions", "finance"];
+      coreTabs.forEach(t => {
+        if (!parsedTabs.includes(t)) parsedTabs.push(t);
+      });
+
       res.json({
         ...row,
         enabled_tabs: parsedTabs
@@ -9114,7 +9125,7 @@ server
             "theme_color TEXT DEFAULT '#0284c7'",
             "theme_accent TEXT DEFAULT '#f59e0b'",
             "theme_sidebar TEXT DEFAULT '#0f172a'",
-            "enabled_tabs TEXT DEFAULT '[\"register\",\"orders\",\"pending\",\"customer\",\"inventory\",\"shift\",\"returns\",\"settings\"]'",
+            "enabled_tabs TEXT DEFAULT '[\"register\",\"orders\",\"pending\",\"customer\",\"inventory\",\"shift\",\"returns\",\"invoice\",\"debtors\",\"creditors\",\"transactions\",\"finance\",\"settings\"]'",
             "pause_schedule_start TEXT",
             "pause_schedule_end TEXT"
           ];
@@ -9139,12 +9150,34 @@ server
                   "#0284c7",
                   "#f59e0b",
                   "#0f172a",
-                  JSON.stringify(["register", "orders", "pending", "customer", "inventory", "shift", "returns", "settings"])
+                  JSON.stringify(["register", "orders", "pending", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "transactions", "finance", "settings"])
                 ],
                 () => {
                   console.log("[STARTUP] Seeded default company 'iGourd Demo Restaurant' (IGOURD).");
                 }
               );
+            } else {
+              // Ensure existing companies have finance & transactions in enabled_tabs
+              db.all("SELECT prefix, enabled_tabs FROM companies", [], (compErr, compRows) => {
+                if (!compErr && Array.isArray(compRows)) {
+                  compRows.forEach(c => {
+                    let cTabs = [];
+                    try {
+                      cTabs = typeof c.enabled_tabs === "string" ? JSON.parse(c.enabled_tabs) : (c.enabled_tabs || []);
+                    } catch (_) {}
+                    let changed = false;
+                    ["invoice", "debtors", "creditors", "transactions", "finance"].forEach(tab => {
+                      if (!cTabs.includes(tab)) {
+                        cTabs.push(tab);
+                        changed = true;
+                      }
+                    });
+                    if (changed) {
+                      db.run("UPDATE companies SET enabled_tabs = ? WHERE prefix = ?", [JSON.stringify(cTabs), c.prefix], () => {});
+                    }
+                  });
+                }
+              });
             }
           });
         }

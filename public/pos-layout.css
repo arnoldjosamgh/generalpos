@@ -229,6 +229,18 @@ html, body {
     flex-shrink: 0;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     z-index: 100;
+    transition: width 0.22s ease, padding 0.22s ease;
+}
+
+.pos-sidebar.collapsed {
+    width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-right: none !important;
+}
+
+.pos-sidebar.collapsed * {
+    display: none !important;
 }
 
 .pos-sidebar-brand {
@@ -688,6 +700,36 @@ html, body {
     justify-content: space-between;
     flex-shrink: 0;
     z-index: 50;
+    transition: width 0.22s ease;
+}
+
+.pos-order-panel.collapsed {
+    display: none !important;
+}
+
+/* Floating Expand Cart Button when checkout panel is minimized */
+.pos-expand-cart-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 22px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4);
+    cursor: pointer;
+    z-index: 120;
+    transition: transform 0.15s ease;
+}
+
+.pos-expand-cart-btn:hover {
+    transform: scale(1.04);
 }
 
 .order-panel-header {

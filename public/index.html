@@ -172,13 +172,26 @@
                 <div class="header-left-tools">
                     <button class="header-hamburger-btn" type="button" onclick="toggleSidebarMenu()"><i class="fa-solid fa-bars"></i></button>
 
-                    <!-- Online Status Pill -->
-                    <div class="header-status-pill">
+                    <!-- Online Status Pill with Interactive Dropdown for Offline Mode & Sync -->
+                    <div class="header-status-pill" style="cursor:pointer; position:relative;" onclick="toggleOnlineMenu(event)">
                         <span class="status-indicator-dot" id="online-dot"></span>
                         <span id="online-status-text">Online</span>
                         <i class="fa-solid fa-chevron-down" style="font-size:0.65rem; color:#94a3b8;"></i>
                         <span style="color:#cbd5e1; margin:0 2px;">|</span>
                         <i class="fa-solid fa-circle-info" style="color:#64748b; font-size:0.75rem;" title="System Status OK"></i>
+
+                        <!-- Online / Offline Quick Dropdown Menu -->
+                        <div id="online-status-dropdown" style="display:none; position:absolute; top:36px; left:0; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:230px; z-index:200; padding:8px 0; color:#1e293b;" onclick="event.stopPropagation()">
+                            <div style="padding:8px 14px; border-bottom:1px solid #f1f5f9; font-size:0.75rem; color:#64748b; font-weight:700;">NETWORK &amp; SYNC</div>
+                            <button type="button" style="width:100%; text-align:left; background:none; border:none; padding:10px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:8px;" onclick="syncOfflineOrders()">
+                                <i class="fa-solid fa-cloud-arrow-up" style="color:var(--primary);"></i>
+                                <span>Sync Offline Data Now</span>
+                            </button>
+                            <button type="button" style="width:100%; text-align:left; background:none; border:none; padding:10px 14px; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:8px;" onclick="toggleForceOffline()">
+                                <i class="fa-solid fa-wifi" id="menu-wifi-icon" style="color:#10b981;"></i>
+                                <span id="menu-toggle-offline-text">Switch to Offline Mode</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Offline Upload Button -->
@@ -1162,7 +1175,7 @@
                     
                     <!-- Panel Top Header (Pic 2) -->
                     <div class="order-panel-header">
-                        <button class="order-back-btn" type="button" onclick="clearCurrentOrder()">
+                        <button class="order-back-btn" type="button" onclick="collapseCheckoutPanel()" title="Minimize checkout and expand product catalog">
                             <i class="fa-solid fa-chevron-left"></i>
                             <span>Back</span>
                         </button>
@@ -1170,7 +1183,7 @@
                             <i class="fa-solid fa-location-dot" style="color:var(--primary); font-size:0.8rem;"></i>
                             <span>First Floor -- First Floor No. 1</span>
                         </div>
-                        <div style="font-size:0.75rem; color:#94a3b8;"><i class="fa-solid fa-user"></i></div>
+                        <div style="font-size:0.75rem; color:#94a3b8; cursor:pointer;" onclick="clearCurrentOrder()" title="Clear cart items"><i class="fa-solid fa-trash-can"></i></div>
                     </div>
 
                     <!-- Cart Items List (Pic 2) -->
@@ -1220,6 +1233,13 @@
                         </div>
                     </div>
                 </aside>
+
+                <!-- Floating Cart Resume Button (Visible when checkout is collapsed) -->
+                <button type="button" class="pos-expand-cart-btn" id="btn-expand-cart" onclick="expandCheckoutPanel()">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>Show Cart (<span id="expand-cart-count">0</span>)</span>
+                    <span id="expand-cart-total" style="background:rgba(255,255,255,0.25); padding:2px 8px; border-radius:12px; font-size:0.8rem;">0 Sh</span>
+                </button>
 
             </div>
         </div>

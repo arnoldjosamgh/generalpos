@@ -16,7 +16,7 @@ let companyData = {
     theme_color: '#0284c7',
     theme_accent: '#f59e0b',
     theme_sidebar: '#0f172a',
-    enabled_tabs: ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'settings']
+    enabled_tabs: ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'settings']
 };
 
 let allProducts = [];
@@ -138,8 +138,8 @@ function applyCompanyBranding() {
     }
 
     // 3. Tab Visibility (e.g. Hide 'Pending' tab for Supermarkets!)
-    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'settings'];
-    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'settings'];
+    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'settings'];
+    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'transactions', 'settings'];
     tabs.forEach(tab => {
         const btn = document.getElementById(`nav-btn-${tab}`);
         if (btn) {
@@ -206,6 +206,7 @@ function enforceRolePermissions() {
         'kitchen': perms.can_see_kitchen === 1,
         'debtors': perms.can_see_debtors !== 0,
         'creditors': perms.can_see_creditors !== 0,
+        'transactions': perms.can_see_transactions !== 0,
         'settings': perms.can_see_settings === 1
     };
 
@@ -294,6 +295,7 @@ function switchNavTab(tabName) {
     if (tabName === 'kitchen') loadKitchenTokens();
     if (tabName === 'debtors') loadDebtorsList();
     if (tabName === 'creditors') loadCreditorsList();
+    if (tabName === 'transactions') loadTransactionsList();
     if (tabName === 'settings') loadCustomRolesSettings();
     if (tabName === 'tech') loadTechCompanies();
 }
@@ -1355,6 +1357,7 @@ function openEditRoleModal(roleName) {
     if (document.getElementById('role-tab-kitchen')) document.getElementById('role-tab-kitchen').checked = r.can_see_kitchen === 1;
     if (document.getElementById('role-tab-debtors')) document.getElementById('role-tab-debtors').checked = r.can_see_debtors !== 0;
     if (document.getElementById('role-tab-creditors')) document.getElementById('role-tab-creditors').checked = r.can_see_creditors !== 0;
+    if (document.getElementById('role-tab-transactions')) document.getElementById('role-tab-transactions').checked = r.can_see_transactions !== 0;
 
     if (document.getElementById('role-act-add-order')) document.getElementById('role-act-add-order').checked = r.can_add_order !== 0;
     if (document.getElementById('role-act-reduce-inv')) document.getElementById('role-act-reduce-inv').checked = r.can_reduce_inventory === 1;
@@ -1386,6 +1389,7 @@ async function handleSaveCustomRole(e) {
         can_see_kitchen: document.getElementById('role-tab-kitchen')?.checked ? 1 : 0,
         can_see_debtors: document.getElementById('role-tab-debtors')?.checked ? 1 : 0,
         can_see_creditors: document.getElementById('role-tab-creditors')?.checked ? 1 : 0,
+        can_see_transactions: document.getElementById('role-tab-transactions')?.checked ? 1 : 0,
 
         can_sell: document.getElementById('role-act-sell').checked ? 1 : 0,
         can_add_order: document.getElementById('role-act-add-order')?.checked ? 1 : 0,
@@ -1550,6 +1554,7 @@ async function handleCreateNewCompany(e) {
     if (document.getElementById('tab-chk-kitchen')?.checked) enabled_tabs.push('kitchen');
     if (document.getElementById('tab-chk-debtors')?.checked) enabled_tabs.push('debtors');
     if (document.getElementById('tab-chk-creditors')?.checked) enabled_tabs.push('creditors');
+    if (document.getElementById('tab-chk-transactions')?.checked) enabled_tabs.push('transactions');
     if (document.getElementById('tab-chk-settings').checked) enabled_tabs.push('settings');
 
     const payload = {
@@ -2096,6 +2101,248 @@ async function handleSaveCreditorPayment(e) {
             alert('Error: ' + d.error);
         }
     } catch (_) {}
+}
+
+// ============================================================================
+// TAB: TRANSACTIONS (Old Receipts & Ledgers) CONTROLLER
+// ============================================================================
+let allTransactionsList = [];
+let currentPreviewedReceipt = null;
+
+async function loadTransactionsList() {
+    try {
+        const typeEl = document.getElementById('tx-filter-type');
+        const startEl = document.getElementById('tx-filter-start');
+        const endEl = document.getElementById('tx-filter-end');
+
+        let url = '/api/transactions?limit=200';
+        if (typeEl && typeEl.value && typeEl.value !== 'ALL') {
+            url += `&type=${encodeURIComponent(typeEl.value)}`;
+        }
+        if (startEl && startEl.value) {
+            url += `&start_date=${encodeURIComponent(startEl.value)}`;
+        }
+        if (endEl && endEl.value) {
+            url += `&end_date=${encodeURIComponent(endEl.value)}`;
+        }
+
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            allTransactionsList = data.transactions || [];
+            renderTransactionsTable(allTransactionsList);
+        }
+    } catch (err) {
+        console.error('Failed to load transactions:', err);
+    }
+}
+
+function renderTransactionsTable(list) {
+    const tbody = document.getElementById('transactions-table-tbody');
+    if (!tbody) return;
+
+    if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No transactions or old receipts found.</td></tr>';
+        return;
+    }
+
+    const curr = companyData.currency || 'Sh';
+    tbody.innerHTML = list.map(t => {
+        const rcptNo = t.receipt_no || t.id;
+        const dateStr = t.transaction_date ? new Date(t.transaction_date).toLocaleString() : '—';
+        const typeColor = t.type === 'INCOME' ? '#10b981' : (t.type === 'EXPENSE' ? '#ef4444' : '#6366f1');
+        const cust = t.order_buyer_name || (t.type === 'GOODS_ON_CREDIT' ? 'Credit Client' : '—');
+        const paymentMethod = t.order_payment_method || (t.type === 'EXPENSE' ? 'Cash Out' : 'Cash');
+        const recordedBy = t.recorded_by_name || t.order_served_by || 'Staff';
+        const amt = parseFloat(t.amount || 0).toLocaleString();
+
+        return `
+            <tr>
+                <td><strong style="color:var(--primary); font-family:monospace; font-size:0.95rem;">#${rcptNo}</strong></td>
+                <td style="font-size:0.82rem; color:#64748b;">${dateStr}</td>
+                <td><span class="cat-pill-btn" style="padding:2px 8px; font-size:0.75rem; background:${typeColor}15; color:${typeColor}; border:1px solid ${typeColor}40;">${escapeHtml(t.type)}</span></td>
+                <td>${escapeHtml(t.description || '—')}</td>
+                <td>${escapeHtml(cust)}</td>
+                <td><span style="font-size:0.8rem; font-weight:600; color:#334155;">${escapeHtml(paymentMethod)}</span></td>
+                <td style="font-size:0.82rem;">${escapeHtml(recordedBy)}</td>
+                <td style="text-align:right; font-weight:700; color:${t.type === 'EXPENSE' ? '#ef4444' : '#0f172a'};">${amt} ${curr}</td>
+                <td style="text-align:center;">
+                    <button class="header-idle-btn" style="padding:4px 10px; font-size:0.78rem;" onclick="viewReceiptDetails('${rcptNo}')">
+                        <i class="fa-solid fa-receipt"></i> View Receipt
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function filterTransactionsList() {
+    const q = (document.getElementById('tx-search-input')?.value || '').toLowerCase().trim();
+    if (!q) {
+        renderTransactionsTable(allTransactionsList);
+        return;
+    }
+    const filtered = allTransactionsList.filter(t => 
+        String(t.receipt_no || t.id).toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q) ||
+        (t.order_buyer_name || '').toLowerCase().includes(q) ||
+        (t.order_served_by || '').toLowerCase().includes(q) ||
+        (t.recorded_by_name || '').toLowerCase().includes(q) ||
+        (t.order_payment_method || '').toLowerCase().includes(q) ||
+        String(t.amount || '').toLowerCase().includes(q)
+    );
+    renderTransactionsTable(filtered);
+}
+
+function resetTxFilters() {
+    if (document.getElementById('tx-search-input')) document.getElementById('tx-search-input').value = '';
+    if (document.getElementById('tx-filter-type')) document.getElementById('tx-filter-type').value = 'ALL';
+    if (document.getElementById('tx-filter-start')) document.getElementById('tx-filter-start').value = '';
+    if (document.getElementById('tx-filter-end')) document.getElementById('tx-filter-end').value = '';
+    loadTransactionsList();
+}
+
+async function viewReceiptDetails(idOrReceipt) {
+    const contentEl = document.getElementById('receipt-preview-content');
+    if (contentEl) {
+        contentEl.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Loading receipt...</div>';
+    }
+    openModal('view-receipt-modal');
+
+    try {
+        const res = await fetch(`/api/receipt/details/${encodeURIComponent(idOrReceipt)}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (!res.ok) {
+            contentEl.innerHTML = '<div style="color:#ef4444; text-align:center; padding:20px;">Receipt not found.</div>';
+            return;
+        }
+
+        const data = await res.json();
+        const r = data.receipt;
+        currentPreviewedReceipt = r;
+        renderReceiptModal(r);
+    } catch (err) {
+        if (contentEl) contentEl.innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px;">Failed to load receipt: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+function renderReceiptModal(r) {
+    const contentEl = document.getElementById('receipt-preview-content');
+    if (!contentEl || !r) return;
+
+    const brand = companyData.name || 'Jomish POS';
+    const loc = companyData.location || 'Kampala, Uganda';
+    const curr = companyData.currency || 'Sh';
+    const rcptNo = r.receipt_no || r.id;
+    const dateStr = r.transaction_date ? new Date(r.transaction_date).toLocaleString() : '—';
+    const cashier = r.recorded_by_name || r.order_served_by || 'Staff';
+    const buyer = r.order_buyer_name ? `${r.order_buyer_name} ${r.order_buyer_phone ? `(${r.order_buyer_phone})` : ''}` : 'Walk-in Customer';
+
+    let itemsHtml = '';
+    if (r.items && r.items.length > 0) {
+        itemsHtml = `
+            <div style="border-top:1px dashed #cbd5e1; border-bottom:1px dashed #cbd5e1; padding:8px 0; margin:10px 0;">
+                <table style="width:100%; font-size:0.84rem; border-collapse:collapse;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #e2e8f0; color:#64748b;">
+                            <th style="text-align:left; padding:4px 0;">Item</th>
+                            <th style="text-align:center; padding:4px 0;">Qty</th>
+                            <th style="text-align:right; padding:4px 0;">Price</th>
+                            <th style="text-align:right; padding:4px 0;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${r.items.map(it => `
+                            <tr>
+                                <td style="padding:4px 0; font-weight:600;">${escapeHtml(it.product_name || it.name)}</td>
+                                <td style="text-align:center; padding:4px 0;">${it.qty}</td>
+                                <td style="text-align:right; padding:4px 0;">${parseFloat(it.price || 0).toLocaleString()}</td>
+                                <td style="text-align:right; padding:4px 0; font-weight:600;">${parseFloat(it.total || (it.price * it.qty)).toLocaleString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        itemsHtml = `
+            <div style="border-top:1px dashed #cbd5e1; border-bottom:1px dashed #cbd5e1; padding:10px 0; margin:10px 0; color:#475569;">
+                <div><strong>Transaction:</strong> ${escapeHtml(r.description || r.type)}</div>
+            </div>
+        `;
+    }
+
+    const totalAmt = parseFloat(r.order_total_amount || r.amount || 0).toLocaleString();
+    const paidAmt = parseFloat(r.order_amount_paid !== undefined ? r.order_amount_paid : r.amount).toLocaleString();
+
+    contentEl.innerHTML = `
+        <div style="text-align:center; margin-bottom:12px;">
+            <div style="font-size:1.15rem; font-weight:800; letter-spacing:0.5px;">${escapeHtml(brand)}</div>
+            <div style="font-size:0.8rem; color:#64748b;">${escapeHtml(loc)}</div>
+            <div style="font-size:0.8rem; color:#64748b;">RECEIPT / TRANSACTION RECORD</div>
+        </div>
+
+        <div style="font-size:0.82rem; margin-bottom:8px; line-height:1.5;">
+            <div><strong>Receipt No:</strong> #${rcptNo}</div>
+            <div><strong>Date:</strong> ${dateStr}</div>
+            <div><strong>Cashier:</strong> ${escapeHtml(cashier)}</div>
+            <div><strong>Customer:</strong> ${escapeHtml(buyer)}</div>
+            <div><strong>Payment:</strong> ${escapeHtml(r.order_payment_method || r.type || 'CASH')}</div>
+        </div>
+
+        ${itemsHtml}
+
+        <div style="font-size:0.88rem; line-height:1.6; margin-top:6px;">
+            <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1.05rem;">
+                <span>TOTAL:</span>
+                <span>${totalAmt} ${curr}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; color:#475569;">
+                <span>Amount Paid:</span>
+                <span>${paidAmt} ${curr}</span>
+            </div>
+        </div>
+
+        <div style="text-align:center; margin-top:16px; font-size:0.78rem; color:#64748b; border-top:1px dashed #cbd5e1; padding-top:10px;">
+            Thank you for your business!<br>Powered by Jomish POS
+        </div>
+    `;
+}
+
+function printPreviewedReceipt() {
+    if (!currentPreviewedReceipt) return;
+    const printContent = document.getElementById('receipt-preview-content');
+    if (!printContent) return;
+
+    const printWin = window.open('', '', 'width=400,height=600');
+    if (printWin) {
+        printWin.document.write(`
+            <html>
+                <head>
+                    <title>Receipt #${currentPreviewedReceipt.receipt_no || currentPreviewedReceipt.id}</title>
+                    <style>
+                        body { font-family: 'Courier New', Courier, monospace; padding: 15px; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; }
+                    </style>
+                </head>
+                <body>
+                    ${printContent.innerHTML}
+                    <script>
+                        window.onload = function() { window.print(); window.close(); }
+                    </script>
+                </body>
+            </html>
+        `);
+        printWin.document.close();
+    }
+}
+
+// Override reprintReceipt on orders table to use the new viewReceiptDetails modal!
+function reprintReceipt(orderId) {
+    viewReceiptDetails(orderId);
 }
 
 // ============================================================================

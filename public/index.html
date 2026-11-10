@@ -139,6 +139,12 @@
                     <span>Creditors</span>
                 </button>
 
+                <!-- TRANSACTIONS TAB (Old receipts & ledger) -->
+                <button class="pos-nav-item" id="nav-btn-transactions" onclick="switchNavTab('transactions')">
+                    <i class="fa-solid fa-receipt"></i>
+                    <span>Transactions</span>
+                </button>
+
                 <button class="pos-nav-item" id="nav-btn-settings" onclick="switchNavTab('settings')">
                     <i class="fa-solid fa-gear"></i>
                     <span>Settings</span>
@@ -706,6 +712,69 @@
 
 
                     <!-- ==========================================
+                         TAB: TRANSACTIONS (Old Receipts & Ledgers)
+                         ========================================== -->
+                    <section class="pos-view-pane" id="view-pane-transactions">
+                        <div class="tab-search-bar-wrap" style="flex-wrap:wrap; gap:10px;">
+                            <div class="tab-search-input-box" style="flex:1; min-width:260px;">
+                                <input 
+                                    type="text" 
+                                    id="tx-search-input" 
+                                    class="tab-search-input" 
+                                    placeholder="Search by receipt #, description, customer, cashier, amount..." 
+                                    oninput="filterTransactionsList()"
+                                >
+                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                            </div>
+
+                            <!-- Filter by Type -->
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <select id="tx-filter-type" class="pos-input" style="padding:7px 12px; font-size:0.85rem;" onchange="loadTransactionsList()">
+                                    <option value="ALL">All Types</option>
+                                    <option value="INCOME">Income / POS Sales</option>
+                                    <option value="GOODS_ON_CREDIT">Goods on Credit</option>
+                                    <option value="EXPENSE">Expenses</option>
+                                    <option value="CASH_IN">Cash In / Float</option>
+                                    <option value="TRANSFER">Transfers</option>
+                                </select>
+
+                                <!-- Date Pickers -->
+                                <input type="date" id="tx-filter-start" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
+                                <span style="color:#64748b; font-size:0.85rem;">to</span>
+                                <input type="date" id="tx-filter-end" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
+
+                                <button class="header-idle-btn" style="padding:7px 14px; font-size:0.85rem;" onclick="resetTxFilters()">
+                                    <i class="fa-solid fa-rotate-left"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="tab-content-container">
+                            <div class="pos-table-card">
+                                <table class="pos-data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Receipt #</th>
+                                            <th>Date &amp; Time</th>
+                                            <th>Type</th>
+                                            <th>Description</th>
+                                            <th>Customer / Details</th>
+                                            <th>Payment Method</th>
+                                            <th>Recorded By</th>
+                                            <th style="text-align:right;">Amount</th>
+                                            <th style="text-align:center;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transactions-table-tbody">
+                                        <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading transactions ledger...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+
+                    <!-- ==========================================
                          TAB 8: SETTINGS & CUSTOM ROLES
                          ========================================== -->
                     <section class="pos-view-pane" id="view-pane-settings">
@@ -1167,6 +1236,7 @@
                         <label><input type="checkbox" id="tab-chk-kitchen"> Kitchen Token</label>
                         <label><input type="checkbox" id="tab-chk-debtors" checked> Debtors</label>
                         <label><input type="checkbox" id="tab-chk-creditors" checked> Creditors</label>
+                        <label><input type="checkbox" id="tab-chk-transactions" checked> Transactions</label>
                         <label><input type="checkbox" id="tab-chk-settings" checked> Settings</label>
                     </div>
                 </div>
@@ -1225,6 +1295,7 @@
                         <label><input type="checkbox" id="role-tab-kitchen"> Kitchen</label>
                         <label><input type="checkbox" id="role-tab-debtors" checked> Debtors</label>
                         <label><input type="checkbox" id="role-tab-creditors" checked> Creditors</label>
+                        <label><input type="checkbox" id="role-tab-transactions" checked> Transactions</label>
                         <label><input type="checkbox" id="role-tab-settings"> Settings</label>
                         <label><input type="checkbox" id="role-tab-dashboard"> Dashboard</label>
                     </div>
@@ -1426,6 +1497,31 @@
                 </div>
                 <button type="submit" class="place-order-btn" style="background:#10b981;">Confirm Supplier Payment</button>
             </form>
+        </div>
+    </div>
+
+
+    <!-- View Receipt / Transaction Details Modal -->
+    <div class="pos-modal-overlay" id="view-receipt-modal">
+        <div class="pos-modal-box" style="max-width:480px;">
+            <div class="pos-modal-header">
+                <h3 class="pos-modal-title"><i class="fa-solid fa-receipt"></i> Receipt Preview</h3>
+                <button class="pos-modal-close" onclick="closeModal('view-receipt-modal')">&times;</button>
+            </div>
+
+            <!-- Thermal Receipt Design Preview -->
+            <div id="receipt-preview-content" style="background:#fff; border:1px dashed #cbd5e1; border-radius:8px; padding:20px; font-family:'Courier New', Courier, monospace; color:#1e293b; font-size:0.88rem; line-height:1.45;">
+                <div style="text-align:center; padding:20px; color:#94a3b8;">Loading receipt details...</div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:16px;">
+                <button type="button" class="place-order-btn" style="flex:1;" onclick="printPreviewedReceipt()">
+                    <i class="fa-solid fa-print"></i> Print Receipt
+                </button>
+                <button type="button" class="header-idle-btn" style="padding:10px 16px;" onclick="closeModal('view-receipt-modal')">
+                    Close
+                </button>
+            </div>
         </div>
     </div>
 

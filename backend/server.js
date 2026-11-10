@@ -2968,11 +2968,11 @@ app.post("/api/attendance/manual-out", authenticateToken, (req, res) => {
 
 // 4. SME Transactions
 app.get("/api/transactions", authenticateToken, (req, res) => {
-  const { type, limit } = req.query;
+  const { type, limit, search, start_date, end_date } = req.query;
   const whereClauses = [];
   const params = [];
 
-  if (type) {
+  if (type && type !== "ALL") {
     const types = type.split(",").map((t) => t.trim().toUpperCase());
     const hasCashIn = types.includes("CASH_IN") || types.includes("FLOAT_IN");
     if (hasCashIn) {
@@ -2991,8 +2991,29 @@ app.get("/api/transactions", authenticateToken, (req, res) => {
     params.push(...types);
   }
 
+  if (search && search.trim()) {
+    const s = `%${search.trim()}%`;
+    whereClauses.push(`(
+      CAST(COALESCE(t.receipt_no, t.id) AS TEXT) LIKE ? OR
+      LOWER(t.description) LIKE LOWER(?) OR
+      LOWER(COALESCE(po.buyer_name, '')) LIKE LOWER(?) OR
+      LOWER(COALESCE(po.served_by, '')) LIKE LOWER(?) OR
+      CAST(t.amount AS TEXT) LIKE ?
+    )`);
+    params.push(s, s, s, s, s);
+  }
+
+  if (start_date) {
+    whereClauses.push(`DATE(t.transaction_date) >= DATE(?)`);
+    params.push(start_date);
+  }
+  if (end_date) {
+    whereClauses.push(`DATE(t.transaction_date) <= DATE(?)`);
+    params.push(end_date);
+  }
+
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
-  const limitSql = limit ? `LIMIT ${parseInt(limit)}` : "";
+  const limitSql = limit ? `LIMIT ${parseInt(limit)}` : "LIMIT 250";
   const receiptNoCol = "COALESCE(t.receipt_no, t.id) AS receipt_no";
 
   db.all(
@@ -3002,6 +3023,7 @@ app.get("/api/transactions", authenticateToken, (req, res) => {
                po.invoice_number AS order_invoice_number,
                po.total_amount AS order_total_amount,
                po.buyer_name AS order_buyer_name,
+               po.buyer_phone AS order_buyer_phone,
                po.served_by AS order_served_by,
                po.payment_method AS order_payment_method,
                po.amount_paid AS order_amount_paid,
@@ -3023,6 +3045,58 @@ app.get("/api/transactions", authenticateToken, (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ transactions: rows || [] });
     },
+  );
+});
+
+// ==== RECEIPT DETAILS API WITH ORDER ITEMS ====
+app.get("/api/receipt/details/:id", authenticateToken, (req, res) => {
+  const identifier = req.params.id;
+  // Match by receipt_no, transaction_id, or pos_orders.id
+  db.get(
+    `SELECT t.*,
+            po.id AS pos_order_id,
+            po.invoice_number AS order_invoice_number,
+            po.total_amount AS order_total_amount,
+            po.buyer_name AS order_buyer_name,
+            po.buyer_phone AS order_buyer_phone,
+            po.served_by AS order_served_by,
+            po.payment_method AS order_payment_method,
+            po.amount_paid AS order_amount_paid,
+            po.discount_amount AS order_discount_amount,
+            po.split_cash_amount,
+            po.split_second_amount,
+            po.split_second_method,
+            CASE 
+              WHEN po.served_by IS NOT NULL AND TRIM(po.served_by) != '' THEN po.served_by
+              WHEN t.recorded_by = 9999 THEN 'System Technician' 
+              ELSE COALESCE(NULLIF(CAST(e.nickname AS TEXT),''), e.first_name || ' ' || e.last_name) 
+            END AS recorded_by_name,
+            COALESCE(t.receipt_no, t.id) AS receipt_no
+     FROM transactions t
+     LEFT JOIN employees e ON t.recorded_by = e.id
+     LEFT JOIN pos_orders po ON po.transaction_id = t.id
+     WHERE t.id = ? OR t.receipt_no = ? OR po.id = ?
+     LIMIT 1`,
+    [identifier, identifier, identifier],
+    (err, tx) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!tx) return res.status(404).json({ error: "Receipt or transaction not found" });
+
+      if (tx.pos_order_id) {
+        db.all(
+          `SELECT * FROM order_items WHERE pos_order_id = ?`,
+          [tx.pos_order_id],
+          (itemErr, items) => {
+            if (itemErr) return res.status(500).json({ error: itemErr.message });
+            tx.items = items || [];
+            res.json({ receipt: tx });
+          }
+        );
+      } else {
+        tx.items = [];
+        res.json({ receipt: tx });
+      }
+    }
   );
 });
 

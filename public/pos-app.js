@@ -2317,9 +2317,47 @@ function renderReceiptModal(r) {
     `;
 }
 
-// Generic print receipt helper using default window.print()
-function printReceiptHtml(htmlContent, title) {
-    // 1. Create a hidden print iframe to prevent popup blockers and invoke default browser window printing
+// Show custom thermal printer animation overlay
+function showPrintAnimation(brandName, rcptNo, totalAmount) {
+    const overlay = document.getElementById('pos-print-animation-overlay');
+    if (!overlay) return;
+
+    const headEl = document.getElementById('anim-receipt-header');
+    const metaEl = document.getElementById('anim-receipt-meta');
+    const totalEl = document.getElementById('anim-receipt-total');
+    const paperEl = document.getElementById('pos-anim-paper-content');
+
+    if (headEl) headEl.textContent = brandName || (companyData.name || 'JOMISH POS');
+    if (metaEl) metaEl.innerHTML = `#${rcptNo || 'RECEIPT'}<br>${new Date().toLocaleTimeString()}`;
+    if (totalEl) totalEl.textContent = `TOTAL: ${totalAmount || ''}`;
+
+    // Reset animation
+    if (paperEl) {
+        paperEl.style.animation = 'none';
+        paperEl.offsetHeight; // trigger reflow
+        paperEl.style.animation = 'feedPaperDown 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards';
+    }
+
+    overlay.style.display = 'flex';
+}
+
+function hidePrintAnimation() {
+    const overlay = document.getElementById('pos-print-animation-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// Generic print receipt helper using custom animation + default window.print()
+function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
+    // 1. Trigger the custom thermal printer animation
+    showPrintAnimation(
+        companyData.name || 'JOMISH POS',
+        receiptMeta.receipt_no || title,
+        receiptMeta.total || ''
+    );
+
+    // 2. Prepare iframe for standard Windows default printer dialog
     let iframe = document.getElementById('receipt-print-frame');
     if (!iframe) {
         iframe = document.createElement('iframe');
@@ -2376,7 +2414,7 @@ function printReceiptHtml(htmlContent, title) {
     `);
     doc.close();
 
-    // Trigger standard default window printing
+    // 3. Trigger standard default window printing timed with animation
     setTimeout(() => {
         try {
             iframe.contentWindow.focus();
@@ -2390,8 +2428,11 @@ function printReceiptHtml(htmlContent, title) {
                 win.focus();
                 win.print();
             }
+        } finally {
+            // Automatically close the animation overlay once print command completes
+            setTimeout(hidePrintAnimation, 1200);
         }
-    }, 250);
+    }, 1100);
 }
 
 function printPreviewedReceipt() {
@@ -2399,7 +2440,13 @@ function printPreviewedReceipt() {
     const printContent = document.getElementById('receipt-preview-content');
     if (!printContent) return;
     const rcptNo = currentPreviewedReceipt.receipt_no || currentPreviewedReceipt.id;
-    printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`);
+    const curr = companyData.currency || 'Sh';
+    const total = `${parseFloat(currentPreviewedReceipt.order_total_amount || currentPreviewedReceipt.amount || 0).toLocaleString()} ${curr}`;
+
+    printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`, {
+        receipt_no: rcptNo,
+        total: total
+    });
 }
 
 async function printReceiptByTransaction(idOrReceipt) {
@@ -2419,7 +2466,13 @@ async function printReceiptByTransaction(idOrReceipt) {
 
         const printContent = document.getElementById('receipt-preview-content');
         if (printContent) {
-            printReceiptHtml(printContent.innerHTML, `Receipt #${r.receipt_no || r.id}`);
+            const rcptNo = r.receipt_no || r.id;
+            const curr = companyData.currency || 'Sh';
+            const total = `${parseFloat(r.order_total_amount || r.amount || 0).toLocaleString()} ${curr}`;
+            printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`, {
+                receipt_no: rcptNo,
+                total: total
+            });
         }
     } catch (err) {
         console.error('Failed to auto-print receipt:', err);

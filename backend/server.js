@@ -1261,7 +1261,7 @@ app.get("/api/system/init-status", (req, res) => {
 
 // Initialize a fresh database schema for a new company
 // Called by Tech Support when onboarding a new company
-app.post("/api/system/initialize", async (req, res) => {
+app.post("/api/system/initialize", authenticateToken, async (req, res) => {
   const {
     company_prefix,
     company_name,

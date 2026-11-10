@@ -138,13 +138,11 @@ function applyCompanyBranding() {
     }
 
     // 3. Tab Visibility (e.g. Hide 'Pending' tab for Supermarkets!)
-    const rawTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
-    const enabledTabs = Array.isArray(rawTabs) ? [...rawTabs] : ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
-    // Guarantee newly introduced core modules (finance, transactions, debtors, creditors, invoice) are visible by default
-    ['finance', 'transactions', 'debtors', 'creditors', 'invoice'].forEach(t => {
-        if (!enabledTabs.includes(t)) enabledTabs.push(t);
-    });
-    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
+    const rawTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'kitchen', 'finance', 'settings'];
+    const enabledTabs = Array.isArray(rawTabs) ? [...rawTabs] : ['register', 'orders', 'customer', 'inventory', 'shift', 'kitchen', 'finance', 'settings'];
+    if (!enabledTabs.includes('finance')) enabledTabs.push('finance');
+
+    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'kitchen', 'finance', 'settings'];
     tabs.forEach(tab => {
         const btn = document.getElementById(`nav-btn-${tab}`);
         if (btn) {
@@ -153,6 +151,16 @@ function applyCompanyBranding() {
             } else {
                 btn.style.display = 'flex';
             }
+        }
+    });
+
+    // Subtabs within Finance based on company enabled_tabs (if company specifically disabled returns/invoice etc.)
+    const finSubTabs = ['transactions', 'invoice', 'debtors', 'creditors', 'returns'];
+    finSubTabs.forEach(st => {
+        const btn = document.getElementById(`fin-tab-btn-${st}`);
+        if (btn) {
+            const isEnabled = !rawTabs.length || rawTabs.includes(st) || rawTabs.includes('finance');
+            btn.style.display = isEnabled ? 'flex' : 'none';
         }
     });
 
@@ -198,7 +206,7 @@ function enforceRolePermissions() {
 
     const perms = userPermissions || {};
 
-    // 1. Tab visibility based on role
+    // 1. Sidebar Tab visibility based on role
     const tabMap = {
         'register': perms.can_see_register !== 0,
         'orders': perms.can_see_orders !== 0,
@@ -206,18 +214,28 @@ function enforceRolePermissions() {
         'customer': perms.can_see_customer !== 0,
         'inventory': perms.can_see_inventory === 1,
         'shift': perms.can_see_shift !== 0,
-        'returns': perms.can_see_returns === 1,
-        'invoice': perms.can_see_invoice !== 0,
         'kitchen': perms.can_see_kitchen === 1,
-        'debtors': perms.can_see_debtors !== 0,
-        'creditors': perms.can_see_creditors !== 0,
-        'transactions': perms.can_see_transactions !== 0,
         'finance': perms.can_see_finance !== 0,
         'settings': perms.can_see_settings === 1
     };
 
     for (const [tab, canSee] of Object.entries(tabMap)) {
         const btn = document.getElementById(`nav-btn-${tab}`);
+        if (btn && !canSee) {
+            btn.style.display = 'none';
+        }
+    }
+
+    // 1b. Finance Subtab visibility based on role permissions
+    const finSubTabMap = {
+        'transactions': perms.can_see_transactions !== 0,
+        'invoice': perms.can_see_invoice !== 0,
+        'debtors': perms.can_see_debtors !== 0,
+        'creditors': perms.can_see_creditors !== 0,
+        'returns': perms.can_see_returns === 1
+    };
+    for (const [subTab, canSee] of Object.entries(finSubTabMap)) {
+        const btn = document.getElementById(`fin-tab-btn-${subTab}`);
         if (btn && !canSee) {
             btn.style.display = 'none';
         }
@@ -267,7 +285,17 @@ function enforceRolePermissions() {
 // ============================================================================
 // NAVIGATION TAB SWITCHING
 // ============================================================================
-function switchNavTab(tabName) {
+// TAB NAVIGATION CONTROLLER
+// ============================================================================
+let activeFinanceSubTab = 'overview';
+
+function switchNavTab(tabName, finSubTab) {
+    // If a bundled financial tab is targeted, route directly to Finance sub-view
+    if (['transactions', 'invoice', 'debtors', 'creditors', 'returns'].includes(tabName)) {
+        finSubTab = tabName;
+        tabName = 'finance';
+    }
+
     activeNavTab = tabName;
 
     // Toggle active sidebar pill
@@ -304,15 +332,45 @@ function switchNavTab(tabName) {
     if (tabName === 'customer') loadCustomerList();
     if (tabName === 'inventory') loadProducts();
     if (tabName === 'shift') loadActiveShiftInfo();
-    if (tabName === 'returns') loadReturnsList();
-    if (tabName === 'invoice') loadInvoicesList();
     if (tabName === 'kitchen') loadKitchenTokens();
-    if (tabName === 'debtors') loadDebtorsList();
-    if (tabName === 'creditors') loadCreditorsList();
-    if (tabName === 'transactions') loadTransactionsList();
-    if (tabName === 'finance') loadFinanceDashboard();
+    if (tabName === 'finance') {
+        switchFinanceSubTab(finSubTab || activeFinanceSubTab || 'overview');
+    }
     if (tabName === 'settings') loadCustomRolesSettings();
     if (tabName === 'tech') loadTechCompanies();
+}
+
+function switchFinanceSubTab(subTab) {
+    activeFinanceSubTab = subTab || 'overview';
+
+    // Toggle active subtab button styling
+    document.querySelectorAll('.pos-fin-subtab-btn').forEach(b => b.classList.remove('active'));
+    const targetBtn = document.getElementById(`fin-tab-btn-${activeFinanceSubTab}`);
+    if (targetBtn) targetBtn.classList.add('active');
+
+    // Toggle active finance subview
+    document.querySelectorAll('.pos-fin-subview').forEach(v => v.classList.remove('active'));
+    const targetView = document.getElementById(`fin-subview-${activeFinanceSubTab}`);
+    if (targetView) targetView.classList.add('active');
+
+    // Trigger subtab specific data loader
+    if (activeFinanceSubTab === 'overview') {
+        loadFinanceDashboard();
+    } else if (activeFinanceSubTab === 'transactions') {
+        loadTransactionsList();
+    } else if (activeFinanceSubTab === 'invoice') {
+        loadInvoicesList();
+    } else if (activeFinanceSubTab === 'debtors') {
+        loadDebtorsList();
+    } else if (activeFinanceSubTab === 'creditors') {
+        loadCreditorsList();
+    } else if (activeFinanceSubTab === 'returns') {
+        loadReturnsList();
+    }
+}
+
+function refreshActiveFinanceSubTab() {
+    switchFinanceSubTab(activeFinanceSubTab || 'overview');
 }
 
 function toggleSidebarMenu() {
@@ -1221,8 +1279,7 @@ async function handleSaveCashIn(e) {
             closeModal('cash-in-modal');
             alert(`Cash addition of ${amount.toLocaleString()} recorded successfully.`);
             await loadActiveShiftInfo();
-            if (activeNavTab === 'finance') loadFinanceDashboard();
-            if (activeNavTab === 'transactions') loadTransactionsList();
+            if (activeNavTab === 'finance') refreshActiveFinanceSubTab();
         } else {
             alert('Cash in failed: ' + (data.error || 'Check authorization'));
         }
@@ -1267,8 +1324,7 @@ async function handleSaveExpense(e) {
             closeModal('expense-modal');
             alert(`Expense of ${amount.toLocaleString()} recorded successfully.`);
             await loadActiveShiftInfo();
-            if (activeNavTab === 'finance') loadFinanceDashboard();
-            if (activeNavTab === 'transactions') loadTransactionsList();
+            if (activeNavTab === 'finance') refreshActiveFinanceSubTab();
         } else {
             alert('Expense recording failed: ' + (data.error || 'Server error'));
         }
@@ -2843,8 +2899,7 @@ async function syncOfflineOrders() {
             if (badge) badge.style.display = 'none';
             alert(`Sync Successful: ${result.synced_count || pendingSales.length} offline orders synchronized with server.`);
             if (activeNavTab === 'orders') loadOrdersList();
-            if (activeNavTab === 'transactions') loadTransactionsList();
-            if (activeNavTab === 'finance') loadFinanceDashboard();
+            if (activeNavTab === 'finance') refreshActiveFinanceSubTab();
         } else {
             const err = await res.json();
             alert('Sync error: ' + (err.error || 'Server rejected batch'));

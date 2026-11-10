@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -110,42 +110,13 @@
                     <span>Shift</span>
                 </button>
 
-                <button class="pos-nav-item" id="nav-btn-returns" onclick="switchNavTab('returns')">
-                    <i class="fa-solid fa-arrow-rotate-left"></i>
-                    <span>Returns</span>
-                </button>
-
-                <!-- INVOICE TAB -->
-                <button class="pos-nav-item" id="nav-btn-invoice" onclick="switchNavTab('invoice')">
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <span>Invoice</span>
-                </button>
-
                 <!-- KITCHEN TOKEN TAB -->
                 <button class="pos-nav-item" id="nav-btn-kitchen" onclick="switchNavTab('kitchen')">
                     <i class="fa-solid fa-utensils"></i>
                     <span>Kitchen</span>
                 </button>
 
-                <!-- DEBTORS TAB (Customers owing) -->
-                <button class="pos-nav-item" id="nav-btn-debtors" onclick="switchNavTab('debtors')">
-                    <i class="fa-solid fa-hand-holding-dollar"></i>
-                    <span>Debtors</span>
-                </button>
-
-                <!-- CREDITORS TAB (Suppliers owed) -->
-                <button class="pos-nav-item" id="nav-btn-creditors" onclick="switchNavTab('creditors')">
-                    <i class="fa-solid fa-truck-field"></i>
-                    <span>Creditors</span>
-                </button>
-
-                <!-- TRANSACTIONS TAB (Old receipts & ledger) -->
-                <button class="pos-nav-item" id="nav-btn-transactions" onclick="switchNavTab('transactions')">
-                    <i class="fa-solid fa-receipt"></i>
-                    <span>Transactions</span>
-                </button>
-
-                <!-- FINANCE TAB (iBanko Style Executive Financial Dashboard) -->
+                <!-- FINANCE TAB (Executive Financial Suite: Overview, Transactions, Invoices, Debtors, Creditors, Returns) -->
                 <button class="pos-nav-item" id="nav-btn-finance" onclick="switchNavTab('finance')">
                     <i class="fa-solid fa-wallet"></i>
                     <span>Finance</span>
@@ -499,90 +470,7 @@
                     </section>
 
 
-                    <!-- ==========================================
-                         TAB 7: RETURNS
-                         ========================================== -->
-                    <section class="pos-view-pane" id="view-pane-returns">
-                        <div class="tab-search-bar-wrap">
-                            <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="returns-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search returns by receipt #, item name, or cashier..." 
-                                    oninput="filterReturnsList(this.value)"
-                                >
-                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
-                            </div>
-                            <button class="header-upload-pill" onclick="openProcessReturnModal()">+ Process Return</button>
-                        </div>
 
-                        <div class="tab-content-container">
-                            <div class="pos-table-card">
-                                <table class="pos-data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Receipt #</th>
-                                            <th>Product Name</th>
-                                            <th>Qty Returned</th>
-                                            <th>Refund Amount</th>
-                                            <th>Method</th>
-                                            <th>Reason</th>
-                                            <th>Processed By</th>
-                                            <th>Return Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="returns-table-tbody">
-                                        <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading returns history...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
-
-
-                    <!-- ==========================================
-                         TAB: INVOICE
-                         ========================================== -->
-                    <section class="pos-view-pane" id="view-pane-invoice">
-                        <div class="tab-search-bar-wrap">
-                            <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="invoice-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search invoices by invoice #, customer name, or phone..." 
-                                    oninput="filterInvoicesList(this.value)"
-                                >
-                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
-                            </div>
-                            <button class="header-upload-pill" onclick="openCreateInvoiceModal()">+ Create Invoice</button>
-                            <button class="header-idle-btn" onclick="loadInvoicesList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                        </div>
-
-                        <div class="tab-content-container">
-                            <div class="pos-table-card">
-                                <table class="pos-data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Invoice #</th>
-                                            <th>Date &amp; Time</th>
-                                            <th>Customer Name</th>
-                                            <th>Phone</th>
-                                            <th>Total Amount</th>
-                                            <th>Amount Paid</th>
-                                            <th>Balance Due</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="invoices-table-tbody">
-                                        <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading invoices...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
 
 
                     <!-- ==========================================
@@ -619,184 +507,45 @@
 
 
                     <!-- ==========================================
-                         TAB: DEBTORS (Accounts Receivable)
-                         ========================================== -->
-                    <section class="pos-view-pane" id="view-pane-debtors">
-                        <div class="tab-search-bar-wrap">
-                            <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="debtors-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search debtors by customer name, phone, or invoice #..." 
-                                    oninput="filterDebtorsList(this.value)"
-                                >
-                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
-                            </div>
-                            <button class="header-upload-pill" onclick="openAddDebtorModal()">+ Add Debtor</button>
-                            <button class="header-idle-btn" onclick="loadDebtorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                        </div>
-
-                        <div class="tab-content-container">
-                            <!-- Debtors Summary Cards -->
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OUTSTANDING DEBT</div>
-                                    <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;" id="debtors-total-amount">0 Sh</div>
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL DEBTORS COUNT</div>
-                                    <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;" id="debtors-total-count">0</div>
-                                </div>
-                            </div>
-
-                            <div class="pos-table-card">
-                                <table class="pos-data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Customer Name</th>
-                                            <th>Phone Number</th>
-                                            <th>Total Debt</th>
-                                            <th>Amount Paid</th>
-                                            <th>Remaining Balance</th>
-                                            <th>Promised / Due Date</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="debtors-table-tbody">
-                                        <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading debtors ledger...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
-
-
-                    <!-- ==========================================
-                         TAB: CREDITORS (Accounts Payable / Suppliers)
-                         ========================================== -->
-                    <section class="pos-view-pane" id="view-pane-creditors">
-                        <div class="tab-search-bar-wrap">
-                            <div class="tab-search-input-box">
-                                <input 
-                                    type="text" 
-                                    id="creditors-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search creditors by supplier name, contact, phone, or bill #..." 
-                                    oninput="filterCreditorsList(this.value)"
-                                >
-                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
-                            </div>
-                            <button class="header-upload-pill" onclick="openAddCreditorModal()">+ Add Supplier Bill</button>
-                            <button class="header-idle-btn" onclick="loadCreditorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                        </div>
-
-                        <div class="tab-content-container">
-                            <!-- Creditors Summary Cards -->
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OWED TO SUPPLIERS</div>
-                                    <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;" id="creditors-total-amount">0 Sh</div>
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-                                    <div style="font-size:0.8rem; color:#64748b; font-weight:600;">SUPPLIERS COUNT</div>
-                                    <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;" id="creditors-total-count">0</div>
-                                </div>
-                            </div>
-
-                            <div class="pos-table-card">
-                                <table class="pos-data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Supplier Name</th>
-                                            <th>Contact Person</th>
-                                            <th>Phone</th>
-                                            <th>Bill / Inv #</th>
-                                            <th>Total Bill</th>
-                                            <th>Amount Paid</th>
-                                            <th>Balance Owed</th>
-                                            <th>Due Date</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="creditors-table-tbody">
-                                        <tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading creditors list...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
-
-
-                    <!-- ==========================================
-                         TAB: TRANSACTIONS (Old Receipts & Ledgers)
-                         ========================================== -->
-                    <section class="pos-view-pane" id="view-pane-transactions">
-                        <div class="tab-search-bar-wrap" style="flex-wrap:wrap; gap:10px;">
-                            <div class="tab-search-input-box" style="flex:1; min-width:260px;">
-                                <input 
-                                    type="text" 
-                                    id="tx-search-input" 
-                                    class="tab-search-input" 
-                                    placeholder="Search by receipt #, description, customer, cashier, amount..." 
-                                    oninput="filterTransactionsList()"
-                                >
-                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
-                            </div>
-
-                            <!-- Filter by Type -->
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <select id="tx-filter-type" class="pos-input" style="padding:7px 12px; font-size:0.85rem;" onchange="loadTransactionsList()">
-                                    <option value="ALL">All Types</option>
-                                    <option value="INCOME">Income / POS Sales</option>
-                                    <option value="GOODS_ON_CREDIT">Goods on Credit</option>
-                                    <option value="EXPENSE">Expenses</option>
-                                    <option value="CASH_IN">Cash In / Float</option>
-                                    <option value="TRANSFER">Transfers</option>
-                                </select>
-
-                                <!-- Date Pickers -->
-                                <input type="date" id="tx-filter-start" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
-                                <span style="color:#64748b; font-size:0.85rem;">to</span>
-                                <input type="date" id="tx-filter-end" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
-
-                                <button class="header-idle-btn" style="padding:7px 14px; font-size:0.85rem;" onclick="resetTxFilters()">
-                                    <i class="fa-solid fa-rotate-left"></i> Reset
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="tab-content-container">
-                            <div class="pos-table-card">
-                                <table class="pos-data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Receipt #</th>
-                                            <th>Date &amp; Time</th>
-                                            <th>Type</th>
-                                            <th>Description</th>
-                                            <th>Customer / Details</th>
-                                            <th>Payment Method</th>
-                                            <th>Recorded By</th>
-                                            <th style="text-align:right;">Amount</th>
-                                            <th style="text-align:center;">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="transactions-table-tbody">
-                                        <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading transactions ledger...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </section>
-
-
-                    <!-- ==========================================
-                         TAB: FINANCE (Executive Dashboard matching iBanko)
+                         TAB: FINANCE (Executive Financial Suite)
+                         Bundled Suite: Overview, Transactions, Invoices, Debtors, Creditors, Returns
                          ========================================== -->
                     <section class="pos-view-pane" id="view-pane-finance" style="padding:0; overflow:hidden;">
+                        <!-- Finance Sub-Navigation Bar -->
+                        <div class="pos-fin-subnav-bar">
+                            <div class="pos-fin-subnav-tabs">
+                                <button type="button" class="pos-fin-subtab-btn active" id="fin-tab-btn-overview" onclick="switchFinanceSubTab('overview')">
+                                    <i class="fa-solid fa-chart-pie"></i>
+                                    <span>Overview</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-transactions" onclick="switchFinanceSubTab('transactions')">
+                                    <i class="fa-solid fa-receipt"></i>
+                                    <span>Transactions</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-invoice" onclick="switchFinanceSubTab('invoice')">
+                                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                                    <span>Invoices</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-debtors" onclick="switchFinanceSubTab('debtors')">
+                                    <i class="fa-solid fa-hand-holding-dollar"></i>
+                                    <span>Debtors</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-creditors" onclick="switchFinanceSubTab('creditors')">
+                                    <i class="fa-solid fa-truck-field"></i>
+                                    <span>Creditors</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="fin-tab-btn-returns" onclick="switchFinanceSubTab('returns')">
+                                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                                    <span>Returns</span>
+                                </button>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button type="button" class="pos-fin-icon-btn" title="Refresh Active Tab" onclick="refreshActiveFinanceSubTab()"><i class="fa-solid fa-rotate"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- 1. OVERVIEW (iBanko Executive Financial Dashboard) -->
+                        <div class="pos-fin-subview active" id="fin-subview-overview">
                         <div class="pos-finance-shell">
                             <div class="pos-finance-grid">
                                 
@@ -1004,6 +753,254 @@
 
                                 </div>
 
+                            </div>
+                        </div>
+                        </div>
+
+                        <!-- 2. TRANSACTIONS SUB-VIEW -->
+                        <div class="pos-fin-subview" id="fin-subview-transactions">
+                            <div class="tab-search-bar-wrap" style="flex-wrap:wrap; gap:10px;">
+                                <div class="tab-search-input-box" style="flex:1; min-width:260px;">
+                                    <input 
+                                        type="text" 
+                                        id="tx-search-input" 
+                                        class="tab-search-input" 
+                                        placeholder="Search by receipt #, description, customer, cashier, amount..." 
+                                        oninput="filterTransactionsList()"
+                                    >
+                                    <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                                </div>
+
+                                <!-- Filter by Type -->
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <select id="tx-filter-type" class="pos-input" style="padding:7px 12px; font-size:0.85rem;" onchange="loadTransactionsList()">
+                                        <option value="ALL">All Types</option>
+                                        <option value="INCOME">Income / POS Sales</option>
+                                        <option value="GOODS_ON_CREDIT">Goods on Credit</option>
+                                        <option value="EXPENSE">Expenses</option>
+                                        <option value="CASH_IN">Cash In / Float</option>
+                                        <option value="TRANSFER">Transfers</option>
+                                    </select>
+
+                                    <!-- Date Pickers -->
+                                    <input type="date" id="tx-filter-start" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
+                                    <span style="color:#64748b; font-size:0.85rem;">to</span>
+                                    <input type="date" id="tx-filter-end" class="pos-input" style="padding:6px 10px; font-size:0.82rem;" onchange="loadTransactionsList()">
+
+                                    <button class="header-idle-btn" style="padding:7px 14px; font-size:0.85rem;" onclick="resetTxFilters()">
+                                        <i class="fa-solid fa-rotate-left"></i> Reset
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="tab-content-container">
+                                <div class="pos-table-card">
+                                    <table class="pos-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Receipt #</th>
+                                                <th>Date &amp; Time</th>
+                                                <th>Type</th>
+                                                <th>Description</th>
+                                                <th>Customer / Details</th>
+                                                <th>Payment Method</th>
+                                                <th>Recorded By</th>
+                                                <th style="text-align:right;">Amount</th>
+                                                <th style="text-align:center;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="transactions-table-tbody">
+                                            <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading transactions ledger...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. INVOICES SUB-VIEW -->
+                        <div class="pos-fin-subview" id="fin-subview-invoice">
+                            <div class="tab-search-bar-wrap">
+                                <div class="tab-search-input-box">
+                                    <input 
+                                        type="text" 
+                                        id="invoice-search-input" 
+                                        class="tab-search-input" 
+                                        placeholder="Search invoices by invoice #, customer name, or phone..." 
+                                        oninput="filterInvoicesList(this.value)"
+                                    >
+                                    <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                                </div>
+                                <button class="header-upload-pill" onclick="openCreateInvoiceModal()">+ Create Invoice</button>
+                                <button class="header-idle-btn" onclick="loadInvoicesList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            </div>
+
+                            <div class="tab-content-container">
+                                <div class="pos-table-card">
+                                    <table class="pos-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Invoice #</th>
+                                                <th>Date &amp; Time</th>
+                                                <th>Customer Name</th>
+                                                <th>Phone</th>
+                                                <th>Total Amount</th>
+                                                <th>Amount Paid</th>
+                                                <th>Balance Due</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="invoices-table-tbody">
+                                            <tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">Loading invoices...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. DEBTORS SUB-VIEW -->
+                        <div class="pos-fin-subview" id="fin-subview-debtors">
+                            <div class="tab-search-bar-wrap">
+                                <div class="tab-search-input-box">
+                                    <input 
+                                        type="text" 
+                                        id="debtors-search-input" 
+                                        class="tab-search-input" 
+                                        placeholder="Search debtors by customer name, phone, or invoice #..." 
+                                        oninput="filterDebtorsList(this.value)"
+                                    >
+                                    <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                                </div>
+                                <button class="header-upload-pill" onclick="openAddDebtorModal()">+ Add Debtor</button>
+                                <button class="header-idle-btn" onclick="loadDebtorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            </div>
+
+                            <div class="tab-content-container">
+                                <!-- Debtors Summary Cards -->
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OUTSTANDING DEBT</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;" id="debtors-total-amount">0 Sh</div>
+                                    </div>
+                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL DEBTORS COUNT</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;" id="debtors-total-count">0</div>
+                                    </div>
+                                </div>
+
+                                <div class="pos-table-card">
+                                    <table class="pos-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Customer Name</th>
+                                                <th>Phone Number</th>
+                                                <th>Total Debt</th>
+                                                <th>Amount Paid</th>
+                                                <th>Remaining Balance</th>
+                                                <th>Promised / Due Date</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="debtors-table-tbody">
+                                            <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading debtors ledger...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5. CREDITORS SUB-VIEW -->
+                        <div class="pos-fin-subview" id="fin-subview-creditors">
+                            <div class="tab-search-bar-wrap">
+                                <div class="tab-search-input-box">
+                                    <input 
+                                        type="text" 
+                                        id="creditors-search-input" 
+                                        class="tab-search-input" 
+                                        placeholder="Search creditors by supplier name, contact, phone, or bill #..." 
+                                        oninput="filterCreditorsList(this.value)"
+                                    >
+                                    <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                                </div>
+                                <button class="header-upload-pill" onclick="openAddCreditorModal()">+ Add Supplier Bill</button>
+                                <button class="header-idle-btn" onclick="loadCreditorsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            </div>
+
+                            <div class="tab-content-container">
+                                <!-- Creditors Summary Cards -->
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:20px;">
+                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">TOTAL OWED TO SUPPLIERS</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#e11d48; margin-top:4px;" id="creditors-total-amount">0 Sh</div>
+                                    </div>
+                                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+                                        <div style="font-size:0.8rem; color:#64748b; font-weight:600;">SUPPLIERS COUNT</div>
+                                        <div style="font-size:1.35rem; font-weight:800; color:#0284c7; margin-top:4px;" id="creditors-total-count">0</div>
+                                    </div>
+                                </div>
+
+                                <div class="pos-table-card">
+                                    <table class="pos-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Supplier Name</th>
+                                                <th>Contact Person</th>
+                                                <th>Phone</th>
+                                                <th>Bill / Inv #</th>
+                                                <th>Total Bill</th>
+                                                <th>Amount Paid</th>
+                                                <th>Balance Owed</th>
+                                                <th>Due Date</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="creditors-table-tbody">
+                                            <tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">Loading creditors list...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 6. RETURNS SUB-VIEW -->
+                        <div class="pos-fin-subview" id="fin-subview-returns">
+                            <div class="tab-search-bar-wrap">
+                                <div class="tab-search-input-box">
+                                    <input 
+                                        type="text" 
+                                        id="returns-search-input" 
+                                        class="tab-search-input" 
+                                        placeholder="Search returns by receipt #, item name, or cashier..." 
+                                        oninput="filterReturnsList(this.value)"
+                                    >
+                                    <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                                </div>
+                                <button class="header-upload-pill" onclick="openProcessReturnModal()">+ Process Return</button>
+                                <button class="header-idle-btn" onclick="loadReturnsList()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            </div>
+
+                            <div class="tab-content-container">
+                                <div class="pos-table-card">
+                                    <table class="pos-data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Receipt #</th>
+                                                <th>Product Name</th>
+                                                <th>Qty Returned</th>
+                                                <th>Refund Amount</th>
+                                                <th>Method</th>
+                                                <th>Reason</th>
+                                                <th>Processed By</th>
+                                                <th>Return Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="returns-table-tbody">
+                                            <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading returns history...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </section>

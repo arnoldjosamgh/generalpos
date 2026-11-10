@@ -1161,3 +1161,548 @@ input:checked + .switch-slider:before { transform: translateX(20px); }
 }
 
 
+
+/* ==========================================================================
+   FINANCE INTELLIGENCE DASHBOARD (Pixel-Perfect Match to iBanko Design)
+   ========================================================================== */
+.pos-finance-shell {
+    background: #f1f5f9;
+    padding: 24px;
+    height: 100%;
+    overflow-y: auto;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.pos-finance-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 24px;
+    max-width: 1440px;
+    margin: 0 auto;
+}
+
+@media (max-width: 1180px) {
+    .pos-finance-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Header greeting */
+.pos-fin-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.pos-fin-greeting-wrap h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.pos-fin-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pos-fin-select-btn {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.pos-fin-icon-btn {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    transition: all 0.15s ease;
+}
+
+.pos-fin-icon-btn:hover {
+    color: #0f172a;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+}
+
+/* My Card (Dark Hero Banner) */
+.pos-fin-hero-card {
+    background: linear-gradient(135deg, #090d16 0%, #151d2a 100%);
+    border-radius: 20px;
+    padding: 24px 28px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25);
+}
+
+.pos-fin-hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.pos-fin-hero-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #94a3b8;
+    letter-spacing: 0.3px;
+}
+
+.pos-fin-hero-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #10b981;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.pos-fin-hero-balance-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    position: relative;
+    z-index: 2;
+}
+
+.pos-fin-hero-amount {
+    font-size: 2.35rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+}
+
+.pos-fin-hero-btns {
+    display: flex;
+    gap: 10px;
+}
+
+.pos-fin-hero-btn {
+    border: none;
+    border-radius: 20px;
+    padding: 9px 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease;
+}
+
+.pos-fin-hero-btn:hover {
+    transform: scale(1.03);
+}
+
+.pos-fin-hero-btn.deposit {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.pos-fin-hero-btn.withdraw {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Financial Record 3-Cards Row */
+.pos-fin-section-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.pos-fin-section-title-row h2 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+}
+
+.pos-fin-pill-select {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    outline: none;
+}
+
+.pos-fin-records-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .pos-fin-records-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pos-fin-stat-card {
+    border-radius: 18px;
+    padding: 20px;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 125px;
+    border: 1px solid transparent;
+}
+
+.pos-fin-stat-card.green {
+    background: #e8f8f2;
+    border-color: #c9ede0;
+}
+
+.pos-fin-stat-card.peach {
+    background: #fdf0ea;
+    border-color: #f7dacd;
+}
+
+.pos-fin-stat-card.blue {
+    background: #edf3ff;
+    border-color: #d7e4fd;
+}
+
+.pos-fin-stat-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pos-fin-stat-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #475569;
+}
+
+.pos-fin-stat-dots {
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.pos-fin-stat-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 14px;
+}
+
+.pos-fin-stat-val {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.pos-fin-stat-trend {
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.pos-fin-stat-trend.up { color: #10b981; }
+.pos-fin-stat-trend.orange { color: #f97316; }
+
+/* Money Flow Chart Box */
+.pos-fin-chart-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 22px 24px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    margin-bottom: 24px;
+}
+
+.pos-fin-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.pos-fin-chart-legends {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.pos-fin-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.pos-fin-legend-dot.dark { background: #0f172a; }
+.pos-fin-legend-dot.orange { background: #f97316; }
+
+/* Bottom Dual Cards (Send Money To & Scheduled Payments) */
+.pos-fin-bottom-dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 850px) {
+    .pos-fin-bottom-dual {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pos-fin-mini-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.pos-fin-send-list {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.pos-fin-add-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #0f172a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.15s ease;
+}
+
+.pos-fin-add-circle:hover {
+    transform: scale(1.08);
+}
+
+.pos-fin-avatar-bubble {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #334155;
+    font-size: 0.85rem;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.pos-fin-avatar-bubble:hover {
+    transform: scale(1.08);
+}
+
+.pos-fin-scheduled-list {
+    display: flex;
+    gap: 14px;
+    margin-top: 14px;
+    overflow-x: auto;
+}
+
+.pos-fin-scheduled-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 10px 14px;
+    min-width: 85px;
+    text-align: center;
+}
+
+.pos-fin-sched-name {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.pos-fin-sched-amt {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 3px;
+}
+
+/* Right Column (Transactions list & Available Cards) */
+.pos-fin-right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.pos-fin-transactions-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 22px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.pos-fin-tx-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.pos-fin-tx-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 0;
+    transition: background 0.15s ease;
+}
+
+.pos-fin-tx-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pos-fin-tx-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+}
+
+.pos-fin-tx-icon.income {
+    background: #e8f8f2;
+    color: #10b981;
+}
+
+.pos-fin-tx-icon.expense {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.pos-fin-tx-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.pos-fin-tx-date {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.pos-fin-tx-amount {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+/* Available Card Mini-Cards */
+.pos-fin-cards-wrap {
+    background: #fff;
+    border-radius: 20px;
+    padding: 22px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.pos-fin-bank-card {
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 90px;
+}
+
+.pos-fin-bank-card.cyan {
+    background: #ecfeff;
+    border: 1px solid #cffafe;
+    color: #0e7490;
+}
+
+.pos-fin-bank-card.mint {
+    background: #f0fdf4;
+    border: 1px solid #dcfce7;
+    color: #15803d;
+}
+
+.pos-fin-bank-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pos-fin-bank-card-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.pos-fin-bank-card-brand {
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+.pos-fin-bank-card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 10px;
+}

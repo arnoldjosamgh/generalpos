@@ -688,7 +688,7 @@ app.post("/api/login", async (req, res) => {
     if (isTech) {
       const techPerms = {
         can_see_register: 1, can_see_orders: 1, can_see_pending: 1, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 1, can_see_dashboard: 1, can_see_tech: 1,
-        can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1,
+        can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1, can_see_transactions: 1, can_see_finance: 1,
         can_sell: 1, can_add_order: 1, can_add_inventory: 1, can_reduce_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1, can_manage_invoices: 1, can_manage_kitchen: 1, can_manage_debtors: 1, can_manage_creditors: 1
       };
       const token = jwt.sign(
@@ -831,6 +831,8 @@ app.post("/api/login", async (req, res) => {
     can_see_kitchen: COALESCE(foundUser.can_see_kitchen, (roleConfig ? roleConfig.can_see_kitchen : 1)),
     can_see_debtors: COALESCE(foundUser.can_see_debtors, (roleConfig ? roleConfig.can_see_debtors : 1)),
     can_see_creditors: COALESCE(foundUser.can_see_creditors, (roleConfig ? roleConfig.can_see_creditors : 1)),
+    can_see_transactions: COALESCE(foundUser.can_see_transactions, (roleConfig ? roleConfig.can_see_transactions : 1)),
+    can_see_finance: COALESCE(foundUser.can_see_finance, (roleConfig ? roleConfig.can_see_finance : 1)),
 
     // Granular Actions
     can_sell: COALESCE(foundUser.can_sell, (roleConfig ? roleConfig.can_sell : 1)),
@@ -1414,35 +1416,35 @@ app.post("/api/system/initialize", async (req, res) => {
             {
               role_name: "Manager",
               can_see_register: 1, can_see_orders: 1, can_see_pending: tabs.includes("pending") ? 1 : 0, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 1, can_see_dashboard: 1,
-              can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1,
+              can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1, can_see_transactions: 1, can_see_finance: 1,
               can_sell: 1, can_add_order: 1, can_add_inventory: 1, can_reduce_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1,
               can_manage_invoices: 1, can_manage_kitchen: 1, can_manage_debtors: 1, can_manage_creditors: 1
             },
             {
               role_name: "Supervisor",
               can_see_register: 1, can_see_orders: 1, can_see_pending: tabs.includes("pending") ? 1 : 0, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 0, can_see_dashboard: 0,
-              can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1,
+              can_see_invoice: 1, can_see_kitchen: 1, can_see_debtors: 1, can_see_creditors: 1, can_see_transactions: 1, can_see_finance: 0,
               can_sell: 1, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 1, can_manage_prices: 0, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
               can_manage_invoices: 1, can_manage_kitchen: 1, can_manage_debtors: 1, can_manage_creditors: 0
             },
             {
               role_name: "Cashier",
               can_see_register: 1, can_see_orders: 1, can_see_pending: 0, can_see_customer: 1, can_see_inventory: 0, can_see_shift: 1, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
-              can_see_invoice: 1, can_see_kitchen: 0, can_see_debtors: 1, can_see_creditors: 0,
+              can_see_invoice: 1, can_see_kitchen: 0, can_see_debtors: 1, can_see_creditors: 0, can_see_transactions: 1, can_see_finance: 0,
               can_sell: 1, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
               can_manage_invoices: 0, can_manage_kitchen: 0, can_manage_debtors: 0, can_manage_creditors: 0
             },
             {
               role_name: "Attendants",
               can_see_register: 1, can_see_orders: 0, can_see_pending: 0, can_see_customer: 1, can_see_inventory: 0, can_see_shift: 0, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
-              can_see_invoice: 0, can_see_kitchen: 0, can_see_debtors: 0, can_see_creditors: 0,
+              can_see_invoice: 0, can_see_kitchen: 0, can_see_debtors: 0, can_see_creditors: 0, can_see_transactions: 0, can_see_finance: 0,
               can_sell: 1, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 0, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
               can_manage_invoices: 0, can_manage_kitchen: 0, can_manage_debtors: 0, can_manage_creditors: 0
             },
             {
               role_name: "Waiter",
               can_see_register: 1, can_see_orders: 1, can_see_pending: 1, can_see_customer: 0, can_see_inventory: 0, can_see_shift: 0, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
-              can_see_invoice: 0, can_see_kitchen: 1, can_see_debtors: 0, can_see_creditors: 0,
+              can_see_invoice: 0, can_see_kitchen: 1, can_see_debtors: 0, can_see_creditors: 0, can_see_transactions: 0, can_see_finance: 0,
               can_sell: 0, can_add_order: 1, can_add_inventory: 0, can_reduce_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 0, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0,
               can_manage_invoices: 0, can_manage_kitchen: 1, can_manage_debtors: 0, can_manage_creditors: 0
             }
@@ -1454,15 +1456,16 @@ app.post("/api/system/initialize", async (req, res) => {
             db.run(
               `INSERT INTO roles_config (
                 role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer, can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-                can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+                can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors, can_see_transactions, can_see_finance,
                 can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
                 can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
                 can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ON CONFLICT(role_name) DO UPDATE SET
                 can_see_register=excluded.can_see_register, can_see_orders=excluded.can_see_orders, can_see_pending=excluded.can_see_pending, can_see_customer=excluded.can_see_customer,
                 can_see_inventory=excluded.can_see_inventory, can_see_shift=excluded.can_see_shift, can_see_returns=excluded.can_see_returns, can_see_settings=excluded.can_see_settings, can_see_dashboard=excluded.can_see_dashboard,
                 can_see_invoice=excluded.can_see_invoice, can_see_kitchen=excluded.can_see_kitchen, can_see_debtors=excluded.can_see_debtors, can_see_creditors=excluded.can_see_creditors,
+                can_see_transactions=excluded.can_see_transactions, can_see_finance=excluded.can_see_finance,
                 can_sell=excluded.can_sell, can_add_order=excluded.can_add_order, can_add_inventory=excluded.can_add_inventory, can_reduce_inventory=excluded.can_reduce_inventory, can_view_inventory=excluded.can_view_inventory, can_manage_prices=excluded.can_manage_prices, can_give_discount=excluded.can_give_discount,
                 can_void_orders=excluded.can_void_orders, can_process_returns=excluded.can_process_returns, can_manage_shifts=excluded.can_manage_shifts, can_manage_users=excluded.can_manage_users, can_edit_settings=excluded.can_edit_settings, can_manage_categories=excluded.can_manage_categories,
                 can_manage_invoices=excluded.can_manage_invoices, can_manage_kitchen=excluded.can_manage_kitchen, can_manage_debtors=excluded.can_manage_debtors, can_manage_creditors=excluded.can_manage_creditors`,
@@ -1481,6 +1484,8 @@ app.post("/api/system/initialize", async (req, res) => {
                 r.can_see_kitchen !== undefined ? r.can_see_kitchen : 1,
                 r.can_see_debtors !== undefined ? r.can_see_debtors : 1,
                 r.can_see_creditors !== undefined ? r.can_see_creditors : 1,
+                r.can_see_transactions !== undefined ? r.can_see_transactions : 1,
+                r.can_see_finance !== undefined ? r.can_see_finance : 1,
                 r.can_sell !== undefined ? r.can_sell : 1,
                 r.can_add_order !== undefined ? r.can_add_order : 1,
                 r.can_add_inventory !== undefined ? r.can_add_inventory : 0,
@@ -2003,7 +2008,9 @@ app.post("/api/roles", authenticateToken, (req, res) => {
     can_manage_invoices,
     can_manage_kitchen,
     can_manage_debtors,
-    can_manage_creditors
+    can_manage_creditors,
+    can_see_transactions,
+    can_see_finance
   } = req.body;
 
   const targetName = (role_name || name || "").trim();
@@ -2013,11 +2020,11 @@ app.post("/api/roles", authenticateToken, (req, res) => {
     `INSERT INTO roles_config (
       role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
       can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-      can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+      can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors, can_see_transactions, can_see_finance,
       can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
       can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
       can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(role_name) DO UPDATE SET
       can_see_register=excluded.can_see_register,
       can_see_orders=excluded.can_see_orders,
@@ -2032,6 +2039,8 @@ app.post("/api/roles", authenticateToken, (req, res) => {
       can_see_kitchen=excluded.can_see_kitchen,
       can_see_debtors=excluded.can_see_debtors,
       can_see_creditors=excluded.can_see_creditors,
+      can_see_transactions=excluded.can_see_transactions,
+      can_see_finance=excluded.can_see_finance,
       can_sell=excluded.can_sell,
       can_add_order=excluded.can_add_order,
       can_add_inventory=excluded.can_add_inventory,
@@ -2064,6 +2073,8 @@ app.post("/api/roles", authenticateToken, (req, res) => {
       can_see_kitchen !== undefined ? (can_see_kitchen ? 1 : 0) : 1,
       can_see_debtors !== undefined ? (can_see_debtors ? 1 : 0) : 1,
       can_see_creditors !== undefined ? (can_see_creditors ? 1 : 0) : 1,
+      can_see_transactions !== undefined ? (can_see_transactions ? 1 : 0) : 1,
+      can_see_finance !== undefined ? (can_see_finance ? 1 : 0) : 1,
       can_sell !== undefined ? (can_sell ? 1 : 0) : 1,
       can_add_order !== undefined ? (can_add_order ? 1 : 0) : 1,
       can_add_inventory !== undefined ? (can_add_inventory ? 1 : 0) : 0,
@@ -2189,6 +2200,8 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
       can_see_kitchen !== undefined ? (can_see_kitchen ? 1 : 0) : 1,
       can_see_debtors !== undefined ? (can_see_debtors ? 1 : 0) : 1,
       can_see_creditors !== undefined ? (can_see_creditors ? 1 : 0) : 1,
+      can_see_transactions !== undefined ? (can_see_transactions ? 1 : 0) : 1,
+      can_see_finance !== undefined ? (can_see_finance ? 1 : 0) : 1,
       can_sell !== undefined ? (can_sell ? 1 : 0) : 1,
       can_add_order !== undefined ? (can_add_order ? 1 : 0) : 1,
       can_add_inventory !== undefined ? (can_add_inventory ? 1 : 0) : 0,
@@ -6576,8 +6589,6 @@ app.post("/api/settings", authenticateToken, (req, res) => {
 // 10. Financial Intelligence Engine
 app.get("/api/finance/summary", authenticateToken, (req, res) => {
   const schema = getSchema();
-  const cached = getCache(schema, "finance_summary");
-  if (cached) return res.json(cached);
   // All dates computed in EAT (East Africa Time = UTC+3) to match Uganda local time
   const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
 
@@ -6596,7 +6607,7 @@ app.get("/api/finance/summary", authenticateToken, (req, res) => {
   const monthStart = today.substring(0, 7) + "-01";
 
   db.all(
-    "SELECT amount, type, transaction_date, payment_status FROM transactions",
+    "SELECT id, amount, type, description, recorded_by, transaction_date, payment_status FROM transactions ORDER BY transaction_date DESC",
     [],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -6610,11 +6621,19 @@ app.get("/api/finance/summary", authenticateToken, (req, res) => {
       let totalIncome = 0,
         totalExpense = 0;
 
-      rows.forEach((tx) => {
+      // Group by daily flow for the last 7 days
+      const daysMap = {};
+      for (let i = 6; i >= 0; i--) {
+        const dStr = toEAT(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString());
+        daysMap[dStr] = { income: 0, expense: 0, profit: 0, date: dStr };
+      }
+
+      const recentTransactions = [];
+
+      (rows || []).forEach((tx) => {
         const txDate = toEAT(tx.transaction_date);
         const amt = parseFloat(tx.amount) || 0;
 
-        // Only count INCOME if it is actually PAID (ignore PENDING COD/Invoices, UNPAID credit sales, and GOODS_ON_CREDIT). Cash In / Float is also income/addition.
         const isCreditSale = tx.type === "GOODS_ON_CREDIT" ||
           tx.payment_status === "UNPAID" ||
           (tx.description && tx.description.toUpperCase().includes("POS SALE (CREDIT") && !tx.description.toLowerCase().includes("deposit"));
@@ -6624,6 +6643,23 @@ app.get("/api/finance/summary", authenticateToken, (req, res) => {
         
         if (isIncomePaid) totalIncome += amt;
         else if (tx.type === "EXPENSE") totalExpense += amt;
+
+        if (recentTransactions.length < 15) {
+          recentTransactions.push({
+            id: tx.id,
+            amount: amt,
+            type: tx.type,
+            description: tx.description || (isIncomePaid ? 'Income' : 'Expense'),
+            date: tx.transaction_date,
+            isIncome: isIncomePaid
+          });
+        }
+
+        if (txDate && daysMap[txDate]) {
+          if (isIncomePaid) daysMap[txDate].income += amt;
+          else if (tx.type === "EXPENSE") daysMap[txDate].expense += amt;
+          daysMap[txDate].profit = daysMap[txDate].income - daysMap[txDate].expense;
+        }
 
         if (!txDate) return;
 
@@ -6640,6 +6676,8 @@ app.get("/api/finance/summary", authenticateToken, (req, res) => {
           else if (tx.type === "EXPENSE") monthExpense += amt;
         }
       });
+
+      const dailyFlow = Object.values(daysMap);
 
       const result = {
         today: {
@@ -6662,25 +6700,15 @@ app.get("/api/finance/summary", authenticateToken, (req, res) => {
           expense: totalExpense,
           profit: totalIncome - totalExpense,
         },
-        totalTransactions: rows.length,
+        dailyFlow,
+        recentTransactions,
+        totalTransactions: rows ? rows.length : 0,
         asOf:
           new Date(Date.now() + EAT_OFFSET_MS)
             .toISOString()
             .replace("T", " ")
-            .substring(0, 16) + " EAT",
-        _debug: {
-          serverToday: today,
-          serverWeekAgo: weekAgo,
-          serverMonthStart: monthStart,
-          lastFewTx: rows.slice(-5).map((tx) => ({
-            originalDate: tx.transaction_date,
-            parsedTxDate: toEAT(tx.transaction_date),
-            type: tx.type,
-            amount: tx.amount,
-          })),
-        },
+            .substring(0, 16) + " EAT"
       };
-      setCache(schema, "finance_summary", result, 30); // 30s TTL
       res.json(result);
     },
   );

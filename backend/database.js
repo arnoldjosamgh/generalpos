@@ -2093,6 +2093,7 @@ function runMigrations(fromVersion) {
             'can_see_debtors INTEGER DEFAULT 1',
             'can_see_creditors INTEGER DEFAULT 1',
             'can_see_transactions INTEGER DEFAULT 1',
+            'can_see_finance INTEGER DEFAULT 1',
             'can_add_order INTEGER DEFAULT 1',
             'can_reduce_inventory INTEGER DEFAULT 0',
             'can_manage_invoices INTEGER DEFAULT 0',
@@ -2197,6 +2198,24 @@ function runMigrations(fromVersion) {
 
         db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '157'], () => {
             console.log('Migration to v157 complete: can_see_transactions column added.');
+        });
+    }
+
+    if (fromVersion < 158) {
+        // v158: Add can_see_finance to roles_config and employees
+        const fCol = 'can_see_finance INTEGER DEFAULT 1';
+        const sql = config.dbType === 'postgres'
+            ? `ALTER TABLE roles_config ADD COLUMN IF NOT EXISTS ${fCol}`
+            : `ALTER TABLE roles_config ADD COLUMN ${fCol}`;
+        db.run(sql, () => {});
+
+        const empSql = config.dbType === 'postgres'
+            ? `ALTER TABLE employees ADD COLUMN IF NOT EXISTS ${fCol}`
+            : `ALTER TABLE employees ADD COLUMN ${fCol}`;
+        db.run(empSql, () => {});
+
+        db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '158'], () => {
+            console.log('Migration to v158 complete: can_see_finance column added.');
         });
     }
 }

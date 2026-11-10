@@ -138,8 +138,8 @@ function applyCompanyBranding() {
     }
 
     // 3. Tab Visibility (e.g. Hide 'Pending' tab for Supermarkets!)
-    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'settings'];
-    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'transactions', 'settings'];
+    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
+    const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
     tabs.forEach(tab => {
         const btn = document.getElementById(`nav-btn-${tab}`);
         if (btn) {
@@ -207,6 +207,7 @@ function enforceRolePermissions() {
         'debtors': perms.can_see_debtors !== 0,
         'creditors': perms.can_see_creditors !== 0,
         'transactions': perms.can_see_transactions !== 0,
+        'finance': perms.can_see_finance !== 0,
         'settings': perms.can_see_settings === 1
     };
 
@@ -296,6 +297,7 @@ function switchNavTab(tabName) {
     if (tabName === 'debtors') loadDebtorsList();
     if (tabName === 'creditors') loadCreditorsList();
     if (tabName === 'transactions') loadTransactionsList();
+    if (tabName === 'finance') loadFinanceDashboard();
     if (tabName === 'settings') loadCustomRolesSettings();
     if (tabName === 'tech') loadTechCompanies();
 }
@@ -908,7 +910,9 @@ function renderCustomerTable(list) {
             <td>${escapeHtml(c.promised_date || '—')}</td>
             <td>${new Date(c.created_at).toLocaleDateString()}</td>
             <td>
-                <button class="header-upload-pill" style="padding:4px 8px; font-size:0.75rem;" onclick="openPayDebtModal(${c.id})">Pay Debt</button>
+                <button class="header-upload-pill" style="padding:4px 8px; font-size:0.75rem; background:#10b981;" onclick="openPayDebtorModal('${escapeHtml(c.buyer_name)}', ${parseFloat(c.balance) || 0})">
+                    <i class="fa-solid fa-coins"></i> Pay Debt
+                </button>
             </td>
         </tr>
     `).join('');
@@ -925,17 +929,16 @@ function filterCustomerList(q) {
 }
 
 function openAddCustomerModal() {
-    const name = prompt('Enter customer full name:');
-    if (!name) return;
-    const phone = prompt('Enter phone number:');
-    alert(`Customer ${name} saved.`);
+    openAddDebtorModal();
 }
 
 function openPayDebtModal(id) {
-    const amt = prompt('Enter payment amount:');
-    if (!amt) return;
-    alert(`Recorded payment of ${amt} for customer record #${id}.`);
-    loadCustomerList();
+    const c = allCustomers.find(x => x.id === id);
+    if (c) {
+        openPayDebtorModal(c.buyer_name, parseFloat(c.balance) || 0);
+    } else {
+        openAddDebtorModal();
+    }
 }
 
 // ============================================================================
@@ -1139,26 +1142,126 @@ function filterShiftHistory(q) {
 }
 
 function openCashInModal() {
-    const amt = prompt('Enter Cash In (Float addition) amount:');
-    if (!amt) return;
-    const notes = prompt('Enter notes/purpose (e.g. Small notes for change):');
-    alert(`Cash in of ${amt} recorded.`);
-    loadActiveShiftInfo();
+    const el = document.getElementById('cash-in-amount');
+    if (el) el.value = '';
+    const purp = document.getElementById('cash-in-purpose');
+    if (purp) purp.value = '';
+    const auth = document.getElementById('cash-in-authorized');
+    if (auth) auth.value = currentUser.name || 'Manager';
+    openModal('cash-in-modal');
+}
+
+async function handleSaveCashIn(e) {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('cash-in-amount').value) || 0;
+    const purpose = document.getElementById('cash-in-purpose').value.trim();
+    const authorized_by = document.getElementById('cash-in-authorized').value.trim();
+
+    try {
+        const res = await fetch('/api/pos/cash-in', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ amount, purpose, authorized_by })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeModal('cash-in-modal');
+            alert(`Cash addition of ${amount.toLocaleString()} recorded successfully.`);
+            await loadActiveShiftInfo();
+            if (activeNavTab === 'finance') loadFinanceDashboard();
+            if (activeNavTab === 'transactions') loadTransactionsList();
+        } else {
+            alert('Cash in failed: ' + (data.error || 'Check authorization'));
+        }
+    } catch (err) {
+        alert('Server error recording cash in.');
+    }
 }
 
 function openExpenseModal() {
-    const amt = prompt('Enter Expense amount:');
-    if (!amt) return;
-    const desc = prompt('Enter reason for expense:');
-    alert(`Expense of ${amt} recorded.`);
-    loadActiveShiftInfo();
+    const el = document.getElementById('expense-amount');
+    if (el) el.value = '';
+    const desc = document.getElementById('expense-desc');
+    if (desc) desc.value = '';
+    const cat = document.getElementById('expense-category');
+    if (cat) cat.value = '';
+    openModal('expense-modal');
+}
+
+async function handleSaveExpense(e) {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('expense-amount').value) || 0;
+    const description = document.getElementById('expense-desc').value.trim();
+    const category = document.getElementById('expense-category').value.trim();
+    const fullDesc = category ? `${description} (${category})` : description;
+
+    try {
+        const res = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({
+                amount,
+                type: 'EXPENSE',
+                description: fullDesc,
+                transaction_date: new Date().toISOString()
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeModal('expense-modal');
+            alert(`Expense of ${amount.toLocaleString()} recorded successfully.`);
+            await loadActiveShiftInfo();
+            if (activeNavTab === 'finance') loadFinanceDashboard();
+            if (activeNavTab === 'transactions') loadTransactionsList();
+        } else {
+            alert('Expense recording failed: ' + (data.error || 'Server error'));
+        }
+    } catch (err) {
+        alert('Server error recording expense.');
+    }
 }
 
 function openCloseShiftModal() {
-    const counted = prompt('Enter counted cash in the register drawer:');
-    if (!counted) return;
-    alert(`Shift closed successfully. Counted: ${counted}. Summary receipt printed.`);
-    handleLogout();
+    const expectedEl = document.getElementById('close-shift-expected-val');
+    const drawerDisplay = document.getElementById('shift-drawer-expected-display');
+    if (expectedEl && drawerDisplay) {
+        expectedEl.textContent = drawerDisplay.textContent;
+    }
+    const countedEl = document.getElementById('close-shift-counted');
+    if (countedEl) countedEl.value = '';
+    openModal('close-shift-modal');
+}
+
+async function handleSaveCloseShift(e) {
+    e.preventDefault();
+    const counted_cash = parseFloat(document.getElementById('close-shift-counted').value) || 0;
+
+    try {
+        const res = await fetch('/api/pos/end-shift', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ counted_cash })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeModal('close-shift-modal');
+            alert(`Shift reconciled and closed successfully! Counted cash: ${counted_cash.toLocaleString()}`);
+            handleLogout();
+        } else {
+            alert('Could not end shift: ' + (data.error || 'Ensure active shift exists'));
+        }
+    } catch (err) {
+        alert('Server connection error ending shift.');
+    }
 }
 
 // ============================================================================
@@ -1413,6 +1516,7 @@ function openEditRoleModal(roleName) {
     if (document.getElementById('role-tab-debtors')) document.getElementById('role-tab-debtors').checked = r.can_see_debtors !== 0;
     if (document.getElementById('role-tab-creditors')) document.getElementById('role-tab-creditors').checked = r.can_see_creditors !== 0;
     if (document.getElementById('role-tab-transactions')) document.getElementById('role-tab-transactions').checked = r.can_see_transactions !== 0;
+    if (document.getElementById('role-tab-finance')) document.getElementById('role-tab-finance').checked = r.can_see_finance !== 0;
 
     if (document.getElementById('role-act-add-order')) document.getElementById('role-act-add-order').checked = r.can_add_order !== 0;
     if (document.getElementById('role-act-reduce-inv')) document.getElementById('role-act-reduce-inv').checked = r.can_reduce_inventory === 1;
@@ -1445,6 +1549,7 @@ async function handleSaveCustomRole(e) {
         can_see_debtors: document.getElementById('role-tab-debtors')?.checked ? 1 : 0,
         can_see_creditors: document.getElementById('role-tab-creditors')?.checked ? 1 : 0,
         can_see_transactions: document.getElementById('role-tab-transactions')?.checked ? 1 : 0,
+        can_see_finance: document.getElementById('role-tab-finance')?.checked ? 1 : 0,
 
         can_sell: document.getElementById('role-act-sell').checked ? 1 : 0,
         can_add_order: document.getElementById('role-act-add-order')?.checked ? 1 : 0,
@@ -1610,6 +1715,7 @@ async function handleCreateNewCompany(e) {
     if (document.getElementById('tab-chk-debtors')?.checked) enabled_tabs.push('debtors');
     if (document.getElementById('tab-chk-creditors')?.checked) enabled_tabs.push('creditors');
     if (document.getElementById('tab-chk-transactions')?.checked) enabled_tabs.push('transactions');
+    if (document.getElementById('tab-chk-finance')?.checked) enabled_tabs.push('finance');
     if (document.getElementById('tab-chk-settings').checked) enabled_tabs.push('settings');
 
     const payload = {
@@ -2617,3 +2723,294 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+
+
+// ============================================================================
+// TAB: FINANCE INTELLIGENCE DASHBOARD (Pixel-Perfect Match to iBanko)
+// ============================================================================
+let currentFinanceData = null;
+
+async function loadFinanceDashboard() {
+    try {
+        const res = await fetch('/api/finance/summary', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            currentFinanceData = await res.json();
+            renderFinanceDashboardUI();
+        }
+    } catch (e) {
+        console.warn('Error loading finance summary:', e.message);
+    }
+}
+
+function renderFinanceDashboardUI() {
+    if (!currentFinanceData) return;
+    const curr = companyData.currency || 'Sh';
+    const all = currentFinanceData.allTime || { income: 0, expense: 0, profit: 0 };
+    const month = currentFinanceData.month || { income: 0, expense: 0, profit: 0 };
+
+    // 1. User greeting
+    const userNameEl = document.getElementById('fin-user-name');
+    if (userNameEl) {
+        userNameEl.textContent = currentUser.name || 'Manager';
+    }
+
+    // 2. Hero Card balance (Net Vault Balance)
+    const heroBalEl = document.getElementById('fin-hero-balance');
+    if (heroBalEl) {
+        const vaultBalance = all.profit !== undefined ? all.profit : (all.income - all.expense);
+        heroBalEl.textContent = `${vaultBalance.toLocaleString()} ${curr}`;
+    }
+
+    // 3. Render the 3 records cards based on the selected period
+    renderFinanceRecords();
+
+    // 4. Render Money Flow SVG chart
+    renderMoneyFlowChart();
+
+    // 5. Render Send Money To quick payees
+    renderQuickPayees();
+
+    // 6. Render Scheduled Payments from creditors
+    renderScheduledPayments();
+
+    // 7. Render Recent Transactions
+    renderFinanceRecentTx();
+
+    // 8. Render Available cards values (Drawer float vs MoMo)
+    renderAvailableCards();
+}
+
+function renderFinanceRecords() {
+    if (!currentFinanceData) return;
+    const curr = companyData.currency || 'Sh';
+    const period = document.getElementById('fin-record-period')?.value || 'month';
+    const data = currentFinanceData[period] || currentFinanceData.month || { income: 0, expense: 0, profit: 0 };
+
+    const incEl = document.getElementById('fin-stat-income');
+    const expEl = document.getElementById('fin-stat-expense');
+    const savEl = document.getElementById('fin-stat-saving');
+
+    if (incEl) incEl.textContent = `${Number(data.income || 0).toLocaleString()} ${curr}`;
+    if (expEl) expEl.textContent = `${Number(data.expense || 0).toLocaleString()} ${curr}`;
+    if (savEl) savEl.textContent = `${Number(data.profit || 0).toLocaleString()} ${curr}`;
+}
+
+function renderMoneyFlowChart() {
+    const container = document.getElementById('fin-svg-chart-container');
+    if (!container) return;
+
+    const dailyFlow = (currentFinanceData && currentFinanceData.dailyFlow) || [];
+    if (dailyFlow.length === 0) {
+        // Fallback default 7 days dummy curve
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000);
+            dailyFlow.push({
+                date: d.toISOString().split('T')[0],
+                income: 0,
+                expense: 0,
+                profit: 0
+            });
+        }
+    }
+
+    const width = container.clientWidth || 580;
+    const height = 210;
+    const padding = { top: 20, right: 30, bottom: 35, left: 55 };
+
+    const maxVal = Math.max(
+        ...dailyFlow.map(d => Math.max(d.income || 0, d.expense || 0, Math.abs(d.profit || 0))),
+        1000
+    );
+
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+
+    const pointsSaving = [];
+    const pointsExpense = [];
+
+    dailyFlow.forEach((item, idx) => {
+        const x = padding.left + (chartW / Math.max(1, dailyFlow.length - 1)) * idx;
+        const normSaving = Math.max(0, (item.profit || item.income || 0)) / maxVal;
+        const normExpense = Math.max(0, item.expense || 0) / maxVal;
+
+        const ySaving = padding.top + chartH - (normSaving * chartH);
+        const yExpense = padding.top + chartH - (normExpense * chartH);
+
+        pointsSaving.push({ x, y: ySaving, label: item.date.substring(5), val: item.profit || item.income });
+        pointsExpense.push({ x, y: yExpense, label: item.date.substring(5), val: item.expense });
+    });
+
+    // Build SVG paths
+    function buildSmoothPath(pts) {
+        if (pts.length === 0) return '';
+        let d = `M ${pts[0].x} ${pts[0].y}`;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = pts[i];
+            const p1 = pts[i + 1];
+            const cx = (p0.x + p1.x) / 2;
+            d += ` C ${cx} ${p0.y}, ${cx} ${p1.y}, ${p1.x} ${p1.y}`;
+        }
+        return d;
+    }
+
+    const pathSaving = buildSmoothPath(pointsSaving);
+    const pathExpense = buildSmoothPath(pointsExpense);
+
+    // Grid lines
+    const yGridCount = 4;
+    let gridLinesSvg = '';
+    for (let i = 0; i <= yGridCount; i++) {
+        const y = padding.top + (chartH / yGridCount) * i;
+        const valAtY = Math.round(maxVal - (maxVal / yGridCount) * i);
+        gridLinesSvg += `
+            <line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#f1f5f9" stroke-width="1" />
+            <text x="${padding.left - 10}" y="${y + 4}" fill="#94a3b8" font-size="10" text-anchor="end">${valAtY >= 1000 ? (valAtY/1000).toFixed(0) + 'k' : valAtY}</text>
+        `;
+    }
+
+    // X-axis date labels
+    let xLabelsSvg = '';
+    pointsSaving.forEach((pt) => {
+        xLabelsSvg += `
+            <text x="${pt.x}" y="${height - 10}" fill="#94a3b8" font-size="10" text-anchor="middle">${pt.label}</text>
+        `;
+    });
+
+    // Tooltip highlight at peak point
+    let peakSvg = '';
+    if (pointsSaving.length > 0) {
+        const peak = pointsSaving.reduce((max, p) => p.val > max.val ? p : max, pointsSaving[0]);
+        if (peak.val > 0) {
+            peakSvg = `
+                <circle cx="${peak.x}" cy="${peak.y}" r="4" fill="#0f172a" stroke="#ffffff" stroke-width="2" />
+                <rect x="${peak.x - 30}" y="${peak.y - 30}" width="60" height="22" rx="6" fill="#0f172a" />
+                <text x="${peak.x}" y="${peak.y - 15}" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">${Number(peak.val).toLocaleString()}</text>
+            `;
+        }
+    }
+
+    container.innerHTML = `
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+            ${gridLinesSvg}
+            <path d="${pathExpense}" fill="none" stroke="#f97316" stroke-width="2.5" stroke-dasharray="4,4" />
+            <path d="${pathSaving}" fill="none" stroke="#0f172a" stroke-width="2.8" stroke-linecap="round" />
+            ${xLabelsSvg}
+            ${peakSvg}
+        </svg>
+    `;
+}
+
+function renderQuickPayees() {
+    const container = document.getElementById('fin-quick-payees-list');
+    if (!container) return;
+
+    // Pick top 4 creditors or employees
+    const payees = (allCreditorsList && allCreditorsList.length > 0)
+        ? allCreditorsList.slice(0, 4)
+        : [
+            { supplier_name: 'Jane Cooper' },
+            { supplier_name: 'Leslie Alexander' },
+            { supplier_name: 'Robert Fox' },
+            { supplier_name: 'Jacob Jones' }
+        ];
+
+    const plusBtn = `
+        <button type="button" class="pos-fin-add-circle" title="Record New Payout" onclick="openExpenseModal()">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+    `;
+
+    const avatars = payees.map(p => {
+        const name = p.supplier_name || 'Staff';
+        const initial = name.charAt(0).toUpperCase();
+        return `
+            <div class="pos-fin-avatar-bubble" title="${escapeHtml(name)} - Tap to Pay" onclick="quickFillExpense('${escapeHtml(name)}')">
+                ${initial}
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = plusBtn + avatars;
+}
+
+function quickFillExpense(payeeName) {
+    openExpenseModal();
+    const descEl = document.getElementById('expense-desc');
+    if (descEl) descEl.value = `Payment to ${payeeName}`;
+}
+
+function renderScheduledPayments() {
+    const container = document.getElementById('fin-scheduled-bills-list');
+    if (!container) return;
+    const curr = companyData.currency || 'Sh';
+
+    const bills = (allCreditorsList && allCreditorsList.length > 0)
+        ? allCreditorsList.slice(0, 3).map(c => ({
+            name: c.supplier_name || 'Bill',
+            amt: `${(parseFloat(c.balance) || 0).toLocaleString()} ${curr}`
+        }))
+        : [
+            { name: 'Power / Umeme', amt: `150,000 ${curr}` },
+            { name: 'Water Bill', amt: `45,000 ${curr}` },
+            { name: 'Store Rent', amt: `800,000 ${curr}` }
+        ];
+
+    container.innerHTML = bills.map(b => `
+        <div class="pos-fin-scheduled-item" onclick="switchNavTab('creditors')" style="cursor:pointer;" title="View in Creditors">
+            <div class="pos-fin-sched-name">${escapeHtml(b.name)}</div>
+            <div class="pos-fin-sched-amt">${escapeHtml(b.amt)}</div>
+        </div>
+    `).join('');
+}
+
+function renderFinanceRecentTx() {
+    const container = document.getElementById('fin-recent-tx-container');
+    if (!container) return;
+    const curr = companyData.currency || 'Sh';
+
+    const recent = (currentFinanceData && currentFinanceData.recentTransactions) || [];
+    if (recent.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:25px; color:#94a3b8; font-size:0.85rem;">No recent transactions yet.</div>';
+        return;
+    }
+
+    container.innerHTML = recent.slice(0, 6).map(tx => {
+        const isInc = tx.isIncome;
+        const iconClass = isInc ? 'income' : 'expense';
+        const icon = isInc ? '<i class="fa-solid fa-arrow-down-left"></i>' : '<i class="fa-solid fa-arrow-up-right"></i>';
+        const dateStr = tx.date ? new Date(tx.date).toLocaleDateString() : 'Today';
+
+        return `
+            <div class="pos-fin-tx-item" onclick="viewReceiptDetails(${tx.id})" title="Click to view details">
+                <div class="pos-fin-tx-left">
+                    <div class="pos-fin-tx-icon ${iconClass}">${icon}</div>
+                    <div>
+                        <div class="pos-fin-tx-name">${escapeHtml(tx.description || 'Transaction')}</div>
+                        <div class="pos-fin-tx-date">${dateStr}</div>
+                    </div>
+                </div>
+                <div class="pos-fin-tx-amount" style="color:${isInc ? '#10b981' : '#0f172a'};">
+                    ${isInc ? '+' : '-'}${Number(tx.amount || 0).toLocaleString()} ${curr}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAvailableCards() {
+    const curr = companyData.currency || 'Sh';
+    const drawerEl = document.getElementById('fin-card-drawer-val');
+    const momoEl = document.getElementById('fin-card-momo-val');
+
+    const drawerDisplay = document.getElementById('shift-drawer-expected-display');
+    const momoDisplay = document.getElementById('shift-momo-sales-display');
+
+    if (drawerEl) {
+        drawerEl.textContent = drawerDisplay ? drawerDisplay.textContent : `0 ${curr}`;
+    }
+    if (momoEl) {
+        momoEl.textContent = momoDisplay ? momoDisplay.textContent : `0 ${curr}`;
+    }
+}

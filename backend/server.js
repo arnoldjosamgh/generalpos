@@ -340,7 +340,7 @@ function generateBarcodesFromId(productId, stock) {
 app.use((req, res, next) => {
   let prefix = "public"; // fallback to public/master schema
 
-  // 1. Try from JWT Auth Header or Cookie
+  // 1. Try from JWT Auth Header or Cookie (highest trust — always wins)
   const authHeader = req.headers["authorization"];
   let token = authHeader && authHeader.split(" ")[1];
   if (!token && req.cookies && req.cookies.jomish_auth) {
@@ -353,9 +353,15 @@ app.use((req, res, next) => {
     } catch (e) {}
   }
 
-  // 1b. Try from X-Tenant-Prefix header
+  // 1b. X-Tenant-Prefix header is ONLY trusted when there is no valid JWT prefix.
+  //     This prevents authenticated users from switching tenant schemas via a header.
+  //     Header is still useful for the login endpoint (unauthenticated).
   if ((!prefix || prefix === "public") && req.headers["x-tenant-prefix"]) {
-    prefix = req.headers["x-tenant-prefix"].trim();
+    const headerPrefix = req.headers["x-tenant-prefix"].trim();
+    // Only allow alphanumeric prefixes to prevent path-traversal style attacks
+    if (/^[A-Za-z0-9]{1,8}$/.test(headerPrefix)) {
+      prefix = headerPrefix;
+    }
   }
 
   // 2. Override for login endpoint parsing (e.g. ABC00001 -> prefix ABC)
@@ -680,10 +686,9 @@ app.post("/api/login", async (req, res) => {
       }
     } catch (e) { /* ignore */ }
 
-    // Emergency/Standard fallback for Tech Support
-    if (!isTech && (password === "Jomish9!!" || password === "Admin")) {
-      isTech = true;
-    }
+    // NOTE: Plaintext fallback password removed for security.
+    // Tech login now requires a valid bcrypt-hashed entry in the tech_users table.
+    // The tech_users table is seeded at startup if empty (see initDb startup block).
 
     if (isTech) {
       const techPerms = {
@@ -919,8 +924,10 @@ app.get("/api/verify", authenticateToken, (req, res) => {
 });
 
 // ==== SYSTEM INITIALIZATION & TECH HUB (New Business Onboarding) ====
-app.get("/api/system/companies", (req, res) => {
-  // Return all companies from the master registry
+app.get("/api/system/companies", authenticateToken, (req, res) => {
+  // Return all companies from the master registry — TECH-only
+  const isTech = req.user && (req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician");
+  if (!isTech) return res.status(403).json({ error: "Forbidden: Tech Support access required." });
   asyncLocalStorage.run("public", () => {
     db.all(
       "SELECT * FROM companies ORDER BY created_at DESC",
@@ -1273,10 +1280,11 @@ app.post("/api/system/initialize", async (req, res) => {
     custom_roles
   } = req.body;
 
-  // Validate tech support access if provided or check token if tech
+  // Validate tech support access — must be an authenticated TECH-role user.
+  // Plaintext tech_password fallback has been removed for security.
   const isTechUser = req.user && (req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician");
-  if (!isTechUser && tech_password !== "Jomish9!!") {
-    return res.status(403).json({ error: "Invalid tech support credentials." });
+  if (!isTechUser) {
+    return res.status(403).json({ error: "Forbidden: Tech Support access required." });
   }
   if (!company_prefix || !company_name) {
     return res

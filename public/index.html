@@ -871,11 +871,11 @@
                     <!-- Order Footer Controls (Pic 2) -->
                     <div class="order-panel-footer">
                         
-                        <!-- Print to Kitchen Toggle Switch (Pic 2) -->
-                        <div class="kitchen-toggle-row">
+                        <!-- Print to Kitchen Toggle Switch (Restaurant only) -->
+                        <div class="kitchen-toggle-row" id="kitchen-toggle-row" style="display:none;">
                             <span>Print to kitchen</span>
                             <label class="switch-toggle">
-                                <input type="checkbox" id="kitchen-print-toggle" checked>
+                                <input type="checkbox" id="kitchen-print-toggle">
                                 <span class="switch-slider"></span>
                             </label>
                         </div>
@@ -945,12 +945,14 @@
                 <input type="number" id="pay-tendered-input" class="pos-input" style="font-size:1.2rem; font-weight:700;" oninput="calculateChange()">
             </div>
 
-            <!-- Quick Cash Buttons -->
-            <div style="display:flex; gap:8px; margin-bottom:16px;" id="quick-cash-row">
-                <button type="button" class="cat-pill-btn" onclick="addTender(5000)">+5,000</button>
-                <button type="button" class="cat-pill-btn" onclick="addTender(10000)">+10,000</button>
-                <button type="button" class="cat-pill-btn" onclick="addTender(20000)">+20,000</button>
-                <button type="button" class="cat-pill-btn" onclick="addTender(50000)">+50,000</button>
+            <!-- Quick Cash Denomination Buttons -->
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;" id="quick-cash-row">
+                <button type="button" class="cat-pill-btn" onclick="setTender(1000)">1,000</button>
+                <button type="button" class="cat-pill-btn" onclick="setTender(2000)">2,000</button>
+                <button type="button" class="cat-pill-btn" onclick="setTender(5000)">5,000</button>
+                <button type="button" class="cat-pill-btn" onclick="setTender(10000)">10,000</button>
+                <button type="button" class="cat-pill-btn" onclick="setTender(20000)">20,000</button>
+                <button type="button" class="cat-pill-btn" onclick="setTender(50000)">50,000</button>
                 <button type="button" class="cat-pill-btn" onclick="setExactTender()">Exact</button>
             </div>
 

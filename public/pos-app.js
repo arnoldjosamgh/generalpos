@@ -151,6 +151,18 @@ function applyCompanyBranding() {
         }
     });
 
+    // 4. Kitchen Token row visibility (Only restaurants, cafes, hotels, bars show print to kitchen)
+    const kitchenRow = document.getElementById('kitchen-toggle-row');
+    const kitchenToggle = document.getElementById('kitchen-print-toggle');
+    const bType = (companyData.business_type || '').toLowerCase();
+    const isRestaurant = ['restaurant', 'cafe', 'hotel', 'bar', 'eatery', 'food'].some(k => bType.includes(k));
+    if (kitchenRow) {
+        kitchenRow.style.display = isRestaurant ? 'flex' : 'none';
+    }
+    if (kitchenToggle) {
+        kitchenToggle.checked = isRestaurant;
+    }
+
     // Populate Settings Inputs
     const setCompName = document.getElementById('setting-company-name');
     if (setCompName) {
@@ -603,6 +615,12 @@ function setPaymentMethod(method, element) {
         document.getElementById('pay-tendered-input').value = calculateCartTotal();
         calculateChange();
     }
+}
+
+function setTender(amount) {
+    const input = document.getElementById('pay-tendered-input');
+    input.value = amount;
+    calculateChange();
 }
 
 function addTender(amount) {

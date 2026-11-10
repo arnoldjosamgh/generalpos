@@ -2689,6 +2689,14 @@ app.post("/api/creditors/pay", authenticateToken, (req, res) => {
 });
 
 // ==== POS CHECKOUT COMPATIBILITY WRAPPER ====
+// ============================================================
+// CHECKOUT STUB — /api/pos/orders forwards here directly
+// The real checkout logic lives in app.post("/api/checkout") below.
+// We use a lightweight promise bridge so we can call it without
+// relying on the fragile app._router.stack introspection.
+// ============================================================
+let _checkoutCoreHandler = null; // set once app.post("/api/checkout") is registered
+
 app.post("/api/pos/orders", authenticateToken, async (req, res) => {
   // If the user's role cannot sell (e.g. Waiter who can only add orders), check if save/kitchen only
   const userPerms = req.user.permissions || {};
@@ -2721,6 +2729,22 @@ app.post("/api/pos/orders", authenticateToken, async (req, res) => {
     total: (item.price || 0) * (item.qty || 1)
   }));
 
+  // If send to kitchen was requested, generate kitchen token
+  if (print_kitchen && items.length > 0) {
+    const summary = items.map(i => `${i.qty}x ${i.name}`).join(", ");
+    db.get("SELECT COALESCE(MAX(token_number), 0) + 1 as next_token FROM kitchen_tokens WHERE DATE(created_at) = CURRENT_DATE", [], (err, row) => {
+      const tokenNum = (row && row.next_token) ? parseInt(row.next_token) : 1;
+      const tokenCode = `KT-${String(tokenNum).padStart(3, "0")}`;
+      db.run(
+        `INSERT INTO kitchen_tokens (token_number, token_code, table_label, server_name, items_summary, notes, status)
+         VALUES (?, ?, ?, ?, ?, ?, 'PENDING')`,
+        [tokenNum, tokenCode, table_label || "Terminal 1", req.user ? (req.user.name || req.user.username) : "Staff", summary, remarks || ""],
+        () => {}
+      );
+    });
+  }
+
+  // Build checkout-compatible req.body and call handleCheckout directly (no router introspection)
   const checkoutReq = {
     ...req,
     body: {
@@ -2736,45 +2760,11 @@ app.post("/api/pos/orders", authenticateToken, async (req, res) => {
     }
   };
 
-  // If send to kitchen was requested, generate kitchen token
-  if (print_kitchen && items.length > 0) {
-    const summary = items.map(i => `${i.qty}x ${i.name}`).join(", ");
-    db.get("SELECT COALESCE(MAX(token_number), 0) + 1 as next_token FROM kitchen_tokens WHERE DATE(created_at) = CURRENT_DATE", [], (err, row) => {
-      const tokenNum = (row && row.next_token) ? parseInt(row.next_token) : 1;
-      const tokenCode = `KT-${String(tokenNum).padStart(3, "0")}`;
-      db.run(
-        `INSERT INTO kitchen_tokens (token_number, token_code, table_label, server_name, items_summary, notes, status)
-         VALUES (?, ?, ?, ?, ?, ?, 'PENDING')`,
-        [tokenNum, tokenCode, table_label || "Terminal 1", checkoutReq.body.served_by, summary, remarks || ""],
-        () => {}
-      );
-    });
-  }
-
-  // Forward to checkout
-  try {
-    const fakeRes = {
-      status(code) {
-        this.statusCode = code;
-        return this;
-      },
-      json(data) {
-        if (this.statusCode && this.statusCode >= 400) {
-          return res.status(this.statusCode).json(data);
-        }
-        return res.json(data);
-      }
-    };
-
-    // Forward to app.post("/api/checkout") handler
-    const checkoutHandler = app._router.stack.find(r => r.route && r.route.path === "/api/checkout" && r.route.methods.post);
-    if (checkoutHandler) {
-      return checkoutHandler.handle(checkoutReq, res);
-    } else {
-      return res.json({ message: "Order processed successfully", invoice_number: Date.now() });
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  // Forward directly to the registered checkout handler
+  if (_checkoutCoreHandler) {
+    return _checkoutCoreHandler(checkoutReq, res);
+  } else {
+    return res.status(503).json({ error: "Checkout system initializing, please try again." });
   }
 });
 
@@ -4774,7 +4764,7 @@ async function checkAndRecycleReceiptNumbers(targetSchema, force = false) {
   }
 }
 
-app.post("/api/checkout", authenticateToken, async (req, res) => {
+const checkoutHandlerFn = async (req, res) => {
   const currentSchema = getSchema();
   if (currentSchema === "public" && req.user && req.user.role !== "TECH") {
     console.error(`[CHECKOUT BLOCKED] Attempted write to public schema by non-TECH user ${req.user.id} (${req.user.name})`);
@@ -5118,7 +5108,10 @@ app.post("/api/checkout", authenticateToken, async (req, res) => {
     console.error("[CHECKOUT] Error:", err.message);
     res.status(500).json({ error: "Checkout failed: " + err.message });
   }
-});
+};
+
+_checkoutCoreHandler = checkoutHandlerFn;
+app.post("/api/checkout", authenticateToken, checkoutHandlerFn);
 
 // ── CASHIER SHIFTS MANAGEMENT ──────────────────────────────────────────
 const _ensuredCashierShiftSchemas = new Set();

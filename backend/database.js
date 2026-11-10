@@ -2055,43 +2055,34 @@ function runMigrations(fromVersion) {
     }
 
     if (fromVersion < 155) {
-        // v155: Seed realistic demo products matching layout picture 2 if products empty
-        db.get('SELECT COUNT(*) as count FROM products', [], (err, row) => {
-            if (!err && (!row || parseInt(row.count) < 3)) {
-                const sampleDishes = [
-                    ['Vegetable Curry', 'Main Course', 8000, 100, 'VC001', 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&auto=format&fit=crop&q=80'],
-                    ['Chicken Alfredo Pasta', 'Main Course', 8000, 100, 'CAP002', 'https://images.unsplash.com/photo-1645112411341-6c4fd023714a?w=400&auto=format&fit=crop&q=80'],
-                    ['Buffalo Chicken Pizza', 'Main Course', 8000, 80, 'BCP003', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&auto=format&fit=crop&q=80'],
-                    ['Garden Salad', 'Salad, Sandwiches and Burgers', 20000, 90, 'GS004', 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&auto=format&fit=crop&q=80'],
-                    ['Cucumber Sandwich', 'Salad, Sandwiches and Burgers', 20000, 90, 'CS005', 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=400&auto=format&fit=crop&q=80'],
-                    ['Classic Cheeseburger', 'Salad, Sandwiches and Burgers', 20000, 85, 'CCB006', 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=80'],
-                    ['Red Velvet Slice', 'Dessert', 16000, 60, 'RVS007', 'https://images.unsplash.com/photo-1586788680434-30d324b2d46f?w=400&auto=format&fit=crop&q=80'],
-                    ['Black Forest Slice', 'Dessert', 16000, 60, 'BFS008', 'https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?w=400&auto=format&fit=crop&q=80'],
-                    ['Vanilla Ice Cream', 'Dessert', 20000, 100, 'VIC009', 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=400&auto=format&fit=crop&q=80'],
-                    ['Americano', 'Drinks & Coffee', 8000, 200, 'AM010', 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80'],
-                    ['Espresso Coffee', 'Drinks & Coffee', 8000, 200, 'EC011', 'https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=400&auto=format&fit=crop&q=80'],
-                    ['African Tea', 'Drinks & Coffee', 12000, 150, 'AT012', 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400&auto=format&fit=crop&q=80'],
-                    ['Mango Milkshake', 'Drinks & Coffee', 8000, 120, 'MM013', 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=400&auto=format&fit=crop&q=80'],
-                    ['Orange Juice', 'Drinks & Coffee', 8000, 120, 'OJ014', 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&auto=format&fit=crop&q=80'],
-                    ['Lemonade', 'Drinks & Coffee', 5000, 120, 'LEM015', 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&auto=format&fit=crop&q=80'],
-                    ['Heineken Beer', 'Drinks & Coffee', 6000, 150, 'HB016', 'https://images.unsplash.com/photo-1608270192799-59e8f8b28282?w=400&auto=format&fit=crop&q=80'],
-                    ['Bella Wine', 'Drinks & Coffee', 8000, 75, 'BW017', 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&auto=format&fit=crop&q=80'],
-                    ['Single Room', 'Room Service', 4000, 20, 'SR018', 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=400&auto=format&fit=crop&q=80']
-                ];
+        // v155: For default/demo schema only, seed demo products if products empty.
+        // In clean-slate tenant databases, new businesses start with NO products.
+        const activeSchema = (asyncLocalStorage.getStore() || 'public').toLowerCase();
+        if (activeSchema === 'public' || activeSchema === 't_igourd') {
+            db.get('SELECT COUNT(*) as count FROM products', [], (err, row) => {
+                if (!err && (!row || parseInt(row.count) < 3)) {
+                    const sampleDishes = [
+                        ['Vegetable Curry', 'Main Course', 8000, 100, 'VC001', 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&auto=format&fit=crop&q=80'],
+                        ['Chicken Alfredo Pasta', 'Main Course', 8000, 100, 'CAP002', 'https://images.unsplash.com/photo-1645112411341-6c4fd023714a?w=400&auto=format&fit=crop&q=80'],
+                        ['Buffalo Chicken Pizza', 'Main Course', 8000, 80, 'BCP003', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&auto=format&fit=crop&q=80']
+                    ];
 
-                sampleDishes.forEach(([name, cat, price, stock, barcode, photo]) => {
-                    db.run(
-                        'INSERT INTO products (name, category, price, stock, barcode, photo_base64) VALUES (?, ?, ?, ?, ?, ?)',
-                        [name, cat, price, stock, barcode, photo],
-                        () => {}
-                    );
+                    sampleDishes.forEach(([name, cat, price, stock, barcode, photo]) => {
+                        db.run(
+                            'INSERT INTO products (name, category, price, stock, barcode, photo_base64) VALUES (?, ?, ?, ?, ?, ?)',
+                            [name, cat, price, stock, barcode, photo],
+                            () => {}
+                        );
+                    });
+                }
+
+                db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '155'], () => {
+                    console.log('Migration to v155 complete: Demo products seeded for demo schema.');
                 });
-            }
-
-            db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '155'], () => {
-                console.log('Migration to v155 complete: Products seeded.');
             });
-        });
+        } else {
+            db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '155'], () => {});
+        }
     }
 
     if (fromVersion < 156) {

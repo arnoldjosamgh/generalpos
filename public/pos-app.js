@@ -567,10 +567,15 @@ function renderRegisterProducts(products) {
         const cartItem = currentCart.find(item => item.id === p.id);
         const countBadge = cartItem ? `<div class="prod-cart-count-badge">${cartItem.qty}</div>` : '';
         const imgUrl = p.photo_base64 || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&auto=format&fit=crop&q=80';
+        const isUnlimited = p.track_stock === 0;
+        const unlimitedBadge = isUnlimited
+            ? `<div style="position:absolute; bottom:4px; left:4px; background:#0284c7; color:#fff; border-radius:8px; padding:1px 6px; font-size:0.65rem; font-weight:800; z-index:3;">∞</div>`
+            : '';
 
         return `
             <div class="pos-product-card" onclick="addToOrderCart(${p.id})">
                 ${countBadge}
+                ${unlimitedBadge}
                 <div class="prod-price-tag">${Number(p.price || 0).toLocaleString()}</div>
                 <div class="prod-img-wrap">
                     <img src="${imgUrl}" alt="${escapeHtml(p.name)}" onerror="this.src='favicon.png'">
@@ -617,6 +622,7 @@ function addToOrderCart(productId) {
             id: product.id,
             name: product.name,
             price: Number(product.price || 0),
+            track_stock: product.track_stock,
             qty: 1
         });
     }
@@ -1057,7 +1063,7 @@ function renderInventoryTable(products) {
     if (!tbody) return;
 
     if (!products || products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">No products in inventory.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">No products in inventory.</td></tr>';
         return;
     }
 
@@ -1065,7 +1071,14 @@ function renderInventoryTable(products) {
 
     tbody.innerHTML = products.map(p => {
         const img = p.photo_base64 || 'favicon.png';
-        const stockColor = (p.stock || 0) <= 5 ? '#ef4444' : '#10b981';
+        const isUnlimited = p.track_stock === 0;
+        const stockColor = isUnlimited ? '#0284c7' : ((p.stock || 0) <= 5 ? '#ef4444' : '#10b981');
+        const stockDisplay = isUnlimited
+            ? `<span style="color:#0284c7; font-weight:800; font-size:1.05rem;">∞</span> <span style="color:#0284c7; font-size:0.8rem; font-weight:600;">Unlimited</span>`
+            : `<strong style="color:${stockColor};">${p.stock || 0} units</strong>`;
+        const typeBadge = isUnlimited
+            ? `<span style="background:#eff6ff; color:#0284c7; border:1px solid #bfdbfe; border-radius:12px; padding:2px 8px; font-size:0.72rem; font-weight:700;">∞ No Tracking</span>`
+            : `<span style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; border-radius:12px; padding:2px 8px; font-size:0.72rem; font-weight:700;">Tracked</span>`;
 
         return `
             <tr>
@@ -1074,7 +1087,8 @@ function renderInventoryTable(products) {
                 <td><span class="cat-pill-btn" style="padding:2px 8px; font-size:0.75rem;">${escapeHtml(p.category || 'General')}</span></td>
                 <td><code>${escapeHtml(p.barcode || '—')}</code></td>
                 <td><strong>${Number(p.price || 0).toLocaleString()} ${curr}</strong></td>
-                <td><strong style="color:${stockColor};">${p.stock || 0} units</strong></td>
+                <td>${typeBadge}</td>
+                <td>${stockDisplay}</td>
                 <td>
                     <button class="header-idle-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditProductModal(${p.id})">Edit</button>
                 </td>
@@ -1102,6 +1116,21 @@ function populateCategorySelect() {
     `).join('');
 }
 
+function toggleProductStockTracking(checked) {
+    const stockWrap = document.getElementById('prod-form-stock-wrap');
+    const unlimitedBadge = document.getElementById('prod-form-unlimited-badge');
+    const stockInput = document.getElementById('prod-form-stock');
+    if (checked) {
+        stockWrap.style.display = 'none';
+        unlimitedBadge.style.display = 'flex';
+        stockInput.removeAttribute('required');
+    } else {
+        stockWrap.style.display = '';
+        unlimitedBadge.style.display = 'none';
+        stockInput.setAttribute('required', '');
+    }
+}
+
 function openAddProductModal() {
     document.getElementById('product-modal-title').innerHTML = '<i class="fa-solid fa-box"></i> Add Product';
     document.getElementById('prod-form-id').value = '';
@@ -1110,6 +1139,9 @@ function openAddProductModal() {
     document.getElementById('prod-form-stock').value = '100';
     document.getElementById('prod-form-barcode').value = '';
     document.getElementById('prod-form-image').value = '';
+    // Reset unlimited stock toggle
+    const noTrackCb = document.getElementById('prod-form-no-tracking');
+    if (noTrackCb) { noTrackCb.checked = false; toggleProductStockTracking(false); }
     populateCategorySelect();
     openModal('product-modal');
 }
@@ -1121,9 +1153,13 @@ function openEditProductModal(id) {
     document.getElementById('prod-form-id').value = p.id;
     document.getElementById('prod-form-name').value = p.name;
     document.getElementById('prod-form-price').value = p.price;
-    document.getElementById('prod-form-stock').value = p.stock || 0;
     document.getElementById('prod-form-barcode').value = p.barcode || '';
     document.getElementById('prod-form-image').value = p.photo_base64 || '';
+    // Set unlimited stock toggle based on track_stock
+    const noTracking = p.track_stock === 0;
+    const noTrackCb = document.getElementById('prod-form-no-tracking');
+    if (noTrackCb) { noTrackCb.checked = noTracking; toggleProductStockTracking(noTracking); }
+    document.getElementById('prod-form-stock').value = noTracking ? '' : (p.stock || 0);
     populateCategorySelect();
     document.getElementById('prod-form-category').value = p.category || '';
     openModal('product-modal');
@@ -1135,11 +1171,16 @@ async function handleSaveProduct(e) {
     const name = document.getElementById('prod-form-name').value.trim();
     const category = document.getElementById('prod-form-category').value;
     const price = parseFloat(document.getElementById('prod-form-price').value) || 0;
-    const stock = parseInt(document.getElementById('prod-form-stock').value) || 0;
     const barcode = document.getElementById('prod-form-barcode').value.trim();
     const photo = document.getElementById('prod-form-image').value.trim();
 
-    const payload = { name, category, price, stock, barcode, photo_base64: photo };
+    // Unlimited stock / no inventory tracking
+    const noTrackCb = document.getElementById('prod-form-no-tracking');
+    const noTracking = noTrackCb ? noTrackCb.checked : false;
+    const track_stock = noTracking ? 0 : 1;
+    const stock = noTracking ? 0 : (parseInt(document.getElementById('prod-form-stock').value) || 0);
+
+    const payload = { name, category, price, stock, barcode, photo_base64: photo, track_stock };
 
     try {
         const url = id ? `/api/products/${id}` : '/api/products';

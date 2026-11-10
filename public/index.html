@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -391,12 +391,13 @@
                                             <th>Category</th>
                                             <th>Barcode</th>
                                             <th>Price</th>
+                                            <th>Type</th>
                                             <th>Stock Level</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="inventory-table-tbody">
-                                        <tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">Loading inventory products...</td></tr>
+                                        <tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">Loading inventory products...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1342,14 +1343,31 @@
                     </select>
                 </div>
 
+                <!-- Unlimited / No Inventory Tracking Toggle -->
+                <div class="form-field" style="margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px;">
+                    <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:700; color:#0f172a; margin:0;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-infinity" style="color:var(--primary);"></i>
+                            <span>Unlimited Stock (No Inventory Tracking)</span>
+                        </span>
+                        <input type="checkbox" id="prod-form-no-tracking" onchange="toggleProductStockTracking(this.checked)" style="width:18px; height:18px; cursor:pointer; accent-color:var(--primary);">
+                    </label>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">
+                        Enable for cooked meals, services, custom orders, or products that do not need stock management.
+                    </div>
+                </div>
+
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
                     <div>
                         <label class="field-label">Selling Price</label>
                         <input type="number" id="prod-form-price" class="pos-input" placeholder="8000" min="0" required>
                     </div>
-                    <div>
+                    <div id="prod-form-stock-wrap">
                         <label class="field-label">Stock Quantity</label>
                         <input type="number" id="prod-form-stock" class="pos-input" placeholder="100" min="0" required>
+                    </div>
+                    <div id="prod-form-unlimited-badge" style="display:none; align-items:center; justify-content:center; background:#f0fdf4; border:1px dashed #86efac; border-radius:8px; padding:10px; color:#16a34a; font-weight:700; font-size:0.85rem; gap:6px;">
+                        <i class="fa-solid fa-infinity"></i> Unlimited Stock
                     </div>
                 </div>
 

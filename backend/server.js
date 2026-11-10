@@ -2748,6 +2748,7 @@ app.post("/api/pos/orders", authenticateToken, async (req, res) => {
     name: item.name,
     product_name: item.name,
     price: item.price,
+    track_stock: item.track_stock,
     qty: item.qty || 1,
     quantity: item.qty || 1,
     total: (item.price || 0) * (item.qty || 1)
@@ -4342,17 +4343,16 @@ app.get("/api/barcodes/sold", authenticateToken, (req, res) => {
 });
 
 app.post("/api/products", authenticateToken, (req, res) => {
-  const { name, category, price, photo_base64, buying_price, track_stock, low_stock_threshold } = req.body;
-  // Set stock to 0 initially since barcodes haven't been scanned
-  const stock = 0;
+  const { name, category, price, photo_base64, buying_price, track_stock, low_stock_threshold, stock: reqStock, barcode } = req.body;
+  const ts = track_stock === undefined ? 1 : (parseInt(track_stock) === 0 ? 0 : 1);
+  const stock = ts === 0 ? 0 : (parseInt(reqStock) || 0);
   const bp = parseFloat(buying_price) || 0;
-  const ts = track_stock === undefined ? 1 : track_stock;
   const lst = low_stock_threshold !== undefined && low_stock_threshold !== null ? parseInt(low_stock_threshold) : 10;
+  const prodBarcode = barcode && String(barcode).trim() ? String(barcode).trim() : null;
 
-  // INSERT with NULL barcode — NULL bypasses UNIQUE constraint in SQLite
   db.run(
-    "INSERT INTO products (name, category, price, stock, barcode, barcode_end, photo_base64, buying_price, track_stock, low_stock_threshold) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)",
-    [name, category, price, stock, photo_base64 || null, bp, ts, lst],
+    "INSERT INTO products (name, category, price, stock, barcode, barcode_end, photo_base64, buying_price, track_stock, low_stock_threshold) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)",
+    [name, category, price, stock, prodBarcode, photo_base64 || null, bp, ts, lst],
     function (err) {
       if (err) {
         console.error("[PRODUCT CREATE ERROR]", err.message);
@@ -4360,7 +4360,7 @@ app.post("/api/products", authenticateToken, (req, res) => {
       }
       const newId = this.lastID;
       emitAndBust("products", "products");
-      res.json({ id: newId, name, stock, auto_assigned: false });
+      res.json({ id: newId, name, stock, track_stock: ts, auto_assigned: false });
     },
   );
 });
@@ -4598,27 +4598,29 @@ app.put("/api/products/:id", authenticateToken, (req, res) => {
     buying_price,
     track_stock,
     low_stock_threshold,
+    stock: reqStock,
   } = req.body;
   const { id } = req.params;
 
-  db.get("SELECT barcode, barcode_end FROM products WHERE id = ?", [id], (err, current) => {
+  db.get("SELECT barcode, barcode_end, stock FROM products WHERE id = ?", [id], (err, current) => {
     if (err) return res.status(500).json({ error: err.message });
 
     let finalBarcode = barcode ? barcode.toString().trim() : (current?.barcode || `JOM-${id}`);
     let finalBarcodeEnd = barcode_end !== undefined ? (barcode_end ? barcode_end.toString().trim() : null) : (current?.barcode_end || null);
 
     const bp = parseFloat(buying_price) || 0;
-    const ts = track_stock === undefined ? 1 : track_stock;
+    const ts = track_stock === undefined ? 1 : (parseInt(track_stock) === 0 ? 0 : 1);
     const lst = low_stock_threshold !== undefined && low_stock_threshold !== null ? parseInt(low_stock_threshold) : 10;
+    const finalStock = ts === 0 ? 0 : (reqStock !== undefined ? parseInt(reqStock) || 0 : (current?.stock || 0));
 
-    const params = [name, category, price, finalBarcode, finalBarcodeEnd, bp, ts, lst, id];
+    const params = [name, category, price, finalStock, finalBarcode, finalBarcodeEnd, bp, ts, lst, id];
     let sql =
-      "UPDATE products SET name = ?, category = ?, price = ?, barcode = ?, barcode_end = ?, buying_price = ?, track_stock = ?, low_stock_threshold = ? WHERE id = ?";
+      "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, barcode = ?, barcode_end = ?, buying_price = ?, track_stock = ?, low_stock_threshold = ? WHERE id = ?";
 
     if (photo_base64 && photo_base64.length > 50) {
       sql =
-        "UPDATE products SET name = ?, category = ?, price = ?, barcode = ?, barcode_end = ?, buying_price = ?, track_stock = ?, low_stock_threshold = ?, photo_base64 = ? WHERE id = ?";
-      params.splice(8, 0, photo_base64); // insert photo before id
+        "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, barcode = ?, barcode_end = ?, buying_price = ?, track_stock = ?, low_stock_threshold = ?, photo_base64 = ? WHERE id = ?";
+      params.splice(9, 0, photo_base64); // insert photo before id
     }
 
     db.run(sql, params, function (err) {
@@ -5144,15 +5146,15 @@ const checkoutHandlerFn = async (req, res) => {
       const cashierName = req.user ? (req.user.name || req.user.username || "Cashier") : "Cashier";
       const servedByLabel = effectiveServedBy || cashierName;
       for (const item of items) {
-        if (item.track_stock === 0) continue; // Made-to-order: no stock tracking
-        // Fetch current stock BEFORE deduction using q() — must stay on the SAME
-        // transactional connection/client. Using db.get() here would grab a second
-        // pool connection and could deadlock Postgres or produce stale reads.
+        if (item.track_stock === 0) continue; // Made-to-order or unlimited: no stock tracking
+        // Fetch current stock BEFORE deduction using q()
         const stockBeforeRes = await q(
-          "SELECT stock FROM products WHERE id = ?",
+          "SELECT stock, track_stock FROM products WHERE id = ?",
           [item.id]
         );
-        const stockBeforeVal = (stockBeforeRes.rows && stockBeforeRes.rows[0]) ? stockBeforeRes.rows[0].stock : null;
+        const prodRow = (stockBeforeRes.rows && stockBeforeRes.rows[0]) ? stockBeforeRes.rows[0] : null;
+        if (prodRow && prodRow.track_stock === 0) continue; // Double-guard from DB: skip deduction
+        const stockBeforeVal = prodRow ? prodRow.stock : null;
         await q(
           "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?",
           [item.qty, item.id, item.qty]

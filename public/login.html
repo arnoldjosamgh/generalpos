@@ -1,800 +1,720 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-window.onerror = function(msg, url, line, col, error) {
-    document.body.innerHTML += '<div style="color:red;z-index:9999;position:relative;">ERROR: ' + msg + '<br>Line: ' + line + '</div>';
-};
-window.onunhandledrejection = function(e) {
-    document.body.innerHTML += '<div style="color:red;z-index:9999;position:relative;">PROMISE REJECTION: ' + e.reason + '</div>';
-};
-</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="canonical" href="https://jomishsuite.onrender.com/login.html">
-    <meta name="google-site-verification" content="google4725248131705fcf" />
-    <title>Jomish Business Suite - Enterprise POS &amp; Management Software</title>
-    <meta name="description" content="Jomish Business Suite is a powerful cloud-based POS and enterprise management system.">
-    <meta name="author" content="Arnold Josam">
+    <title>Login - iGourd / Jomish Business Suite POS</title>
     <link rel="icon" type="image/png" href="favicon.png?v=2">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#6366f1">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Jomish">
-    <link rel="apple-touch-icon" href="/favicon.png">
-    <script src="kiosk-lock.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="offline-db.js"></script>
     <script src="lib/bcryptjs.min.js"></script>
     <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        *, *::before, *::after {
+            margin: 0; padding: 0; box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
         :root {
-            --cyan: #00e5ff; --magenta: #e040fb; --dark: #0c0c1a;
-            --card: #161628; --input-bg: #1e1e35;
-            --border: rgba(255,255,255,0.08); --text: #eee; --muted: #7a7a9a;
-            --radius: 14px; --green: #10b981;
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --primary-light: #e0f2fe;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #cbd5e1;
+            --bg-page: #0f172a;
+            --card-bg: #ffffff;
         }
+
         body {
-            font-family: 'Segoe UI', -apple-system, sans-serif;
-            min-height: 100vh; display: flex; align-items: center;
-            justify-content: center; background: var(--dark); overflow: hidden;
+            min-height: 100vh;
+            background: #111827;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(2, 132, 199, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.1) 0px, transparent 50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-x: hidden;
         }
-        body::before {
-            content: ''; position: fixed; inset: 0;
-            background: radial-gradient(ellipse at 30% 20%, rgba(0,229,255,0.06), transparent 60%),
-                        radial-gradient(ellipse at 70% 80%, rgba(224,64,251,0.05), transparent 60%);
+
+        /* ── Main Monitor / Window Container ── */
+        .pos-terminal-frame {
+            width: 100%;
+            max-width: 920px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            display: flex;
+            min-height: 520px;
+            position: relative;
+        }
+
+        /* ── Left Illustration Column (Matching Pic 3) ── */
+        .login-visual-panel {
+            flex: 1.1;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 45%, #0284c7 100%);
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            color: #ffffff;
+        }
+
+        .visual-decor-circle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
             pointer-events: none;
         }
+        .vd-1 { width: 320px; height: 320px; top: -80px; left: -80px; }
+        .vd-2 { width: 220px; height: 220px; bottom: -50px; right: -50px; background: rgba(0, 0, 0, 0.08); }
 
-        /* ── Animated border card ── */
-        .card-wrap { position: relative; z-index: 10; padding: 3px; border-radius: 22px; animation: cardIn .5s ease both; }
-        @keyframes cardIn { from { opacity:0; transform:translateY(20px) scale(.97) } to { opacity:1; transform:none } }
-        .card-wrap::before {
-            content: ''; position: absolute; inset: -2px; border-radius: 22px;
-            background: repeating-conic-gradient(from var(--angle,0deg),var(--cyan) 0%,var(--magenta) 5%,transparent 5%,transparent 40%,var(--cyan) 50%);
-            filter: drop-shadow(0 15px 50px rgba(0,229,255,0.15));
-            animation: spinBorder 4s linear infinite; z-index: -1;
-        }
-        @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-        @keyframes spinBorder { to { --angle: 360deg } }
-        .card-wrap::after {
-            content: ''; position: absolute; inset: -2px; border-radius: 22px;
-            background: repeating-conic-gradient(from var(--angle,0deg),var(--cyan) 0%,var(--magenta) 5%,transparent 5%,transparent 40%,var(--cyan) 50%);
-            filter: blur(20px); opacity: .3; animation: spinBorder 4s linear infinite; z-index: -2;
+        .isometric-illustration {
+            width: 100%;
+            max-width: 340px;
+            height: auto;
+            filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.25));
+            animation: floatIllustration 5s ease-in-out infinite;
         }
 
-        .login-card {
-            background: var(--card); border-radius: 20px; padding: 24px 24px;
-            width: min(480px, 98vw);
-            max-height: 98vh;
-            overflow-y: auto;
-            position: relative; overflow: hidden;
+        @keyframes floatIllustration {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
         }
 
-        /* ── Brand ── */
-        .brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 24px; gap: 8px; }
-        .brand-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 14px; }
-        .brand-name { font-size: 1.2rem; font-weight: 800; }
-        .brand-name span { background: linear-gradient(135deg, var(--cyan), var(--magenta)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .brand-tag { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
-
-        /* ── Screens ── */
-        .screen { display: none; }
-        .screen.active { display: block; animation: fadeIn .3s ease; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
-
-        /* ── Error / success ── */
-        .alert { display: none; padding: 10px 14px; border-radius: 10px; font-size: .82rem; margin-bottom: 14px; text-align: center; }
-        .alert.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #f87171; }
-        .alert.success { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25); color: #34d399; }
-
-        /* ── User grid (screen 1) ── */
-        .screen-title { font-size: .82rem; color: var(--muted); text-align: center; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
-        .user-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; max-height: 42vh; overflow-y: auto; }
-        .user-tile {
-            display: flex; flex-direction: column; align-items: center; gap: 8px;
-            padding: 14px 8px; border-radius: 14px;
-            background: var(--input-bg); border: 1.5px solid var(--border);
-            cursor: pointer; transition: all .2s; user-select: none;
-        }
-        .user-tile:hover { border-color: var(--cyan); background: rgba(0,229,255,0.06); transform: translateY(-2px); }
-        .user-tile:active { transform: scale(.96); }
-        .user-avatar {
-            width: 48px; height: 48px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--cyan), var(--magenta));
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.3rem; font-weight: 800; color: #0c0c1a;
-        }
-        .user-name { font-size: .78rem; font-weight: 600; color: var(--text); text-align: center; word-break: break-word; }
-        .user-role { font-size: .65rem; color: var(--muted); text-align: center; }
-        .user-tile { position: relative; }
-        .tile-del-btn {
-            position: absolute; top: 4px; right: 4px;
-            background: rgba(239,68,68,0.15); border: none;
-            color: #f87171; border-radius: 50%; width: 20px; height: 20px;
-            font-size: 0.65rem; cursor: pointer; display: flex;
-            align-items: center; justify-content: center; opacity: 0;
-            transition: opacity .2s; line-height: 1; padding: 0;
-        }
-        .user-tile:hover .tile-del-btn { opacity: 1; }
-
-        .other-btn {
-            width: 100%; padding: 13px; border-radius: var(--radius);
-            background: transparent; border: 1.5px dashed rgba(255,255,255,0.12);
-            color: var(--muted); font-size: .88rem; cursor: pointer;
-            transition: all .2s; font-family: inherit;
-        }
-        .other-btn:hover { border-color: var(--magenta); color: var(--magenta); }
-
-        .pin-user-info { display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; gap: 4px; }
-        .pin-avatar {
-            width: 56px; height: 56px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--cyan), var(--magenta));
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.5rem; font-weight: 800; color: #0c0c1a; margin-bottom: 2px;
-        }
-        .pin-user-name { font-size: 1rem; font-weight: 700; color: var(--text); }
-        .pin-user-email { font-size: .72rem; color: var(--muted); }
-
-        .pin-dots { display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; }
-        .pin-dot {
-            width: 13px; height: 13px; border-radius: 50%;
-            border: 2px solid var(--muted); background: transparent;
-            transition: all .15s;
-        }
-        .pin-dot.filled { background: var(--cyan); border-color: var(--cyan); }
-
-        .pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-        .pin-key {
-            padding: 15px; border-radius: 12px; font-size: 1.15rem; font-weight: 700;
-            background: var(--input-bg); border: 1.5px solid var(--border);
-            color: var(--text); cursor: pointer; transition: all .15s;
-            text-align: center; font-family: inherit; user-select: none;
-        }
-        .pin-key:hover { background: rgba(0,229,255,0.08); border-color: var(--cyan); }
-        .pin-key:active { transform: scale(.92); background: rgba(0,229,255,0.15); }
-        .pin-key.del { color: var(--muted); font-size: 1rem; }
-        .pin-key.submit { background: linear-gradient(135deg, var(--cyan), #00b8d4); color: #0c0c1a; border-color: transparent; font-size: .9rem; }
-        .pin-key.submit:hover { box-shadow: 0 4px 20px rgba(0,229,255,0.3); }
-        .pin-key.zero { grid-column: span 2; }
-
-        .back-link { text-align: center; font-size: .78rem; color: var(--muted); cursor: pointer; margin-top: 4px; }
-        .back-link:hover { color: var(--cyan); }
-
-        /* ── Manual email screen (screen 3) ── */
-        .field { position: relative; margin-bottom: 14px; }
-        .field label { display: block; font-size: .7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
-        .field input {
-            width: 100%; background: var(--input-bg); border: 1px solid var(--border);
-            color: var(--text); padding: 13px 16px; border-radius: var(--radius);
-            font-size: .92rem; font-family: inherit; outline: none;
-            transition: border-color .2s, box-shadow .2s;
-        }
-        .field input::placeholder { color: #4a4a65; }
-        .field input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,229,255,0.1); }
-        .eye-btn { position: absolute; right: 14px; bottom: 13px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; }
-
-        /* ── Buttons ── */
-        .submit-btn {
-            width: 100%; padding: 14px; background: linear-gradient(135deg, #00e5ff, #00b8d4);
-            color: #0c0c1a; border: none; border-radius: var(--radius);
-            font-size: .95rem; font-weight: 700; font-family: inherit;
-            cursor: pointer; margin-top: 6px; transition: transform .15s, box-shadow .2s;
-            box-shadow: 0 4px 24px rgba(0,229,255,0.25); letter-spacing: .3px;
-        }
-        .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(0,229,255,0.35); }
-        .submit-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-        .demo-btn {
-            width: 100%; padding: 13px; background: linear-gradient(135deg, #e040fb, #b020c0);
-            color: white; border: none; border-radius: var(--radius);
-            font-size: .92rem; font-weight: 700; font-family: inherit;
-            cursor: pointer; margin-top: 10px; transition: transform .15s, box-shadow .2s;
-        }
-
-        @keyframes spin-load { to { transform: rotate(360deg) } }
-        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(12,12,26,0.3); border-top-color: #0c0c1a; border-radius: 50%; animation: spin-load .7s linear infinite; vertical-align: middle; margin-right: 6px; }
-        .spinner-white { border-color: rgba(255,255,255,0.3); border-top-color: white; }
-
-        /* ── Offline banner ── */
-        #offline-banner { display: none; background: #f59e0b; color: #fff; text-align: center; padding: 8px; font-size: .85rem; font-weight: bold; position: fixed; top: 0; width: 100%; z-index: 9999; }
-
-        @media(max-width: 500px) { .login-card { padding: 24px 16px; } .pinpad { gap: 7px; } .pin-key { padding: 16px; } }
-
-        /* ── Full-Screen tile overlay (screen-select) — PC/tablet only ── */
-        @media (min-width: 768px) {
-            body.tiles-mode {
-                align-items: stretch;
-                justify-content: stretch;
-            }
-            body.tiles-mode .card-wrap {
-                padding: 0;
-                border-radius: 0;
-                width: 100vw; height: 100vh;
-                animation: none;
-            }
-            body.tiles-mode .card-wrap::before,
-            body.tiles-mode .card-wrap::after { display: none; }
-            body.tiles-mode .login-card {
-                width: 100vw; height: 100vh;
-                max-height: 100vh;
-                border-radius: 0;
-                padding: 0;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-            /* compact brand bar when full-screen */
-            body.tiles-mode .brand {
-                flex-direction: row;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                margin-bottom: 0;
-                padding: 12px 20px;
-                border-bottom: 1px solid rgba(255,255,255,0.07);
-                background: rgba(22,22,40,0.9);
-                backdrop-filter: blur(8px);
-                flex-shrink: 0;
-            }
-            body.tiles-mode .brand-logo { width: 34px; height: 34px; border-radius: 8px; }
-            body.tiles-mode .brand-name { font-size: 1rem; }
-            body.tiles-mode .brand-tag { display: none; }
-            /* tile screen fills remaining space */
-            body.tiles-mode #screen-select {
-                flex: 1;
-                display: flex !important;
-                flex-direction: column;
-                padding: 16px 16px 12px;
-                overflow: hidden;
-                min-height: 0;
-            }
-            body.tiles-mode .screen-title {
-                margin-bottom: 12px;
-                font-size: .8rem;
-            }
-            body.tiles-mode .user-grid {
-                flex: 1;
-                min-height: 0;
-                max-height: none;
-                overflow-y: auto;
-                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-                gap: 12px;
-                margin-bottom: 12px;
-                align-content: start;
-            }
-            body.tiles-mode .user-tile {
-                padding: 16px 8px;
-            }
-            body.tiles-mode .user-avatar {
-                width: 52px; height: 52px; font-size: 1.4rem;
-            }
-            body.tiles-mode .other-btn,
-            body.tiles-mode .demo-btn {
-                flex-shrink: 0;
-            }
-            body.tiles-mode .demo-btn { margin-top: 8px !important; }
-        }
-
-        /* ── Mobile: keep login card centred, limit grid height ── */
-        @media (max-width: 767px) {
-            .login-card {
-                overflow-y: auto;
-            }
-            .user-grid {
-                max-height: 45vh;
-                overflow-y: auto;
-            }
-        }
-    </style>
-
-    <!-- ── PWA Install Prompt Styles ── -->
-    <style>
-        #pwa-install-banner {
-            position: fixed;
-            bottom: -160px;
-            left: 50%; transform: translateX(-50%);
-            width: min(440px, calc(100vw - 32px));
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            border: 1px solid rgba(99,102,241,0.45);
-            border-radius: 20px;
-            padding: 20px 22px;
+        .visual-footer-info {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 8px;
+        }
+
+        /* ── Right Form Column (Exact Match to Pic 3) ── */
+        .login-form-panel {
+            flex: 1.2;
+            background: #ffffff;
+            padding: 40px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        /* Top Language Bar */
+        .form-top-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .lang-select-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: #475569;
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-select-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        /* Title */
+        .login-title {
+            font-size: 1.85rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 18px;
+            letter-spacing: -0.5px;
+        }
+
+        /* Mode Tabs (Login ID, Email, Phone Number) */
+        .login-tabs-nav {
+            display: flex;
+            gap: 28px;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 28px;
+        }
+
+        .login-tab-item {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #64748b;
+            padding-bottom: 10px;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.2s;
+            user-select: none;
+        }
+
+        .login-tab-item:hover {
+            color: var(--primary);
+        }
+
+        .login-tab-item.active {
+            color: var(--primary);
+        }
+
+        .login-tab-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2.5px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        /* Input Form */
+        .form-field {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field-label {
+            font-size: 0.88rem;
+            font-weight: 500;
+            color: #334155;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .pos-input {
+            width: 100%;
+            padding: 11px 14px;
+            font-size: 0.95rem;
+            color: #0f172a;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .pos-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        }
+
+        .pos-input.input-error {
+            border-color: #ef4444;
+            background: #fff5f5;
+        }
+
+        .field-error-msg {
+            color: #ef4444;
+            font-size: 0.78rem;
+            font-weight: 500;
+            margin-top: 3px;
+            display: none;
+        }
+
+        /* Action Buttons */
+        .login-submit-btn {
+            width: 100%;
+            background: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 13px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+            transition: all 0.2s;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .login-submit-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+        }
+
+        .login-submit-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Tech Support Link & Status */
+        .form-bottom-links {
+            margin-top: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+        }
+
+        .tech-portal-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .tech-portal-link:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Hardware Bezel Brand Bar (matching Pic 3) ── */
+        .hardware-bezel-footer {
+            width: 100%;
+            max-width: 920px;
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 18px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #94a3b8;
+            font-size: 0.82rem;
+        }
+
+        .bezel-logo-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .bezel-support-sticker {
+            background: #0284c7;
+            color: #ffffff;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.78rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
+        }
+
+        /* ── Tech Support Modal (Super Admin Console) ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
             z-index: 9999;
-            box-shadow: 0 -4px 40px rgba(99,102,241,0.25), 0 20px 60px rgba(0,0,0,0.5);
-            transition: bottom 0.5s cubic-bezier(0.34,1.56,0.64,1);
-            backdrop-filter: blur(20px);
+            padding: 20px;
         }
-        #pwa-install-banner.show { bottom: 24px; }
-        #pwa-install-banner .pwa-icon {
-            width: 52px; height: 52px; border-radius: 14px;
-            flex-shrink: 0; object-fit: cover;
-            box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+
+        .modal-card {
+            background: #ffffff;
+            border-radius: 14px;
+            width: 100%;
+            max-width: 480px;
+            padding: 30px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
         }
-        #pwa-install-banner .pwa-text { flex: 1; min-width: 0; }
-        #pwa-install-banner .pwa-text h4 {
-            font-size: 0.88rem; font-weight: 700;
-            color: #fff; margin-bottom: 3px; letter-spacing: 0.01em;
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
         }
-        #pwa-install-banner .pwa-text p {
-            font-size: 0.75rem; color: rgba(255,255,255,0.55);
-            line-height: 1.4; margin: 0;
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        #pwa-install-banner .pwa-actions {
-            display: flex; flex-direction: column; gap: 7px; flex-shrink: 0;
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #94a3b8;
+            cursor: pointer;
         }
-        #pwa-btn-install {
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            color: #fff; border: none; border-radius: 10px;
-            padding: 8px 18px; font-size: 0.78rem; font-weight: 700;
-            cursor: pointer; white-space: nowrap;
-            box-shadow: 0 4px 14px rgba(99,102,241,0.5);
-            transition: transform 0.15s, box-shadow 0.15s;
+
+        @media (max-width: 768px) {
+            .pos-terminal-frame {
+                flex-direction: column;
+            }
+            .login-visual-panel {
+                padding: 25px 20px;
+            }
+            .isometric-illustration {
+                max-width: 220px;
+            }
+            .login-form-panel {
+                padding: 30px 24px;
+            }
         }
-        #pwa-btn-install:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.65); }
-        #pwa-btn-dismiss {
-            background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.5);
-            border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-            padding: 6px 18px; font-size: 0.72rem; cursor: pointer;
-            transition: background 0.15s;
-        }
-        #pwa-btn-dismiss:hover { background: rgba(255,255,255,0.12); color: #fff; }
     </style>
 </head>
 <body>
-<!-- ── PWA Install Banner ── -->
-<div id="pwa-install-banner" role="dialog" aria-label="Install Jomish as an app">
-    <img src="favicon.png" alt="Jomish" class="pwa-icon">
-    <div class="pwa-text">
-        <h4>Install Jomish Business Suite</h4>
-        <p>Add to your home screen for a faster,<br>full-screen experience — works offline too.</p>
-    </div>
-    <div class="pwa-actions">
-        <button id="pwa-btn-install">⬇ Install App</button>
-        <button id="pwa-btn-dismiss">Not now</button>
-    </div>
-</div>
 
-<div id="offline-banner">⚠ You are currently offline. Local login available.</div>
+    <!-- Main POS Terminal Frame (Pic 3 Layout) -->
+    <div class="pos-terminal-frame">
+        
+        <!-- Left Visual Panel -->
+        <div class="login-visual-panel">
+            <div class="visual-decor-circle vd-1"></div>
+            <div class="visual-decor-circle vd-2"></div>
+            
+            <!-- SVG Illustration of Analytics & Modern Dashboard (Matching Pic 3) -->
+            <svg class="isometric-illustration" viewBox="0 0 400 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g filter="url(#drop-sh)">
+                    <!-- Isometric Main Board -->
+                    <path d="M70 120 L210 50 L340 120 L200 200 Z" fill="#ffffff" fill-opacity="0.95"/>
+                    <path d="M70 120 L200 200 L200 220 L70 140 Z" fill="#0284c7"/>
+                    <path d="M200 200 L340 120 L340 140 L200 220 Z" fill="#0369a1"/>
 
-<div class="card-wrap">
-    <div class="login-card">
-        <!-- Brand -->
-        <div class="brand">
-            <img src="favicon.png" alt="Jomish" class="brand-logo">
-            <div class="brand-name"><span>Jomish Workforce</span></div>
-            <div class="brand-tag">Enterprise Platform</div>
+                    <!-- Analytics Screen Card (Cyan/Blue layers) -->
+                    <path d="M90 140 L190 85 L290 140 L190 200 Z" fill="#f8fafc"/>
+                    
+                    <!-- Chart Bars in Isometric Perspective -->
+                    <path d="M120 145 L135 137 L135 110 L120 118 Z" fill="#38bdf8"/>
+                    <path d="M135 137 L150 145 L150 118 L135 110 Z" fill="#0284c7"/>
+                    <path d="M120 118 L135 110 L150 118 L135 126 Z" fill="#7dd3fc"/>
+
+                    <path d="M160 167 L175 159 L175 120 L160 128 Z" fill="#10b981"/>
+                    <path d="M175 159 L190 167 L190 128 L175 120 Z" fill="#059669"/>
+                    <path d="M160 128 L175 120 L190 128 L175 136 Z" fill="#6ee7b7"/>
+
+                    <path d="M200 145 L215 137 L215 90 L200 98 Z" fill="#f59e0b"/>
+                    <path d="M215 137 L230 145 L230 98 L215 90 Z" fill="#d97706"/>
+                    <path d="M200 98 L215 90 L230 98 L215 106 Z" fill="#fcd34d"/>
+
+                    <!-- Standing Figure Silhouette / Operator -->
+                    <circle cx="280" cy="180" r="14" fill="#0f172a"/>
+                    <path d="M272 196 L288 196 L294 250 L266 250 Z" fill="#1e293b"/>
+                    <path d="M275 250 L273 280 L280 280 L282 250 Z" fill="#0284c7"/>
+                    <path d="M285 250 L287 280 L294 280 L292 250 Z" fill="#0284c7"/>
+                </g>
+                <defs>
+                    <filter id="drop-sh" x="40" y="30" width="320" height="260" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                        <feDropShadow dx="0" dy="12" stdDeviation="10" flood-opacity="0.3"/>
+                    </filter>
+                </defs>
+            </svg>
+
+            <div class="visual-footer-info">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Multi-Tenant Cloud Sync &amp; Local Offline Resilient</span>
+            </div>
         </div>
 
-        <!-- ─── SCREEN 1: User Select ─── -->
-        <div class="screen active" id="screen-select">
-            <p class="screen-title">Who's working today?</p>
-            <div id="error-select" class="alert error"></div>
-            <div class="user-grid" id="user-grid"></div>
-            <button class="other-btn" id="btn-other">
-                ➕ &nbsp;Sign in with email
-            </button>
-        </div>
-
-        <!-- ─── SCREEN 2: PIN Pad ─── -->
-        <div class="screen" id="screen-pin">
-            <div class="pin-user-info">
-                <div class="pin-avatar" id="pin-avatar">?</div>
-                <div class="pin-user-name" id="pin-name">User</div>
-                <div class="pin-user-email" id="pin-email-label"></div>
-            </div>
-            <div id="error-pin" class="alert error"></div>
-            <!-- PIN dots (4 digits, auto-submits) -->
-            <div class="pin-dots" id="pin-dots">
-                <div class="pin-dot" id="d0"></div>
-                <div class="pin-dot" id="d1"></div>
-                <div class="pin-dot" id="d2"></div>
-                <div class="pin-dot" id="d3"></div>
-            </div>
-            <!-- PIN Pad -->
-            <div class="pinpad">
-                <button class="pin-key" data-k="1">1</button>
-                <button class="pin-key" data-k="2">2</button>
-                <button class="pin-key" data-k="3">3</button>
-                <button class="pin-key" data-k="4">4</button>
-                <button class="pin-key" data-k="5">5</button>
-                <button class="pin-key" data-k="6">6</button>
-                <button class="pin-key" data-k="7">7</button>
-                <button class="pin-key" data-k="8">8</button>
-                <button class="pin-key" data-k="9">9</button>
-                <button class="pin-key zero" data-k="0">0</button>
-                <button class="pin-key del" id="pin-del">⌫</button>
-            </div>
-            <button class="submit-btn" id="pin-submit">Sign In</button>
-            <p class="back-link" id="pin-back">← Back to users</p>
-        </div>
-
-        <!-- ─── SCREEN 3: Manual Email + PIN ─── -->
-        <div class="screen" id="screen-manual">
-            <div id="error-manual" class="alert error"></div>
-            <form id="form-manual" autocomplete="on">
-                <div class="field">
-                    <label>Email or Employee ID</label>
-                    <input type="text" id="manual-email" placeholder="e.g. JOM001 or jerry@gmail.com" required autocomplete="username" inputmode="text">
-                    <p style="font-size:0.73rem; color:var(--muted); margin:4px 0 0 0;">Use your Employee ID (given by Admin) or your registered email</p>
+        <!-- Right Form Panel -->
+        <div class="login-form-panel">
+            <div>
+                <!-- Top Language Bar -->
+                <div class="form-top-bar">
+                    <button class="lang-select-btn" type="button">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>English</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;"></i>
+                    </button>
                 </div>
-                <div class="field">
-                    <label>PIN / Password</label>
-                    <input type="password" id="manual-password" placeholder="4-digit PIN or password" required autocomplete="current-password" inputmode="numeric">
-                    <button type="button" class="eye-btn" id="toggle-pwd">👁</button>
+
+                <!-- Header Title -->
+                <h1 class="login-title">Login</h1>
+
+                <!-- Mode Tabs: Login ID | Email | Phone Number -->
+                <div class="login-tabs-nav">
+                    <div class="login-tab-item active" onclick="switchLoginMode('login_id', this)">Login ID</div>
+                    <div class="login-tab-item" onclick="switchLoginMode('email', this)">Email</div>
+                    <div class="login-tab-item" onclick="switchLoginMode('phone', this)">Phone Number</div>
                 </div>
-                <button type="submit" class="submit-btn" id="btn-manual-signin">Sign In</button>
+
+                <!-- Login Form -->
+                <form id="pos-login-form" onsubmit="handleEmployeeLogin(event)">
+                    
+                    <!-- Account Input (Login ID / Email / Phone) -->
+                    <div class="form-field">
+                        <label class="field-label" id="account-label">Employee account:</label>
+                        <div class="input-wrapper">
+                            <input 
+                                type="text" 
+                                id="login-account-input" 
+                                class="pos-input" 
+                                placeholder="e.g. admin@igourd or EMP001" 
+                                required 
+                                autocomplete="username"
+                            >
+                        </div>
+                        <div class="field-error-msg" id="account-error">Please enter a valid employee account</div>
+                    </div>
+
+                    <!-- Password Input -->
+                    <div class="form-field">
+                        <label class="field-label">Account password:</label>
+                        <div class="input-wrapper">
+                            <input 
+                                type="password" 
+                                id="login-password-input" 
+                                class="pos-input" 
+                                placeholder="Enter account password" 
+                                required 
+                                autocomplete="current-password"
+                            >
+                        </div>
+                        <div class="field-error-msg" id="password-error">Incorrect password. Please try again.</div>
+                    </div>
+
+                    <!-- Imprest (Opening Float / Shift Cash) -->
+                    <div class="form-field">
+                        <label class="field-label">Imprest:</label>
+                        <div class="input-wrapper">
+                            <input 
+                                type="number" 
+                                id="login-imprest-input" 
+                                class="pos-input" 
+                                placeholder="0" 
+                                min="0" 
+                                step="500"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="login-submit-btn" id="login-btn">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>Login</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Bottom Tech Link & Auto Info -->
+            <div class="form-bottom-links">
+                <a class="tech-portal-link" onclick="openTechSupportModal()">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                    <span>Tech Support Portal</span>
+                </a>
+                <span style="color:#94a3b8; font-size:0.75rem;">v2.5.0 Standalone</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Bezel Hardware Strip (Matching Pic 3) -->
+    <div class="hardware-bezel-footer">
+        <div class="bezel-logo-group">
+            <span style="color:#0284c7;">igourd</span>
+            <span style="font-size:0.75rem; color:#64748b; font-weight:500;">POS Terminal Station</span>
+        </div>
+        <div class="bezel-support-sticker">
+            <i class="fa-solid fa-receipt"></i>
+            <span>Call 0760180588 to Buy Paper Roll</span>
+        </div>
+    </div>
+
+    <!-- Tech Support Super Admin Modal -->
+    <div class="modal-overlay" id="tech-modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-server" style="color:var(--primary);"></i>
+                    <span>Tech Support Super Admin</span>
+                </div>
+                <button class="modal-close-btn" onclick="closeTechSupportModal()">&times;</button>
+            </div>
+
+            <p style="color:#64748b; font-size:0.85rem; margin-bottom:18px;">
+                Enter Technical Support credentials to provision companies, customize roles, pause/unpause databases, and modify system branding.
+            </p>
+
+            <form onsubmit="handleTechDirectLogin(event)">
+                <div class="form-field">
+                    <label class="field-label">Tech Username</label>
+                    <input type="text" id="tech-username-input" class="pos-input" value="tech" required>
+                </div>
+
+                <div class="form-field">
+                    <label class="field-label">Tech Master Password</label>
+                    <input type="password" id="tech-password-input" class="pos-input" placeholder="Enter Tech PIN or Password" required>
+                </div>
+
+                <button type="submit" class="login-submit-btn" style="background:#0f172a; margin-top:15px;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Access Super Admin Console</span>
+                </button>
             </form>
-            <p class="back-link" id="manual-back" style="margin-top:14px;">← Back to users</p>
+            <div id="tech-login-error" style="color:#ef4444; font-size:0.82rem; margin-top:10px; display:none; text-align:center;"></div>
         </div>
     </div>
-</div>
 
-<script>
-    const BASE = window.location.protocol === 'file:' ? 'http://localhost:3005' : window.location.origin;
-    const SAVED_USERS_KEY = 'jomish_known_users'; // array of {name, email, role, initials}
+    <script>
+        let currentMode = 'login_id';
 
-    let pinBuffer = '';
-    let selectedEmail = '';
+        function switchLoginMode(mode, element) {
+            currentMode = mode;
+            document.querySelectorAll('.login-tab-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
 
-    // ───── Utilities ─────
-    function getInitials(name) {
-        if (!name) return '?';
-        const parts = name.trim().split(' ');
-        return parts.length >= 2
-            ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase()
-            : parts[0].substring(0, 2).toUpperCase();
-    }
+            const label = document.getElementById('account-label');
+            const input = document.getElementById('login-account-input');
 
-    function showScreen(id) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        // Full-screen tile mode: expand to entire viewport on the selection screen
-        if (id === 'screen-select') {
-            document.body.classList.add('tiles-mode');
-        } else {
-            document.body.classList.remove('tiles-mode');
-        }
-        // Auto-focus the first focusable field when screen-manual appears
-        if (id === 'screen-manual') {
-            setTimeout(() => {
-                const f = document.getElementById('manual-email');
-                if (f) f.focus();
-            }, 50);
-        }
-    }
-
-    function showError(screenId, msg) {
-        const el = document.getElementById('error-' + screenId);
-        if (!el) return;
-        el.textContent = msg;
-        el.style.display = 'block';
-        setTimeout(() => el.style.display = 'none', 4000);
-    }
-
-    function clearError(screenId) {
-        const el = document.getElementById('error-' + screenId);
-        if (el) el.style.display = 'none';
-    }
-
-    // ───── Load saved users ─────
-    function getSavedUsers() {
-        try { return JSON.parse(localStorage.getItem(SAVED_USERS_KEY) || '[]'); } catch { return []; }
-    }
-
-    function saveUser(userData) {
-        // Only save Cashier accounts to the device quick-select grid.
-        // Admins, Supervisors, Managers and CEO use their own devices.
-        const skipRoles = ['admin', 'supervisor', 'manager', 'ceo', 'tech', 'hr'];
-        if (skipRoles.includes((userData.role || '').toLowerCase())) return;
-
-        const users = getSavedUsers();
-        const exists = users.findIndex(u => u.email === userData.email);
-        const entry = {
-            name: userData.name,
-            email: userData.email || userData.username || '',
-            role: userData.role,
-            initials: getInitials(userData.name),
-        };
-        if (exists >= 0) users[exists] = entry; else users.push(entry);
-        localStorage.setItem(SAVED_USERS_KEY, JSON.stringify(users));
-    }
-
-    function buildUserGrid() {
-        const users = getSavedUsers();
-        const grid = document.getElementById('user-grid');
-        grid.innerHTML = '';
-
-        if (users.length === 0) {
-            // First time — go straight to email form
-            showScreen('screen-manual');
-            document.getElementById('btn-other').style.display = 'none';
-            return;
-        }
-
-        users.forEach((u, idx) => {
-            const tile = document.createElement('button');
-            tile.className = 'user-tile';
-            tile.innerHTML = `
-                <div class="user-avatar">${u.initials}</div>
-                <div class="user-name">${u.name.split(' ')[0]}</div>
-                <div class="user-role">${u.role || ''}</div>
-                <button class="tile-del-btn" title="Remove tile" tabindex="-1">✕</button>
-            `;
-            // Delete tile button — remove this user from quick-select
-            tile.querySelector('.tile-del-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                const all = getSavedUsers();
-                all.splice(idx, 1);
-                localStorage.setItem(SAVED_USERS_KEY, JSON.stringify(all));
-                buildUserGrid();
-            });
-            tile.addEventListener('click', () => selectUser(u));
-            grid.appendChild(tile);
-        });
-    }
-
-    // ───── Select user → PIN screen ─────
-    function selectUser(u) {
-        selectedEmail = u.email;
-        pinBuffer = '';
-        updatePinDots();
-        clearError('pin');
-
-        document.getElementById('pin-avatar').textContent = u.initials;
-        document.getElementById('pin-name').textContent = u.name;
-        document.getElementById('pin-email-label').textContent = u.email;
-
-        showScreen('screen-pin');
-    }
-
-    // ───── PIN pad logic ─────
-    function updatePinDots() {
-        for (let i = 0; i < 4; i++) {
-            const dot = document.getElementById('d' + i);
-            if (dot) dot.classList.toggle('filled', i < pinBuffer.length);
-        }
-    }
-
-    document.querySelectorAll('.pin-key[data-k]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (pinBuffer.length >= 4) return; // auto-submit at 4 digits
-            pinBuffer += btn.dataset.k;
-            updatePinDots();
-            // Auto-login as soon as 4 digits are entered
-            if (pinBuffer.length === 4) {
-                setTimeout(() => doLogin(selectedEmail, pinBuffer, 'pin'), 120);
+            if (mode === 'login_id') {
+                label.textContent = 'Employee account:';
+                input.placeholder = 'e.g. admin@igourd or EMP001';
+                input.type = 'text';
+            } else if (mode === 'email') {
+                label.textContent = 'Account email:';
+                input.placeholder = 'e.g. cashier@company.com';
+                input.type = 'email';
+            } else if (mode === 'phone') {
+                label.textContent = 'Phone number:';
+                input.placeholder = 'e.g. 0700000000';
+                input.type = 'tel';
             }
-        });
-    });
-
-    document.getElementById('pin-del').addEventListener('click', () => {
-        pinBuffer = pinBuffer.slice(0, -1);
-        updatePinDots();
-    });
-
-    document.getElementById('pin-submit').addEventListener('click', async () => {
-        if (!pinBuffer) return showError('pin', 'Please enter your PIN.');
-        await doLogin(selectedEmail, pinBuffer, 'pin');
-    });
-
-    document.getElementById('pin-back').addEventListener('click', () => {
-        pinBuffer = '';
-        showScreen('screen-select');
-    });
-
-    // Handle physical keyboard input for PIN
-    document.addEventListener('keydown', (e) => {
-        const pinScreen = document.getElementById('screen-pin');
-        // Only trigger if PIN screen is the active screen
-        if (!pinScreen || !pinScreen.classList.contains('active')) return;
-
-        if (e.key >= '0' && e.key <= '9') {
-            e.preventDefault();
-            if (pinBuffer.length >= 4) return;
-            pinBuffer += e.key;
-            updatePinDots();
-            if (pinBuffer.length === 4) {
-                setTimeout(() => doLogin(selectedEmail, pinBuffer, 'pin'), 120);
-            }
-        } else if (e.key === 'Backspace') {
-            e.preventDefault();
-            pinBuffer = pinBuffer.slice(0, -1);
-            updatePinDots();
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (pinBuffer) {
-                document.getElementById('pin-submit').click();
-            }
+            input.focus();
         }
-    });
 
-    // ───── Manual form ─────
-    document.getElementById('toggle-pwd').addEventListener('click', () => {
-        const p = document.getElementById('manual-password');
-        p.type = p.type === 'password' ? 'text' : 'password';
-    });
+        async function handleEmployeeLogin(e) {
+            e.preventDefault();
+            const accountInput = document.getElementById('login-account-input').value.trim();
+            const passwordInput = document.getElementById('login-password-input').value;
+            const imprestInput = document.getElementById('login-imprest-input').value;
 
-    document.getElementById('form-manual').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('manual-email').value.trim();
-        const pass = document.getElementById('manual-password').value;
-        await doLogin(email, pass, 'manual');
-    });
+            const passErr = document.getElementById('password-error');
+            const accErr = document.getElementById('account-error');
+            const submitBtn = document.getElementById('login-btn');
 
-    document.getElementById('manual-back').addEventListener('click', () => {
-        const users = getSavedUsers();
-        if (users.length > 0) showScreen('screen-select');
-    });
+            passErr.style.display = 'none';
+            accErr.style.display = 'none';
 
-    document.getElementById('btn-other').addEventListener('click', () => {
-        clearError('manual');
-        showScreen('screen-manual');
-    });
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
 
-    // ───── Core login ─────
-    async function doLogin(email, password, source) {
-        const btnId = source === 'pin' ? 'pin-submit' : 'btn-manual-signin';
-        const btn = document.getElementById(btnId);
-        btn.disabled = true;
-        btn.innerHTML = source === 'pin'
-            ? '<span class="spinner"></span>Signing in...'
-            : '<span class="spinner"></span>Signing in...';
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: accountInput,
+                        email: accountInput,
+                        password: passwordInput,
+                        imprest: imprestInput ? parseFloat(imprestInput) : 0
+                    })
+                });
 
-        try {
-            const res = await fetch(`${BASE}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: email, password })
-            });
-            const data = await res.json();
+                const data = await response.json();
 
-            if (res.ok) {
-                // Save this user for future quick-select
-                saveUser({ name: data.name, email, role: data.role });
-
-                // Save offline credentials
-                if (window.OfflineDB) {
-                    try {
-                        const salt = bcrypt.genSaltSync(10);
-                        const hash = bcrypt.hashSync(password, salt);
-                        await window.OfflineDB.saveOfflineCredentials(email, hash, data);
-                    } catch (e) { console.warn('Offline save failed', e); }
-                    try {
-                        if (typeof window.OfflineDB.clearAllCache === 'function') {
-                            await window.OfflineDB.clearAllCache();
-                        }
-                    } catch (e) {}
+                if (!response.ok) {
+                    passErr.textContent = data.error || 'Invalid credentials or company is paused.';
+                    passErr.style.display = 'block';
+                    document.getElementById('login-password-input').classList.add('input-error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Login';
+                    return;
                 }
 
-                localStorage.removeItem('jomish_demo');
+                // Save session in localStorage
                 localStorage.setItem('jomish_token', data.token);
                 localStorage.setItem('jomish_role', data.role);
                 localStorage.setItem('jomish_name', data.name);
-                localStorage.setItem('jomish_permissions', JSON.stringify(data.permissions));
                 localStorage.setItem('jomish_user_id', data.user_id);
+                localStorage.setItem('jomish_permissions', JSON.stringify(data.permissions || {}));
                 if (data.prefix) {
                     localStorage.setItem('jomish_prefix', data.prefix.toLowerCase().trim());
-                } else {
-                    localStorage.removeItem('jomish_prefix');
                 }
-                window.location.href = 'index.html';
-            } else {
-                const isTerminated = res.status === 403 && data.error && data.error.includes('terminated');
-                const msg = isTerminated ? 'Account terminated. Contact HR.' : (data.error || 'Invalid credentials');
-                showError(source === 'pin' ? 'pin' : 'manual', msg);
-                if (source === 'pin') { pinBuffer = ''; updatePinDots(); }
-                btn.disabled = false;
-                btn.textContent = 'Sign In';
+                if (imprestInput) {
+                    localStorage.setItem('pos_shift_imprest', imprestInput);
+                }
+                if (data.company) {
+                    localStorage.setItem('jomish_company_data', JSON.stringify(data.company));
+                }
+
+                // Redirect to main POS
+                window.location.replace('index.html');
+            } catch (err) {
+                console.error(err);
+                passErr.textContent = 'Connection error. Please check server status.';
+                passErr.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Login';
             }
-        } catch (err) {
-            // Offline fallback
-            if (window.OfflineDB) {
-                try {
-                    const cached = await window.OfflineDB.getOfflineCredentials(email);
-                    if (cached && bcrypt.compareSync(password, cached.passwordHash)) {
-                        const d = cached.userData;
-                        localStorage.removeItem('jomish_demo');
-                        localStorage.setItem('jomish_token', d.token);
-                        localStorage.setItem('jomish_role', d.role);
-                        localStorage.setItem('jomish_name', d.name);
-                        localStorage.setItem('jomish_permissions', JSON.stringify(d.permissions));
-                        localStorage.setItem('jomish_user_id', d.user_id);
-                        if (d.prefix) {
-                            localStorage.setItem('jomish_prefix', d.prefix.toLowerCase().trim());
-                        } else {
-                            localStorage.removeItem('jomish_prefix');
-                        }
-                        window.location.href = 'index.html?offline=true';
-                        return;
-                    }
-                } catch(e) { console.error('Offline login error', e); }
-            }
-            showError(source === 'pin' ? 'pin' : 'manual', 'Cannot reach server. Check connection.');
-            btn.disabled = false;
-            btn.textContent = 'Sign In';
         }
-    }
 
-    // ───── Online/Offline banner with active server validation ─────
-    async function updateOnlineStatus() {
-        const banner = document.getElementById('offline-banner');
-        if (navigator.onLine) {
-            banner.style.display = 'none';
-            return;
+        function openTechSupportModal() {
+            document.getElementById('tech-modal-overlay').style.display = 'flex';
+            document.getElementById('tech-password-input').focus();
         }
-        // Verify with real server ping before claiming offline to prevent false alarms
-        try {
-            const res = await fetch('/api/system/status', { cache: 'no-store' });
-            banner.style.display = res.ok ? 'none' : 'block';
-        } catch (_) {
-            banner.style.display = 'block';
+
+        function closeTechSupportModal() {
+            document.getElementById('tech-modal-overlay').style.display = 'none';
         }
-    }
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    updateOnlineStatus();
-    setInterval(updateOnlineStatus, 45000);
 
-    // ───── Reset URL params ─────
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('reset') === 'success') {
-        // Clear saved users on full reset
-        localStorage.removeItem(SAVED_USERS_KEY);
-    }
-
-    // ───── Init ─────
-    buildUserGrid();
-    // Apply full-screen tile mode immediately (screen-select is active on load)
-    document.body.classList.add('tiles-mode');
-
-    // ───── PWA Install Prompt ─────
-    (function initPWAInstallBanner() {
-        const DISMISSED_KEY = 'jomish_pwa_dismissed';
-        const banner = document.getElementById('pwa-install-banner');
-        const btnInstall = document.getElementById('pwa-btn-install');
-        const btnDismiss = document.getElementById('pwa-btn-dismiss');
-        let deferredPrompt = null;
-
-        // Don't show if already dismissed or already installed as standalone
-        if (localStorage.getItem(DISMISSED_KEY)) return;
-        if (window.matchMedia('(display-mode: standalone)').matches) return;
-        if (window.navigator.standalone) return; // iOS standalone
-
-        // Capture the browser's beforeinstallprompt event
-        window.addEventListener('beforeinstallprompt', (e) => {
+        async function handleTechDirectLogin(e) {
             e.preventDefault();
-            deferredPrompt = e;
-            // Show banner with a short delay for a polished entrance
-            setTimeout(() => banner.classList.add('show'), 800);
-        });
+            const username = document.getElementById('tech-username-input').value.trim();
+            const password = document.getElementById('tech-password-input').value;
+            const errBox = document.getElementById('tech-login-error');
 
-        btnInstall.addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            banner.classList.remove('show');
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log('[PWA] Install outcome:', outcome);
-            if (outcome === 'accepted') {
-                localStorage.setItem(DISMISSED_KEY, '1');
+            errBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email: username, password })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    errBox.textContent = data.error || 'Invalid Tech Support credentials.';
+                    errBox.style.display = 'block';
+                    return;
+                }
+
+                localStorage.setItem('jomish_token', data.token);
+                localStorage.setItem('jomish_role', data.role);
+                localStorage.setItem('jomish_name', data.name);
+                localStorage.setItem('jomish_user_id', data.user_id);
+                localStorage.setItem('jomish_permissions', JSON.stringify(data.permissions || {}));
+                localStorage.setItem('jomish_prefix', 'public');
+                localStorage.setItem('tech_super_admin', 'true');
+
+                window.location.replace('index.html?view=tech');
+            } catch (err) {
+                errBox.textContent = 'Server connection failed.';
+                errBox.style.display = 'block';
             }
-            deferredPrompt = null;
-        });
-
-        btnDismiss.addEventListener('click', () => {
-            banner.classList.remove('show');
-            localStorage.setItem(DISMISSED_KEY, '1');
-        });
-
-        // Hide banner if app gets installed later
-        window.addEventListener('appinstalled', () => {
-            banner.classList.remove('show');
-            localStorage.setItem(DISMISSED_KEY, '1');
-            console.log('[PWA] App installed successfully.');
-        });
-    })();
-</script>
+        }
+    </script>
 </body>
 </html>

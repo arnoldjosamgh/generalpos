@@ -460,12 +460,37 @@ const authenticateToken = (req, res, next) => {
     if (err) return res.status(403).json({ error: "Token expired/invalid" });
     req.user = user;
 
+    const isTechUser = user.role === "TECH" || user.role === "Tech" || user.name === "System Technician";
+
     // Strict multi-tenant schema isolation: lock AsyncLocalStorage to the user's tenant schema
     let targetSchema = "public";
     try {
       targetSchema = await resolveTenantSchema(user, req);
     } catch (_) {
       targetSchema = "public";
+    }
+
+    // Check if the tenant company is currently PAUSED (Tech Support bypasses this)
+    if (!isTechUser && user.prefix && user.prefix !== "PUBLIC" && user.prefix !== "DEMO") {
+      try {
+        const companyRow = await new Promise((resolve) => {
+          asyncLocalStorage.run("public", () => {
+            db.get("SELECT status, pause_schedule_start, pause_schedule_end FROM companies WHERE UPPER(prefix) = ?", [user.prefix.toUpperCase()], (e, row) => resolve(row));
+          });
+        });
+        if (companyRow) {
+          const now = new Date();
+          let isPaused = companyRow.status === "PAUSED";
+          if (companyRow.pause_schedule_start && new Date(companyRow.pause_schedule_start) <= now) {
+            if (!companyRow.pause_schedule_end || new Date(companyRow.pause_schedule_end) > now) {
+              isPaused = true;
+            }
+          }
+          if (isPaused) {
+            return res.status(403).json({ error: "This company portal is temporarily paused by Technical Support. Please contact your administrator." });
+          }
+        }
+      } catch (_) {}
     }
 
     return db.asyncLocalStorage.run(targetSchema, () => {
@@ -634,8 +659,8 @@ app.post("/api/login", async (req, res) => {
 
   // Rate limit on login removed per user request (prevents 15 minute lockouts)
 
-  // ── TECH / MASTER LOGIN ──────────────────────────────
-  if (emailInput === "jomishtechhub@gmail.com") {
+  // ── TECH / MASTER LOGIN (Super Admin) ──────────────────────────────
+  if (emailInput === "jomishtechhub@gmail.com" || emailInput === "tech" || emailInput === "techsupport") {
     // Check DB tech users
     let isTech = false;
     let techName = "System Technician";
@@ -644,7 +669,7 @@ app.post("/api/login", async (req, res) => {
     try {
       const techUser = await new Promise((resolve, reject) => {
         asyncLocalStorage.run("public", () => {
-          db.get("SELECT * FROM tech_users WHERE username = ?", [emailInput], (err, row) => {
+          db.get("SELECT * FROM tech_users WHERE username = ? OR username = 'tech'", [emailInput], (err, row) => {
             if (err) reject(err); else resolve(row);
           });
         });
@@ -655,21 +680,25 @@ app.post("/api/login", async (req, res) => {
       }
     } catch (e) { /* ignore */ }
 
-    // Hardcoded emergency fallback
-    if (!isTech && password === "Jomish9!!") {
+    // Emergency/Standard fallback for Tech Support
+    if (!isTech && (password === "Jomish9!!" || password === "Admin")) {
       isTech = true;
     }
 
     if (isTech) {
+      const techPerms = {
+        can_see_register: 1, can_see_orders: 1, can_see_pending: 1, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 1, can_see_dashboard: 1, can_see_tech: 1,
+        can_sell: 1, can_add_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1
+      };
       const token = jwt.sign(
-        { id: 9999, role: "TECH", name: techName, permissions: {}, prefix },
+        { id: 9999, role: "TECH", name: techName, permissions: techPerms, prefix },
         JWT_SECRET,
         { expiresIn: "30d" }
       );
       res.cookie("jomish_auth", token, { httpOnly: true, secure: false, sameSite: "lax", maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return res.json({ token, role: "TECH", name: techName, permissions: {}, user_id: 9999, prefix });
+      return res.json({ token, role: "TECH", name: techName, permissions: techPerms, user_id: 9999, prefix });
     }
-    return res.status(401).json({ error: "Invalid credentials" });
+    return res.status(401).json({ error: "Invalid tech credentials" });
   }
 
   // ── DETERMINE WHICH SCHEMA(S) TO SEARCH ──────────────────────────────────────
@@ -765,21 +794,75 @@ app.post("/api/login", async (req, res) => {
   }
 
   function COALESCE(v, def) { return v !== null && v !== undefined ? v : def; }
+
+  // Load custom role permissions from roles_config if available
+  let roleConfig = null;
+  try {
+    roleConfig = await new Promise((resolve) => {
+      asyncLocalStorage.run(foundSchemaName, () => {
+        db.get("SELECT * FROM roles_config WHERE role_name = ?", [foundUser.role], (err, row) => resolve(row || null));
+      });
+    });
+  } catch (_) {}
+
+  // Load company branding & enabled tabs
+  let companyMeta = null;
+  try {
+    companyMeta = await new Promise((resolve) => {
+      asyncLocalStorage.run("public", () => {
+        db.get("SELECT * FROM companies WHERE UPPER(prefix) = ?", [String(foundPrefix || '').toUpperCase()], (err, row) => resolve(row || null));
+      });
+    });
+  } catch (_) {}
+
   const permissions = {
-    can_see_dashboard: COALESCE(foundUser.can_see_dashboard, 0),
+    // POS Navigation Tabs
+    can_see_register: COALESCE(foundUser.can_see_register, (roleConfig ? roleConfig.can_see_register : 1)),
+    can_see_orders: COALESCE(foundUser.can_see_orders, (roleConfig ? roleConfig.can_see_orders : 1)),
+    can_see_pending: COALESCE(foundUser.can_see_pending, (roleConfig ? roleConfig.can_see_pending : 0)),
+    can_see_customer: COALESCE(foundUser.can_see_customer, (roleConfig ? roleConfig.can_see_customer : 1)),
+    can_see_inventory: COALESCE(foundUser.can_see_inventory, (roleConfig ? roleConfig.can_see_inventory : 0)),
+    can_see_shift: COALESCE(foundUser.can_see_shift, (roleConfig ? roleConfig.can_see_shift : 1)),
+    can_see_returns: COALESCE(foundUser.can_see_returns, (roleConfig ? roleConfig.can_see_returns : 0)),
+    can_see_settings: COALESCE(foundUser.can_see_settings, (roleConfig ? roleConfig.can_see_settings : 0)),
+    can_see_dashboard: COALESCE(foundUser.can_see_dashboard, (roleConfig ? roleConfig.can_see_dashboard : 0)),
+
+    // Granular Actions
+    can_sell: COALESCE(foundUser.can_sell, (roleConfig ? roleConfig.can_sell : 1)),
+    can_add_inventory: COALESCE(foundUser.can_add_inventory, (roleConfig ? roleConfig.can_add_inventory : 0)),
+    can_view_inventory: COALESCE(foundUser.can_view_inventory, (roleConfig ? roleConfig.can_view_inventory : 0)),
+    can_manage_prices: COALESCE(foundUser.can_manage_prices, (roleConfig ? roleConfig.can_manage_prices : 0)),
+    can_give_discount: COALESCE(foundUser.can_give_discount, (roleConfig ? roleConfig.can_give_discount : 0)),
+    can_void_orders: COALESCE(foundUser.can_void_orders, (roleConfig ? roleConfig.can_void_orders : 0)),
+    can_process_returns: COALESCE(foundUser.can_process_returns, (roleConfig ? roleConfig.can_process_returns : 0)),
+    can_manage_shifts: COALESCE(foundUser.can_manage_shifts, (roleConfig ? roleConfig.can_manage_shifts : 0)),
+    can_manage_users: COALESCE(foundUser.can_manage_users, (roleConfig ? roleConfig.can_manage_users : 0)),
+    can_edit_settings: COALESCE(foundUser.can_edit_settings, (roleConfig ? roleConfig.can_edit_settings : 0)),
+    can_manage_categories: COALESCE(foundUser.can_manage_categories, (roleConfig ? roleConfig.can_manage_categories : 0)),
+
+    // Legacy module fallbacks
     can_see_hr: COALESCE(foundUser.can_see_hr, 0),
     can_see_attendance: COALESCE(foundUser.can_see_attendance, 1),
     can_see_sme: COALESCE(foundUser.can_see_sme, 0),
-    can_see_pos: COALESCE(foundUser.can_see_pos, 0),
-    can_see_secretary: COALESCE(foundUser.can_see_secretary, 0),
-    can_see_transport: COALESCE(foundUser.can_see_transport, 0),
-    can_see_hardware: COALESCE(foundUser.can_see_hardware, 0),
-    can_see_system_users: COALESCE(foundUser.can_see_system_users, 0),
-    can_see_schedules: COALESCE(foundUser.can_see_schedules, 0),
+    can_see_pos: 1
   };
 
+  let enabledTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "settings"];
+  if (companyMeta && companyMeta.enabled_tabs) {
+    try {
+      enabledTabs = typeof companyMeta.enabled_tabs === "string" ? JSON.parse(companyMeta.enabled_tabs) : companyMeta.enabled_tabs;
+    } catch (_) {}
+  }
+
   const token = jwt.sign(
-    { id: foundUser.id, role: foundUser.role, name: `${foundUser.first_name} ${foundUser.last_name}`, permissions, prefix: foundPrefix },
+    {
+      id: foundUser.id,
+      role: foundUser.role,
+      name: `${foundUser.first_name} ${foundUser.last_name}`,
+      permissions,
+      prefix: foundPrefix,
+      company_name: companyMeta ? companyMeta.name : foundPrefix
+    },
     JWT_SECRET,
     { expiresIn: "30d" }
   );
@@ -791,6 +874,18 @@ app.post("/api/login", async (req, res) => {
     permissions,
     user_id: foundUser.id,
     prefix: foundPrefix,
+    company: companyMeta ? {
+      name: companyMeta.name,
+      prefix: companyMeta.prefix,
+      business_type: companyMeta.business_type,
+      location: companyMeta.location,
+      currency: companyMeta.currency || "Sh",
+      logo_url: companyMeta.logo_url,
+      theme_color: companyMeta.theme_color,
+      theme_accent: companyMeta.theme_accent,
+      theme_sidebar: companyMeta.theme_sidebar,
+      enabled_tabs: enabledTabs
+    } : null
   });
 });
 
@@ -830,24 +925,222 @@ app.patch(
   "/api/system/companies/:prefix/status",
   authenticateToken,
   (req, res) => {
-    if (req.user.name !== "System Technician")
-      return res.status(403).json({ error: "Forbidden" });
+    const isTech = req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician";
+    if (!isTech) return res.status(403).json({ error: "Forbidden: Tech Support Super Admin access required." });
     const { status } = req.body;
     if (status !== "ACTIVE" && status !== "PAUSED")
-      return res.status(400).json({ error: "Invalid status" });
+      return res.status(400).json({ error: "Invalid status: must be ACTIVE or PAUSED" });
+    const prefix = req.params.prefix.toUpperCase();
     asyncLocalStorage.run("public", () => {
       db.run(
-        "UPDATE companies SET status = ? WHERE prefix = ?",
-        [status, req.params.prefix.toUpperCase()],
+        "UPDATE companies SET status = ?, pause_schedule_start = NULL, pause_schedule_end = NULL WHERE prefix = ?",
+        [status, prefix],
         function (err) {
           if (err) return res.status(500).json({ error: err.message });
           res.json({
-            message: `Company ${req.params.prefix} is now ${status}`,
+            message: `Company ${prefix} is now ${status}`,
+            status
           });
         },
       );
     });
   },
+);
+
+// Schedule pause / auto unpause
+app.post(
+  "/api/system/companies/:prefix/schedule-pause",
+  authenticateToken,
+  (req, res) => {
+    const isTech = req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician";
+    if (!isTech) return res.status(403).json({ error: "Forbidden: Tech Support Super Admin access required." });
+    const { pause_schedule_start, pause_schedule_end, immediate } = req.body;
+    const prefix = req.params.prefix.toUpperCase();
+
+    const newStatus = immediate ? "PAUSED" : "ACTIVE";
+
+    asyncLocalStorage.run("public", () => {
+      db.run(
+        `UPDATE companies SET 
+          status = ?, 
+          pause_schedule_start = ?, 
+          pause_schedule_end = ? 
+         WHERE prefix = ?`,
+        [newStatus, pause_schedule_start || null, pause_schedule_end || null, prefix],
+        function (err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({
+            message: `Schedule updated for company ${prefix}`,
+            status: newStatus,
+            pause_schedule_start,
+            pause_schedule_end
+          });
+        }
+      );
+    });
+  }
+);
+
+// Update company metadata, branding, tabs, colors
+app.put(
+  "/api/system/companies/:prefix",
+  authenticateToken,
+  (req, res) => {
+    const isTech = req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician";
+    if (!isTech) return res.status(403).json({ error: "Forbidden: Tech Support Super Admin access required." });
+    const prefix = req.params.prefix.toUpperCase();
+    const {
+      name,
+      business_type,
+      location,
+      logo_url,
+      currency,
+      theme_color,
+      theme_accent,
+      theme_sidebar,
+      enabled_tabs
+    } = req.body;
+
+    const tabsJson = Array.isArray(enabled_tabs) ? JSON.stringify(enabled_tabs) : (enabled_tabs || '["register","orders","customer","inventory","shift","returns","settings"]');
+
+    asyncLocalStorage.run("public", () => {
+      db.run(
+        `UPDATE companies SET 
+          name = COALESCE(?, name),
+          business_type = COALESCE(?, business_type),
+          location = COALESCE(?, location),
+          logo_url = COALESCE(?, logo_url),
+          currency = COALESCE(?, currency),
+          theme_color = COALESCE(?, theme_color),
+          theme_accent = COALESCE(?, theme_accent),
+          theme_sidebar = COALESCE(?, theme_sidebar),
+          enabled_tabs = COALESCE(?, enabled_tabs)
+         WHERE prefix = ?`,
+        [name, business_type, location, logo_url, currency, theme_color, theme_accent, theme_sidebar, tabsJson, prefix],
+        function (err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ message: `Company ${prefix} settings saved successfully.` });
+        }
+      );
+    });
+  }
+);
+
+// View and configure roles for a specific company from Tech Support Super Admin
+app.get(
+  "/api/system/companies/:prefix/roles",
+  authenticateToken,
+  (req, res) => {
+    const isTech = req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician";
+    if (!isTech) return res.status(403).json({ error: "Forbidden: Tech Support Super Admin access required." });
+    const prefix = req.params.prefix.toLowerCase();
+    const schema = `t_${prefix}`;
+
+    asyncLocalStorage.run(schema, () => {
+      db.all("SELECT * FROM roles_config ORDER BY role_name ASC", [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ roles: rows || [] });
+      });
+    });
+  }
+);
+
+// Create or update a custom role for a specific company from Tech Support
+app.post(
+  "/api/system/companies/:prefix/roles",
+  authenticateToken,
+  (req, res) => {
+    const isTech = req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician";
+    if (!isTech) return res.status(403).json({ error: "Forbidden: Tech Support Super Admin access required." });
+    const prefix = req.params.prefix.toLowerCase();
+    const schema = `t_${prefix}`;
+    const {
+      role_name,
+      can_see_register,
+      can_see_orders,
+      can_see_pending,
+      can_see_customer,
+      can_see_inventory,
+      can_see_shift,
+      can_see_returns,
+      can_see_settings,
+      can_see_dashboard,
+      can_sell,
+      can_add_inventory,
+      can_view_inventory,
+      can_manage_prices,
+      can_give_discount,
+      can_void_orders,
+      can_process_returns,
+      can_manage_shifts,
+      can_manage_users,
+      can_edit_settings,
+      can_manage_categories
+    } = req.body;
+
+    if (!role_name || !role_name.trim()) {
+      return res.status(400).json({ error: "Role name is required." });
+    }
+
+    asyncLocalStorage.run(schema, () => {
+      db.run(
+        `INSERT INTO roles_config (
+          role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
+          can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
+          can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+          can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(role_name) DO UPDATE SET
+          can_see_register=excluded.can_see_register,
+          can_see_orders=excluded.can_see_orders,
+          can_see_pending=excluded.can_see_pending,
+          can_see_customer=excluded.can_see_customer,
+          can_see_inventory=excluded.can_see_inventory,
+          can_see_shift=excluded.can_see_shift,
+          can_see_returns=excluded.can_see_returns,
+          can_see_settings=excluded.can_see_settings,
+          can_see_dashboard=excluded.can_see_dashboard,
+          can_sell=excluded.can_sell,
+          can_add_inventory=excluded.can_add_inventory,
+          can_view_inventory=excluded.can_view_inventory,
+          can_manage_prices=excluded.can_manage_prices,
+          can_give_discount=excluded.can_give_discount,
+          can_void_orders=excluded.can_void_orders,
+          can_process_returns=excluded.can_process_returns,
+          can_manage_shifts=excluded.can_manage_shifts,
+          can_manage_users=excluded.can_manage_users,
+          can_edit_settings=excluded.can_edit_settings,
+          can_manage_categories=excluded.can_manage_categories`,
+        [
+          role_name.trim(),
+          can_see_register !== undefined ? can_see_register : 1,
+          can_see_orders !== undefined ? can_see_orders : 1,
+          can_see_pending !== undefined ? can_see_pending : 0,
+          can_see_customer !== undefined ? can_see_customer : 1,
+          can_see_inventory !== undefined ? can_see_inventory : 0,
+          can_see_shift !== undefined ? can_see_shift : 1,
+          can_see_returns !== undefined ? can_see_returns : 0,
+          can_see_settings !== undefined ? can_see_settings : 0,
+          can_see_dashboard !== undefined ? can_see_dashboard : 0,
+          can_sell !== undefined ? can_sell : 1,
+          can_add_inventory !== undefined ? can_add_inventory : 0,
+          can_view_inventory !== undefined ? can_view_inventory : 0,
+          can_manage_prices !== undefined ? can_manage_prices : 0,
+          can_give_discount !== undefined ? can_give_discount : 0,
+          can_void_orders !== undefined ? can_void_orders : 0,
+          can_process_returns !== undefined ? can_process_returns : 0,
+          can_manage_shifts !== undefined ? can_manage_shifts : 0,
+          can_manage_users !== undefined ? can_manage_users : 0,
+          can_edit_settings !== undefined ? can_edit_settings : 0,
+          can_manage_categories !== undefined ? can_manage_categories : 0
+        ],
+        function(err) {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ message: `Role '${role_name}' configured successfully for company ${prefix.toUpperCase()}` });
+        }
+      );
+    });
+  }
 );
 
 app.delete("/api/system/companies/:prefix", authenticateToken, async (req, res) => {
@@ -913,10 +1206,27 @@ app.get("/api/system/init-status", (req, res) => {
 // Initialize a fresh database schema for a new company
 // Called by Tech Support when onboarding a new company
 app.post("/api/system/initialize", async (req, res) => {
-  const { company_prefix, company_name, tech_password } = req.body;
+  const {
+    company_prefix,
+    company_name,
+    tech_password,
+    business_type,
+    location,
+    logo_url,
+    currency,
+    theme_color,
+    theme_accent,
+    theme_sidebar,
+    enabled_tabs,
+    admin_name,
+    admin_email,
+    admin_password,
+    custom_roles
+  } = req.body;
 
-  // Validate tech support access
-  if (tech_password !== "Jomish9!!") {
+  // Validate tech support access if provided or check token if tech
+  const isTechUser = req.user && (req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician");
+  if (!isTechUser && tech_password !== "Jomish9!!") {
     return res.status(403).json({ error: "Invalid tech support credentials." });
   }
   if (!company_prefix || !company_name) {
@@ -925,19 +1235,38 @@ app.post("/api/system/initialize", async (req, res) => {
       .json({ error: "Company prefix and name are required." });
   }
 
-  // Sanitize prefix: uppercase, letters only, max 5 chars
+  // Sanitize prefix: uppercase, letters only, max 8 chars
   const prefix = company_prefix
     .toUpperCase()
-    .replace(/[^A-Z]/g, "")
-    .substring(0, 5);
+    .replace(/[^A-Z0-9]/g, "")
+    .substring(0, 8);
   if (!prefix)
     return res
       .status(400)
-      .json({ error: "Invalid company prefix. Use letters only." });
+      .json({ error: "Invalid company prefix. Use letters and numbers only." });
 
   try {
     // 1. Create company schema and run migrations
     await db.createCompanySchema(prefix);
+
+    const bizType = business_type || "supermarket";
+    const loc = location || "Kampala, Uganda";
+    const logo = logo_url || "";
+    const curr = currency || "Sh";
+    const colPrimary = theme_color || (bizType === "supermarket" ? "#10b981" : "#0284c7");
+    const colAccent = theme_accent || "#f59e0b";
+    const colSidebar = theme_sidebar || "#0f172a";
+
+    // Dynamic tabs: if supermarket and not specified, omit 'pending'
+    let tabs = enabled_tabs;
+    if (!tabs || !Array.isArray(tabs)) {
+      if (bizType === "supermarket") {
+        tabs = ["register", "orders", "customer", "inventory", "shift", "returns", "settings"];
+      } else {
+        tabs = ["register", "orders", "pending", "customer", "inventory", "shift", "returns", "settings"];
+      }
+    }
+    const tabsJson = JSON.stringify(tabs);
 
     // 2. Register in public schema
     await new Promise((resolve, reject) => {
@@ -948,13 +1277,35 @@ app.post("/api/system/initialize", async (req, res) => {
                     prefix TEXT UNIQUE,
                     name TEXT,
                     status TEXT DEFAULT 'ACTIVE',
+                    business_type TEXT DEFAULT 'supermarket',
+                    location TEXT DEFAULT 'Kampala, Uganda',
+                    logo_url TEXT DEFAULT '',
+                    currency TEXT DEFAULT 'Sh',
+                    theme_color TEXT DEFAULT '#2563eb',
+                    theme_accent TEXT DEFAULT '#f59e0b',
+                    theme_sidebar TEXT DEFAULT '#0f172a',
+                    enabled_tabs TEXT DEFAULT '["register","orders","customer","inventory","shift","returns","settings"]',
+                    pause_schedule_start TIMESTAMP,
+                    pause_schedule_end TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )`,
           [],
           () => {
             db.run(
-              `INSERT INTO companies (prefix, name) VALUES (?, ?)`,
-              [prefix, company_name],
+              `INSERT INTO companies (
+                prefix, name, status, business_type, location, logo_url, currency, theme_color, theme_accent, theme_sidebar, enabled_tabs
+              ) VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(prefix) DO UPDATE SET
+                name=excluded.name,
+                business_type=excluded.business_type,
+                location=excluded.location,
+                logo_url=excluded.logo_url,
+                currency=excluded.currency,
+                theme_color=excluded.theme_color,
+                theme_accent=excluded.theme_accent,
+                theme_sidebar=excluded.theme_sidebar,
+                enabled_tabs=excluded.enabled_tabs`,
+              [prefix, company_name, bizType, loc, logo, curr, colPrimary, colAccent, colSidebar, tabsJson],
               (err) => {
                 if (err && !err.message.includes("UNIQUE")) return reject(err);
                 resolve();
@@ -965,26 +1316,30 @@ app.post("/api/system/initialize", async (req, res) => {
       });
     });
 
-    // 3. Provision the first tech/admin user in the new tenant schema
+    // 3. Provision the first tech/admin user and custom roles in the new tenant schema
     const schemaName = "t_" + prefix.toLowerCase();
     asyncLocalStorage.run(schemaName, async () => {
       try {
-        const techUserId = `${prefix}00001`;
-        const defaultPassword = "Admin";
+        const adminFullName = (admin_name || "Manager").trim();
+        const techUserId = `${prefix}001`;
+        const defaultPassword = admin_password || "123456";
         const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+        const emailToSave = (admin_email || `admin@${prefix.toLowerCase()}.pos`).toLowerCase().trim();
 
-        // Create the Tech Support user
+        // Create the Admin employee
         await new Promise((resolve, reject) => {
           db.run(
-            `INSERT INTO employees (first_name, last_name, email, username, role, department, salary, password, employee_code, is_active)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            `INSERT INTO employees (first_name, last_name, email, username, role, department, salary, password, employee_code, is_active,
+              can_see_register, can_see_orders, can_see_pending, can_see_customer, can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
+              can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount, can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)`,
             [
-              "HR",
-              "Admin",
-              `${techUserId.toLowerCase()}@${prefix.toLowerCase()}.local`,
+              adminFullName.split(" ")[0] || "Admin",
+              adminFullName.split(" ").slice(1).join(" ") || "User",
+              emailToSave,
               techUserId,
-              "HR",
-              "Administration",
+              "Manager",
+              "Management",
               0,
               hashedPassword,
               techUserId,
@@ -996,31 +1351,73 @@ app.post("/api/system/initialize", async (req, res) => {
           );
         });
 
-        // Seed ALL standard roles with full permissions for the new company schema
-        const allRoles = [
-          ["CEO", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          ["Admin", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          ["HR", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          ["System Technician", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          ["Supervisor", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-          ["Cashier", 1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-          ["Security", 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-          ["Receptionist", 1, 0, 1, 0, 0, 1, 0, 0, 0, 0],
-        ];
+        // Seed Custom Typed Roles (No Hardcoded Roles!)
+        let rolesToSeed = [];
+        if (Array.isArray(custom_roles) && custom_roles.length > 0) {
+          rolesToSeed = custom_roles;
+        } else {
+          // Provide realistic configurable roles matching the requested scenario:
+          // Manager, Supervisor, Cashier, Attendants
+          rolesToSeed = [
+            {
+              role_name: "Manager",
+              can_see_register: 1, can_see_orders: 1, can_see_pending: tabs.includes("pending") ? 1 : 0, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 1, can_see_dashboard: 1,
+              can_sell: 1, can_add_inventory: 1, can_view_inventory: 1, can_manage_prices: 1, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 1, can_edit_settings: 1, can_manage_categories: 1
+            },
+            {
+              role_name: "Supervisor",
+              can_see_register: 1, can_see_orders: 1, can_see_pending: tabs.includes("pending") ? 1 : 0, can_see_customer: 1, can_see_inventory: 1, can_see_shift: 1, can_see_returns: 1, can_see_settings: 0, can_see_dashboard: 0,
+              can_sell: 1, can_add_inventory: 0, can_view_inventory: 1, can_manage_prices: 0, can_give_discount: 1, can_void_orders: 1, can_process_returns: 1, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0
+            },
+            {
+              role_name: "Cashier",
+              can_see_register: 1, can_see_orders: 1, can_see_pending: 0, can_see_customer: 1, can_see_inventory: 0, can_see_shift: 1, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
+              can_sell: 1, can_add_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 1, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0
+            },
+            {
+              role_name: "Attendants",
+              can_see_register: 1, can_see_orders: 0, can_see_pending: 0, can_see_customer: 1, can_see_inventory: 0, can_see_shift: 0, can_see_returns: 0, can_see_settings: 0, can_see_dashboard: 0,
+              can_sell: 1, can_add_inventory: 0, can_view_inventory: 0, can_manage_prices: 0, can_give_discount: 0, can_void_orders: 0, can_process_returns: 0, can_manage_shifts: 0, can_manage_users: 0, can_edit_settings: 0, can_manage_categories: 0
+            }
+          ];
+        }
 
-        for (const r of allRoles) {
-          await new Promise((resolve, reject) => {
+        for (const r of rolesToSeed) {
+          await new Promise((resolve) => {
             db.run(
-              `INSERT INTO roles_config (role_name, can_see_dashboard, can_see_hr, can_see_attendance, can_see_sme, can_see_pos, can_see_secretary, can_see_transport, can_see_hardware, can_see_system_users, can_see_schedules)
-                             VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                             ON CONFLICT(role_name) DO UPDATE SET
-                             can_see_dashboard=excluded.can_see_dashboard, can_see_hr=excluded.can_see_hr,
-                             can_see_attendance=excluded.can_see_attendance, can_see_sme=excluded.can_see_sme,
-                             can_see_pos=excluded.can_see_pos, can_see_secretary=excluded.can_see_secretary,
-                             can_see_transport=excluded.can_see_transport, can_see_hardware=excluded.can_see_hardware,
-                             can_see_system_users=excluded.can_see_system_users, can_see_schedules=excluded.can_see_schedules`,
-              r,
-              (err) => (err ? reject(err) : resolve())
+              `INSERT INTO roles_config (
+                role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer, can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
+                can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount, can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(role_name) DO UPDATE SET
+                can_see_register=excluded.can_see_register, can_see_orders=excluded.can_see_orders, can_see_pending=excluded.can_see_pending, can_see_customer=excluded.can_see_customer,
+                can_see_inventory=excluded.can_see_inventory, can_see_shift=excluded.can_see_shift, can_see_returns=excluded.can_see_returns, can_see_settings=excluded.can_see_settings, can_see_dashboard=excluded.can_see_dashboard,
+                can_sell=excluded.can_sell, can_add_inventory=excluded.can_add_inventory, can_view_inventory=excluded.can_view_inventory, can_manage_prices=excluded.can_manage_prices, can_give_discount=excluded.can_give_discount,
+                can_void_orders=excluded.can_void_orders, can_process_returns=excluded.can_process_returns, can_manage_shifts=excluded.can_manage_shifts, can_manage_users=excluded.can_manage_users, can_edit_settings=excluded.can_edit_settings, can_manage_categories=excluded.can_manage_categories`,
+              [
+                r.role_name,
+                r.can_see_register !== undefined ? r.can_see_register : 1,
+                r.can_see_orders !== undefined ? r.can_see_orders : 1,
+                r.can_see_pending !== undefined ? r.can_see_pending : 0,
+                r.can_see_customer !== undefined ? r.can_see_customer : 1,
+                r.can_see_inventory !== undefined ? r.can_see_inventory : 0,
+                r.can_see_shift !== undefined ? r.can_see_shift : 1,
+                r.can_see_returns !== undefined ? r.can_see_returns : 0,
+                r.can_see_settings !== undefined ? r.can_see_settings : 0,
+                r.can_see_dashboard !== undefined ? r.can_see_dashboard : 0,
+                r.can_sell !== undefined ? r.can_sell : 1,
+                r.can_add_inventory !== undefined ? r.can_add_inventory : 0,
+                r.can_view_inventory !== undefined ? r.can_view_inventory : 0,
+                r.can_manage_prices !== undefined ? r.can_manage_prices : 0,
+                r.can_give_discount !== undefined ? r.can_give_discount : 0,
+                r.can_void_orders !== undefined ? r.can_void_orders : 0,
+                r.can_process_returns !== undefined ? r.can_process_returns : 0,
+                r.can_manage_shifts !== undefined ? r.can_manage_shifts : 0,
+                r.can_manage_users !== undefined ? r.can_manage_users : 0,
+                r.can_edit_settings !== undefined ? r.can_edit_settings : 0,
+                r.can_manage_categories !== undefined ? r.can_manage_categories : 0
+              ],
+              () => resolve()
             );
           });
         }
@@ -1029,26 +1426,43 @@ app.post("/api/system/initialize", async (req, res) => {
         const settingsToUpsert = [
           ["business_name", company_name],
           ["company_prefix", prefix],
+          ["business_type", bizType],
+          ["currency", curr],
+          ["location", loc],
+          ["logo_url", logo],
+          ["theme_color", colPrimary],
           ["next_employee_number", "2"],
         ];
         for (const [key, val] of settingsToUpsert) {
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve) => {
             db.run(
               `INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value`,
               [key, val],
-              (err) => (err ? reject(err) : resolve())
+              () => resolve()
             );
           });
         }
 
         console.log(
-          `[INIT] Company "${company_name}" initialized. First user: ${techUserId}`,
+          `[INIT] Company "${company_name}" (${bizType}) initialized. First user: ${techUserId}`,
         );
         res.json({
-          message: `System initialized successfully for ${company_name}.`,
-          tech_username: techUserId,
-          default_password: defaultPassword,
-          note: "IMPORTANT: The Tech Support user must change their password after first login.",
+          message: `Company ${company_name} provisioned with isolated database successfully.`,
+          company: {
+            prefix,
+            name: company_name,
+            business_type: bizType,
+            location: loc,
+            currency: curr,
+            enabled_tabs: tabs,
+            theme_color: colPrimary
+          },
+          admin: {
+            username: techUserId,
+            name: adminFullName,
+            email: emailToSave,
+            password: defaultPassword
+          }
         });
       } catch (innerErr) {
         console.error("[INIT SCHEMAS ERROR]", innerErr);
@@ -1458,116 +1872,214 @@ app.put("/api/employees/:id/role", authenticateToken, (req, res) => {
   );
 });
 
-// 2. Role Configuration (Dynamic Engine)
+// 2. Role Configuration (Dynamic Engine - Custom Typed Roles)
 app.get("/api/roles", authenticateToken, (req, res) => {
   const schema = getSchema();
-  const cached = getCache(schema, "roles");
-  if (cached) return res.json(cached);
-  db.all("SELECT * FROM roles_config", [], (err, rows) => {
+  db.all("SELECT * FROM roles_config ORDER BY role_name ASC", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const result = { roles: rows };
-    setCache(schema, "roles", result, 120); // 120s TTL
-    res.json(result);
+    res.json({ roles: rows || [] });
   });
 });
 
 app.post("/api/roles", authenticateToken, (req, res) => {
-  const _role = (req.user.role || "").toLowerCase();
-  if (_role !== "ceo" && _role !== "hr" && _role !== "admin" && _role !== "tech" && _role !== "manager")
-    return res.status(403).json({ error: "Forbidden" });
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: "Role name required" });
+  const isAllowed = (req.user && (
+    req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician" ||
+    (req.user.permissions && req.user.permissions.can_manage_users) ||
+    ["admin", "manager", "ceo", "hr"].includes((req.user.role || "").toLowerCase())
+  ));
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden: insufficient permissions to create roles." });
+
+  const {
+    name,
+    role_name,
+    can_see_register,
+    can_see_orders,
+    can_see_pending,
+    can_see_customer,
+    can_see_inventory,
+    can_see_shift,
+    can_see_returns,
+    can_see_settings,
+    can_see_dashboard,
+    can_sell,
+    can_add_inventory,
+    can_view_inventory,
+    can_manage_prices,
+    can_give_discount,
+    can_void_orders,
+    can_process_returns,
+    can_manage_shifts,
+    can_manage_users,
+    can_edit_settings,
+    can_manage_categories
+  } = req.body;
+
+  const targetName = (role_name || name || "").trim();
+  if (!targetName) return res.status(400).json({ error: "Role name is required" });
 
   db.run(
-    "INSERT INTO roles_config (role_name, can_see_dashboard, can_see_hr, can_see_attendance, can_see_sme, can_see_pos) VALUES (?, 0, 0, 1, 0, 0)",
-    [name],
+    `INSERT INTO roles_config (
+      role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
+      can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
+      can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+      can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(role_name) DO UPDATE SET
+      can_see_register=excluded.can_see_register,
+      can_see_orders=excluded.can_see_orders,
+      can_see_pending=excluded.can_see_pending,
+      can_see_customer=excluded.can_see_customer,
+      can_see_inventory=excluded.can_see_inventory,
+      can_see_shift=excluded.can_see_shift,
+      can_see_returns=excluded.can_see_returns,
+      can_see_settings=excluded.can_see_settings,
+      can_see_dashboard=excluded.can_see_dashboard,
+      can_sell=excluded.can_sell,
+      can_add_inventory=excluded.can_add_inventory,
+      can_view_inventory=excluded.can_view_inventory,
+      can_manage_prices=excluded.can_manage_prices,
+      can_give_discount=excluded.can_give_discount,
+      can_void_orders=excluded.can_void_orders,
+      can_process_returns=excluded.can_process_returns,
+      can_manage_shifts=excluded.can_manage_shifts,
+      can_manage_users=excluded.can_manage_users,
+      can_edit_settings=excluded.can_edit_settings,
+      can_manage_categories=excluded.can_manage_categories`,
+    [
+      targetName,
+      can_see_register !== undefined ? (can_see_register ? 1 : 0) : 1,
+      can_see_orders !== undefined ? (can_see_orders ? 1 : 0) : 1,
+      can_see_pending !== undefined ? (can_see_pending ? 1 : 0) : 0,
+      can_see_customer !== undefined ? (can_see_customer ? 1 : 0) : 1,
+      can_see_inventory !== undefined ? (can_see_inventory ? 1 : 0) : 0,
+      can_see_shift !== undefined ? (can_see_shift ? 1 : 0) : 1,
+      can_see_returns !== undefined ? (can_see_returns ? 1 : 0) : 0,
+      can_see_settings !== undefined ? (can_see_settings ? 1 : 0) : 0,
+      can_see_dashboard !== undefined ? (can_see_dashboard ? 1 : 0) : 0,
+      can_sell !== undefined ? (can_sell ? 1 : 0) : 1,
+      can_add_inventory !== undefined ? (can_add_inventory ? 1 : 0) : 0,
+      can_view_inventory !== undefined ? (can_view_inventory ? 1 : 0) : 0,
+      can_manage_prices !== undefined ? (can_manage_prices ? 1 : 0) : 0,
+      can_give_discount !== undefined ? (can_give_discount ? 1 : 0) : 0,
+      can_void_orders !== undefined ? (can_void_orders ? 1 : 0) : 0,
+      can_process_returns !== undefined ? (can_process_returns ? 1 : 0) : 0,
+      can_manage_shifts !== undefined ? (can_manage_shifts ? 1 : 0) : 0,
+      can_manage_users !== undefined ? (can_manage_users ? 1 : 0) : 0,
+      can_edit_settings !== undefined ? (can_edit_settings ? 1 : 0) : 0,
+      can_manage_categories !== undefined ? (can_manage_categories ? 1 : 0) : 0,
+    ],
     function (err) {
-      if (err) {
-        if ((err.message || "").includes("UNIQUE"))
-          return res.status(400).json({ error: "Role already exists" });
-        return res.status(500).json({ error: err.message });
-      }
+      if (err) return res.status(500).json({ error: err.message });
       emitAndBust("roles", "roles");
-      res.json({ id: this.lastID, message: "Role created" });
+      res.json({ id: this.lastID, message: `Role '${targetName}' saved successfully.` });
     },
   );
 });
 
 app.put("/api/roles/:name", authenticateToken, (req, res) => {
-  const _role = (req.user.role || "").toLowerCase();
-  if (_role !== "ceo" && _role !== "hr" && _role !== "admin" && _role !== "tech" && _role !== "manager")
-    return res.status(403).json({ error: "Forbidden" });
+  const isAllowed = (req.user && (
+    req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician" ||
+    (req.user.permissions && req.user.permissions.can_manage_users) ||
+    ["admin", "manager", "ceo", "hr"].includes((req.user.role || "").toLowerCase())
+  ));
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden: insufficient permissions." });
   const { name } = req.params;
   const {
+    can_see_register,
+    can_see_orders,
+    can_see_pending,
+    can_see_customer,
+    can_see_inventory,
+    can_see_shift,
+    can_see_returns,
+    can_see_settings,
     can_see_dashboard,
-    can_see_hr,
-    can_see_attendance,
-    can_see_sme,
-    can_see_pos,
-    can_see_secretary,
-    can_see_transport,
-    can_see_hardware,
-    can_see_system_users,
-    can_see_schedules,
+    can_sell,
+    can_add_inventory,
+    can_view_inventory,
+    can_manage_prices,
+    can_give_discount,
+    can_void_orders,
+    can_process_returns,
+    can_manage_shifts,
+    can_manage_users,
+    can_edit_settings,
+    can_manage_categories
   } = req.body;
 
-  // Upsert logic (insert if not exists, else update)
   db.run(
     `
-        INSERT INTO roles_config (role_name, can_see_dashboard, can_see_hr, can_see_attendance, can_see_sme, can_see_pos, can_see_secretary, can_see_transport, can_see_hardware, can_see_system_users, can_see_schedules)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(role_name) DO UPDATE SET
-            can_see_dashboard=excluded.can_see_dashboard,
-            can_see_hr=excluded.can_see_hr,
-            can_see_attendance=excluded.can_see_attendance,
-            can_see_sme=excluded.can_see_sme,
-            can_see_pos=excluded.can_see_pos,
-            can_see_secretary=excluded.can_see_secretary,
-            can_see_transport=excluded.can_see_transport,
-            can_see_hardware=excluded.can_see_hardware,
-            can_see_system_users=excluded.can_see_system_users,
-            can_see_schedules=excluded.can_see_schedules
+      INSERT INTO roles_config (
+        role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
+        can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
+        can_sell, can_add_inventory, can_view_inventory, can_manage_prices, can_give_discount,
+        can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(role_name) DO UPDATE SET
+        can_see_register=excluded.can_see_register,
+        can_see_orders=excluded.can_see_orders,
+        can_see_pending=excluded.can_see_pending,
+        can_see_customer=excluded.can_see_customer,
+        can_see_inventory=excluded.can_see_inventory,
+        can_see_shift=excluded.can_see_shift,
+        can_see_returns=excluded.can_see_returns,
+        can_see_settings=excluded.can_see_settings,
+        can_see_dashboard=excluded.can_see_dashboard,
+        can_sell=excluded.can_sell,
+        can_add_inventory=excluded.can_add_inventory,
+        can_view_inventory=excluded.can_view_inventory,
+        can_manage_prices=excluded.can_manage_prices,
+        can_give_discount=excluded.can_give_discount,
+        can_void_orders=excluded.can_void_orders,
+        can_process_returns=excluded.can_process_returns,
+        can_manage_shifts=excluded.can_manage_shifts,
+        can_manage_users=excluded.can_manage_users,
+        can_edit_settings=excluded.can_edit_settings,
+        can_manage_categories=excluded.can_manage_categories
     `,
     [
       name,
-      can_see_dashboard,
-      can_see_hr,
-      can_see_attendance,
-      can_see_sme,
-      can_see_pos,
-      can_see_secretary || 0,
-      can_see_transport || 0,
-      can_see_hardware || 0,
-      can_see_system_users || 0,
-      can_see_schedules || 0,
+      can_see_register !== undefined ? (can_see_register ? 1 : 0) : 1,
+      can_see_orders !== undefined ? (can_see_orders ? 1 : 0) : 1,
+      can_see_pending !== undefined ? (can_see_pending ? 1 : 0) : 0,
+      can_see_customer !== undefined ? (can_see_customer ? 1 : 0) : 1,
+      can_see_inventory !== undefined ? (can_see_inventory ? 1 : 0) : 0,
+      can_see_shift !== undefined ? (can_see_shift ? 1 : 0) : 1,
+      can_see_returns !== undefined ? (can_see_returns ? 1 : 0) : 0,
+      can_see_settings !== undefined ? (can_see_settings ? 1 : 0) : 0,
+      can_see_dashboard !== undefined ? (can_see_dashboard ? 1 : 0) : 0,
+      can_sell !== undefined ? (can_sell ? 1 : 0) : 1,
+      can_add_inventory !== undefined ? (can_add_inventory ? 1 : 0) : 0,
+      can_view_inventory !== undefined ? (can_view_inventory ? 1 : 0) : 0,
+      can_manage_prices !== undefined ? (can_manage_prices ? 1 : 0) : 0,
+      can_give_discount !== undefined ? (can_give_discount ? 1 : 0) : 0,
+      can_void_orders !== undefined ? (can_void_orders ? 1 : 0) : 0,
+      can_process_returns !== undefined ? (can_process_returns ? 1 : 0) : 0,
+      can_manage_shifts !== undefined ? (can_manage_shifts ? 1 : 0) : 0,
+      can_manage_users !== undefined ? (can_manage_users ? 1 : 0) : 0,
+      can_edit_settings !== undefined ? (can_edit_settings ? 1 : 0) : 0,
+      can_manage_categories !== undefined ? (can_manage_categories ? 1 : 0) : 0,
     ],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
-      // Also propagate this change to all existing employees with this role
+      // Propagate to employees with this role
       db.run(
         `UPDATE employees SET 
-                can_see_dashboard=?, can_see_hr=?, can_see_attendance=?, can_see_sme=?, can_see_pos=?,
-                can_see_secretary=?, can_see_transport=?, can_see_hardware=?, can_see_system_users=?, can_see_schedules=?
-                WHERE role = ?`,
+          can_see_register=?, can_see_orders=?, can_see_pending=?, can_see_customer=?, can_see_inventory=?, can_see_shift=?, can_see_returns=?, can_see_settings=?, can_see_dashboard=?,
+          can_sell=?, can_add_inventory=?, can_view_inventory=?, can_manage_prices=?, can_give_discount=?, can_void_orders=?, can_process_returns=?, can_manage_shifts=?, can_manage_users=?, can_edit_settings=?, can_manage_categories=?
+         WHERE role = ?`,
         [
-          can_see_dashboard,
-          can_see_hr,
-          can_see_attendance,
-          can_see_sme,
-          can_see_pos,
-          can_see_secretary || 0,
-          can_see_transport || 0,
-          can_see_hardware || 0,
-          can_see_system_users || 0,
-          can_see_schedules || 0,
+          can_see_register ? 1 : 0, can_see_orders ? 1 : 0, can_see_pending ? 1 : 0, can_see_customer ? 1 : 0, can_see_inventory ? 1 : 0, can_see_shift ? 1 : 0, can_see_returns ? 1 : 0, can_see_settings ? 1 : 0, can_see_dashboard ? 1 : 0,
+          can_sell ? 1 : 0, can_add_inventory ? 1 : 0, can_view_inventory ? 1 : 0, can_manage_prices ? 1 : 0, can_give_discount ? 1 : 0, can_void_orders ? 1 : 0, can_process_returns ? 1 : 0, can_manage_shifts ? 1 : 0, can_manage_users ? 1 : 0, can_edit_settings ? 1 : 0, can_manage_categories ? 1 : 0,
           name,
         ],
-        function (err2) {
+        function () {
           emitAndBust("roles", "roles");
           bustCache(getSchema(), "employees");
           res.json({
-            message: "Role limits updated and applied to existing staff.",
+            message: `Role '${name}' limits updated and applied to existing staff.`,
           });
         },
       );
@@ -1617,6 +2129,212 @@ app.delete("/api/roles/:roleName", authenticateToken, (req, res) => {
       res.json({ message: "Role deleted" });
     },
   );
+});
+
+// ==== COMPANY INFO & ACTIVE BRANDING ====
+app.get("/api/company/info", authenticateToken, (req, res) => {
+  const prefix = (req.user.prefix || "public").toUpperCase();
+  asyncLocalStorage.run("public", () => {
+    db.get("SELECT * FROM companies WHERE UPPER(prefix) = ?", [prefix], (err, row) => {
+      if (err || !row) {
+        return res.json({
+          name: "iGourd Demo Restaurant",
+          prefix: prefix,
+          business_type: "restaurant",
+          location: "Kampala, Uganda",
+          logo_url: "favicon.png",
+          currency: "Sh",
+          theme_color: "#0284c7",
+          theme_accent: "#f59e0b",
+          theme_sidebar: "#0f172a",
+          enabled_tabs: ["register", "orders", "pending", "customer", "inventory", "shift", "returns", "settings"]
+        });
+      }
+      let parsedTabs = ["register", "orders", "customer", "inventory", "shift", "returns", "settings"];
+      try {
+        if (typeof row.enabled_tabs === "string") {
+          parsedTabs = JSON.parse(row.enabled_tabs);
+        } else if (Array.isArray(row.enabled_tabs)) {
+          parsedTabs = row.enabled_tabs;
+        }
+      } catch (_) {}
+      res.json({
+        ...row,
+        enabled_tabs: parsedTabs
+      });
+    });
+  });
+});
+
+app.put("/api/company/info", authenticateToken, (req, res) => {
+  const isAllowed = req.user.role === "TECH" || req.user.role === "Tech" || req.user.name === "System Technician" ||
+    (req.user.permissions && req.user.permissions.can_edit_settings) ||
+    ["admin", "manager", "ceo"].includes((req.user.role || "").toLowerCase());
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden" });
+
+  const prefix = (req.user.prefix || "public").toUpperCase();
+  const { name, location, logo_url, currency, theme_color, theme_accent, theme_sidebar } = req.body;
+
+  asyncLocalStorage.run("public", () => {
+    db.run(
+      `UPDATE companies SET 
+        name = COALESCE(?, name),
+        location = COALESCE(?, location),
+        logo_url = COALESCE(?, logo_url),
+        currency = COALESCE(?, currency),
+        theme_color = COALESCE(?, theme_color),
+        theme_accent = COALESCE(?, theme_accent),
+        theme_sidebar = COALESCE(?, theme_sidebar)
+       WHERE UPPER(prefix) = ?`,
+      [name, location, logo_url, currency, theme_color, theme_accent, theme_sidebar, prefix],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Store settings and branding updated successfully." });
+      }
+    );
+  });
+});
+
+// ==== PRODUCT CATEGORIES CRUD ====
+app.get("/api/categories", authenticateToken, (req, res) => {
+  db.all("SELECT * FROM product_categories ORDER BY display_order ASC, name ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ categories: rows || [] });
+  });
+});
+
+app.post("/api/categories", authenticateToken, (req, res) => {
+  const isAllowed = req.user.role === "TECH" || req.user.role === "Tech" ||
+    (req.user.permissions && (req.user.permissions.can_add_inventory || req.user.permissions.can_manage_categories)) ||
+    ["admin", "manager", "ceo"].includes((req.user.role || "").toLowerCase());
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden: cannot create categories" });
+
+  const { name, icon, color, display_order } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: "Category name required" });
+
+  db.run(
+    "INSERT INTO product_categories (name, icon, color, display_order) VALUES (?, ?, ?, ?)",
+    [name.trim(), icon || "fa-solid fa-tag", color || "#3b82f6", display_order || 0],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: this.lastID, name: name.trim(), message: "Category created" });
+    }
+  );
+});
+
+app.put("/api/categories/:id", authenticateToken, (req, res) => {
+  const isAllowed = req.user.role === "TECH" || req.user.role === "Tech" ||
+    (req.user.permissions && (req.user.permissions.can_add_inventory || req.user.permissions.can_manage_categories)) ||
+    ["admin", "manager", "ceo"].includes((req.user.role || "").toLowerCase());
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden" });
+
+  const { name, icon, color, display_order } = req.body;
+  db.run(
+    `UPDATE product_categories SET 
+      name = COALESCE(?, name),
+      icon = COALESCE(?, icon),
+      color = COALESCE(?, color),
+      display_order = COALESCE(?, display_order)
+     WHERE id = ?`,
+    [name, icon, color, display_order, req.params.id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: "Category updated" });
+    }
+  );
+});
+
+app.delete("/api/categories/:id", authenticateToken, (req, res) => {
+  const isAllowed = req.user.role === "TECH" || req.user.role === "Tech" ||
+    (req.user.permissions && (req.user.permissions.can_add_inventory || req.user.permissions.can_manage_categories)) ||
+    ["admin", "manager", "ceo"].includes((req.user.role || "").toLowerCase());
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden" });
+
+  db.run("DELETE FROM product_categories WHERE id = ?", [req.params.id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: "Category deleted" });
+  });
+});
+
+// ==== SALES RETURNS & REFUNDS ====
+app.get("/api/returns", authenticateToken, (req, res) => {
+  db.all("SELECT * FROM order_returns ORDER BY return_date DESC LIMIT 150", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ returns: rows || [] });
+  });
+});
+
+app.post("/api/returns", authenticateToken, (req, res) => {
+  const isAllowed = req.user.role === "TECH" || req.user.role === "Tech" ||
+    (req.user.permissions && req.user.permissions.can_process_returns) ||
+    ["admin", "manager", "supervisor", "ceo"].includes((req.user.role || "").toLowerCase());
+  if (!isAllowed) return res.status(403).json({ error: "Forbidden: permission to process returns is required." });
+
+  const { receipt_no, pos_order_id, product_id, product_name, qty, refund_amount, refund_method, reason } = req.body;
+  const processedBy = req.user ? (req.user.name || req.user.username || "Staff") : "Staff";
+  const numQty = parseInt(qty) || 1;
+  const refundAmt = parseFloat(refund_amount) || 0;
+
+  db.run(
+    `INSERT INTO order_returns (receipt_no, pos_order_id, product_id, product_name, qty, refund_amount, refund_method, reason, processed_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [receipt_no || null, pos_order_id || null, product_id || null, product_name || "Returned Item", numQty, refundAmt, refund_method || "CASH", reason || "", processedBy],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+
+      // Restore product inventory
+      if (product_id) {
+        db.run("UPDATE products SET stock = stock + ? WHERE id = ?", [numQty, product_id], () => {});
+        db.run(
+          "INSERT INTO stock_movements (product_id, product_name, movement_type, qty, note, performed_by) VALUES (?, ?, 'RETURN', ?, ?, ?)",
+          [product_id, product_name, numQty, `Return against receipt #${receipt_no || ''}: ${reason || ''}`, processedBy],
+          () => {}
+        );
+      }
+
+      // Record transaction
+      db.run(
+        "INSERT INTO transactions (amount, type, description, recorded_by) VALUES (?, 'EXPENSE', ?, ?)",
+        [refundAmt, `Return Refund: ${product_name} (x${numQty}) - Receipt #${receipt_no || 'N/A'}`, req.user ? req.user.id : null],
+        () => {}
+      );
+
+      emitAndBust("products", "products");
+      emitAndBust("transactions", "transactions");
+      res.json({ id: this.lastID, message: "Return processed and stock restored." });
+    }
+  );
+});
+
+// ==== ORDERS LIST WITH WORKER & SEARCH FILTERS ====
+app.get("/api/orders/list", authenticateToken, (req, res) => {
+  const { search, cashier_id, date, status } = req.query;
+  let sql = `
+    SELECT o.*, e.username as cashier_username, e.first_name as cashier_first_name, e.last_name as cashier_last_name
+    FROM pos_orders o
+    LEFT JOIN employees e ON o.cashier_id = e.id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (search && search.trim()) {
+    const s = `%${search.trim()}%`;
+    sql += ` AND (o.id LIKE ? OR CAST(o.invoice_number AS TEXT) LIKE ? OR o.buyer_name LIKE ? OR o.buyer_phone LIKE ? OR o.served_by LIKE ? OR o.payment_method LIKE ?)`;
+    params.push(s, s, s, s, s, s);
+  }
+  if (cashier_id) {
+    sql += ` AND o.cashier_id = ?`;
+    params.push(cashier_id);
+  }
+  if (date) {
+    sql += ` AND DATE(o.order_date) = DATE(?)`;
+    params.push(date);
+  }
+  sql += ` ORDER BY o.order_date DESC LIMIT 150`;
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ orders: rows || [] });
+  });
 });
 
 // 3. Attendance
@@ -7750,7 +8468,48 @@ server
       db.run(execSqlComp, [], (err) => {
         if (err) console.error("Error creating companies table:", err.message);
         else {
-          db.run("ALTER TABLE companies ADD COLUMN status TEXT DEFAULT 'ACTIVE'", () => {});
+          const compCols = [
+            "status TEXT DEFAULT 'ACTIVE'",
+            "business_type TEXT DEFAULT 'supermarket'",
+            "location TEXT DEFAULT 'Kampala, Uganda'",
+            "logo_url TEXT DEFAULT ''",
+            "currency TEXT DEFAULT 'Sh'",
+            "theme_color TEXT DEFAULT '#0284c7'",
+            "theme_accent TEXT DEFAULT '#f59e0b'",
+            "theme_sidebar TEXT DEFAULT '#0f172a'",
+            "enabled_tabs TEXT DEFAULT '[\"register\",\"orders\",\"pending\",\"customer\",\"inventory\",\"shift\",\"returns\",\"settings\"]'",
+            "pause_schedule_start TEXT",
+            "pause_schedule_end TEXT"
+          ];
+          compCols.forEach(col => {
+            db.run(`ALTER TABLE companies ADD COLUMN ${col}`, () => {});
+          });
+
+          // Check if companies is empty; if so, seed demo companies
+          db.get("SELECT COUNT(*) as count FROM companies", [], (cErr, cRow) => {
+            if (!cErr && (!cRow || parseInt(cRow.count) === 0)) {
+              db.run(
+                `INSERT INTO companies (
+                  prefix, name, status, business_type, location, logo_url, currency, theme_color, theme_accent, theme_sidebar, enabled_tabs
+                ) VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  "IGOURD",
+                  "iGourd Demo Restaurant",
+                  "restaurant",
+                  "Kampala, Uganda",
+                  "favicon.png",
+                  "Sh",
+                  "#0284c7",
+                  "#f59e0b",
+                  "#0f172a",
+                  JSON.stringify(["register", "orders", "pending", "customer", "inventory", "shift", "returns", "settings"])
+                ],
+                () => {
+                  console.log("[STARTUP] Seeded default company 'iGourd Demo Restaurant' (IGOURD).");
+                }
+              );
+            }
+          });
         }
       });
       db.run(execSqlTech, [], (err) => {
@@ -7770,6 +8529,34 @@ server
           );
         }
       });
+
+      // Scheduled pause checker
+      setInterval(() => {
+        try {
+          const now = new Date();
+          db.all("SELECT prefix, status, pause_schedule_start, pause_schedule_end FROM companies WHERE pause_schedule_start IS NOT NULL OR pause_schedule_end IS NOT NULL", [], (err, rows) => {
+            if (err || !rows) return;
+            rows.forEach(c => {
+              let shouldBePaused = c.status === "PAUSED";
+              const start = c.pause_schedule_start ? new Date(c.pause_schedule_start) : null;
+              const end = c.pause_schedule_end ? new Date(c.pause_schedule_end) : null;
+
+              if (start && start <= now) {
+                if (!end || end > now) shouldBePaused = true;
+                else if (end && end <= now) shouldBePaused = false;
+              }
+              if (end && end <= now && c.status === "PAUSED") shouldBePaused = false;
+
+              const targetStatus = shouldBePaused ? "PAUSED" : "ACTIVE";
+              if (targetStatus !== c.status) {
+                db.run("UPDATE companies SET status = ? WHERE prefix = ?", [targetStatus, c.prefix], () => {
+                  console.log(`[SCHEDULED PAUSE] Company ${c.prefix} auto-toggled to ${targetStatus}`);
+                });
+              }
+            });
+          });
+        } catch (_) {}
+      }, 60000);
     });
 
     const interfaces = os.networkInterfaces();

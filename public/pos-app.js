@@ -679,9 +679,14 @@ async function executeOrderCheckout() {
         }
 
         closeModal('payment-modal');
-        alert(`Order #${data.invoice_number || data.order_id || 'OK'} completed successfully! Receipt printed.`);
+        const orderRcpt = data.receipt_no || data.transaction_id || data.pos_order_id || data.invoice_number;
         clearCurrentOrder();
         await loadActiveShiftInfo();
+
+        // Print receipt directly using standard default window printing
+        if (orderRcpt) {
+            printReceiptByTransaction(orderRcpt);
+        }
     } catch (e) {
         console.error('Checkout error:', e);
         alert('Order saved locally. Will sync once connection stabilizes.');
@@ -2312,31 +2317,112 @@ function renderReceiptModal(r) {
     `;
 }
 
+// Generic print receipt helper using default window.print()
+function printReceiptHtml(htmlContent, title) {
+    // 1. Create a hidden print iframe to prevent popup blockers and invoke default browser window printing
+    let iframe = document.getElementById('receipt-print-frame');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'receipt-print-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="utf-8">
+                <title>${title || 'Receipt'}</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 2mm 3mm;
+                    }
+                    @media print {
+                        body {
+                            width: 100%;
+                            margin: 0;
+                            padding: 0;
+                        }
+                    }
+                    body {
+                        font-family: 'Courier New', Courier, monospace, monospace;
+                        font-size: 12px;
+                        line-height: 1.4;
+                        color: #000;
+                        padding: 6px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th, td {
+                        padding: 2px 0;
+                    }
+                </style>
+            </head>
+            <body>
+                ${htmlContent}
+            </body>
+        </html>
+    `);
+    doc.close();
+
+    // Trigger standard default window printing
+    setTimeout(() => {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (e) {
+            // Fallback to window.open if iframe printing is blocked
+            const win = window.open('', '', 'width=420,height=600');
+            if (win) {
+                win.document.write(doc.documentElement.outerHTML);
+                win.document.close();
+                win.focus();
+                win.print();
+            }
+        }
+    }, 250);
+}
+
 function printPreviewedReceipt() {
     if (!currentPreviewedReceipt) return;
     const printContent = document.getElementById('receipt-preview-content');
     if (!printContent) return;
+    const rcptNo = currentPreviewedReceipt.receipt_no || currentPreviewedReceipt.id;
+    printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`);
+}
 
-    const printWin = window.open('', '', 'width=400,height=600');
-    if (printWin) {
-        printWin.document.write(`
-            <html>
-                <head>
-                    <title>Receipt #${currentPreviewedReceipt.receipt_no || currentPreviewedReceipt.id}</title>
-                    <style>
-                        body { font-family: 'Courier New', Courier, monospace; padding: 15px; font-size: 12px; }
-                        table { width: 100%; border-collapse: collapse; }
-                    </style>
-                </head>
-                <body>
-                    ${printContent.innerHTML}
-                    <script>
-                        window.onload = function() { window.print(); window.close(); }
-                    </script>
-                </body>
-            </html>
-        `);
-        printWin.document.close();
+async function printReceiptByTransaction(idOrReceipt) {
+    try {
+        const res = await fetch(`/api/receipt/details/${encodeURIComponent(idOrReceipt)}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const r = data.receipt;
+        if (!r) return;
+
+        // Render preview content into modal state
+        currentPreviewedReceipt = r;
+        renderReceiptModal(r);
+
+        const printContent = document.getElementById('receipt-preview-content');
+        if (printContent) {
+            printReceiptHtml(printContent.innerHTML, `Receipt #${r.receipt_no || r.id}`);
+        }
+    } catch (err) {
+        console.error('Failed to auto-print receipt:', err);
     }
 }
 

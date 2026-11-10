@@ -28,7 +28,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_wfOXbnA3i0JY@ep-raspy-thunder-ayuhx4hs-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+        value: postgresql://neondb_owner:npg_5kaEo7tSHyzw@ep-silent-salad-bd0ud1sn-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
   # ─────────────────────────────────────────────────────────────
   # 2. STAGING / TEST ENVIRONMENT (Preview & Testing System)

@@ -16,7 +16,7 @@ let companyData = {
     theme_color: '#0284c7',
     theme_accent: '#f59e0b',
     theme_sidebar: '#0f172a',
-    enabled_tabs: ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'settings']
+    enabled_tabs: ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings']
 };
 
 let allProducts = [];
@@ -138,7 +138,12 @@ function applyCompanyBranding() {
     }
 
     // 3. Tab Visibility (e.g. Hide 'Pending' tab for Supermarkets!)
-    const enabledTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
+    const rawTabs = companyData.enabled_tabs || ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
+    const enabledTabs = Array.isArray(rawTabs) ? [...rawTabs] : ['register', 'orders', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
+    // Guarantee newly introduced core modules (finance, transactions, debtors, creditors, invoice) are visible by default
+    ['finance', 'transactions', 'debtors', 'creditors', 'invoice'].forEach(t => {
+        if (!enabledTabs.includes(t)) enabledTabs.push(t);
+    });
     const tabs = ['register', 'orders', 'pending', 'customer', 'inventory', 'shift', 'returns', 'invoice', 'kitchen', 'debtors', 'creditors', 'transactions', 'finance', 'settings'];
     tabs.forEach(tab => {
         const btn = document.getElementById(`nav-btn-${tab}`);
@@ -1272,7 +1277,8 @@ async function handleSaveExpense(e) {
     }
 }
 
-function openCloseShiftModal() {
+async function openCloseShiftModal() {
+    await loadActiveShiftInfo();
     const expectedEl = document.getElementById('close-shift-expected-val');
     const drawerDisplay = document.getElementById('shift-drawer-expected-display');
     if (expectedEl && drawerDisplay) {
@@ -2875,12 +2881,18 @@ let currentFinanceData = null;
 
 async function loadFinanceDashboard() {
     try {
+        if (!allCreditorsList || allCreditorsList.length === 0) {
+            loadCreditorsList();
+        }
         const res = await fetch('/api/finance/summary', {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
         });
         if (res.ok) {
             currentFinanceData = await res.json();
             renderFinanceDashboardUI();
+            setTimeout(() => {
+                renderMoneyFlowChart();
+            }, 80);
         }
     } catch (e) {
         console.warn('Error loading finance summary:', e.message);

@@ -2294,7 +2294,7 @@ function runMigrations(fromVersion) {
             db.run('INSERT OR REPLACE INTO system_info (key, value) VALUES (?, ?)', ['version', '159'], () => {});
         } else if (config.dbType === 'postgres') {
             // Look up business_type from public.companies using a direct query
-            db.get(`SELECT business_type FROM public.companies WHERE prefix = $1`, [prefix], (err, row) => {
+            db.get(`SELECT business_type FROM public.companies WHERE prefix = ?`, [prefix], (err, row) => {
                 const bizType = (!err && row) ? row.business_type : 'supermarket';
                 doCleanup(bizType);
             });

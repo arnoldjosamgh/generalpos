@@ -1534,9 +1534,49 @@
                     <input type="text" id="prod-form-barcode" class="pos-input" placeholder="e.g. BCP003">
                 </div>
 
-                <div class="form-field" style="margin-bottom:20px;">
-                    <label class="field-label">Image URL</label>
-                    <input type="text" id="prod-form-image" class="pos-input" placeholder="https://... or photo path">
+                <div class="form-field" style="margin-bottom:18px;">
+                    <label class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fa-solid fa-image" style="color:#3b82f6;"></i> Product Photo</span>
+                        <span id="prod-photo-status" style="font-size:0.75rem; color:#64748b; font-weight:normal;"></span>
+                    </label>
+                    
+                    <!-- Interactive Drag & Drop / File Upload Box -->
+                    <div id="prod-photo-upload-zone" style="border:2px dashed #cbd5e1; border-radius:10px; padding:12px; text-align:center; background:#f8fafc; cursor:pointer; transition:all 0.2s; position:relative;"
+                        onclick="document.getElementById('prod-photo-file-input').click()"
+                        ondragover="event.preventDefault(); this.style.borderColor='#3b82f6'; this.style.background='#eff6ff';"
+                        ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='#f8fafc';"
+                        ondrop="handleProductPhotoDrop(event)">
+                        
+                        <input type="file" id="prod-photo-file-input" accept="image/*" style="display:none;" onchange="handleProductPhotoSelect(event)">
+                        
+                        <div id="prod-photo-placeholder" style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0;">
+                            <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.8rem; color:#94a3b8;"></i>
+                            <div style="font-size:0.85rem; font-weight:600; color:#334155;">Click to browse or drag &amp; drop photo</div>
+                            <div style="font-size:0.72rem; color:#94a3b8;">PNG, JPG, WebP (auto-compressed &amp; optimized)</div>
+                        </div>
+
+                        <div id="prod-photo-preview-wrap" style="display:none; position:relative; align-items:center; justify-content:center;">
+                            <img id="prod-photo-preview-img" src="" alt="Preview" style="max-height:120px; max-width:100%; border-radius:8px; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                            <button type="button" onclick="event.stopPropagation(); clearProductPhoto();" 
+                                style="position:absolute; top:-8px; right:calc(50% - 70px); background:#ef4444; color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Remove photo">
+                                <i class="fa-solid fa-xmark" style="font-size:0.75rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hidden input retaining photo URL -->
+                    <input type="hidden" id="prod-form-image" value="">
+
+                    <!-- Optional toggle to enter external link manually -->
+                    <div style="margin-top:6px; display:flex; justify-content:flex-end;">
+                        <a href="javascript:void(0)" onclick="toggleManualImageUrl()" style="font-size:0.75rem; color:#3b82f6; text-decoration:none;">
+                            <i class="fa-solid fa-link"></i> Or enter image URL
+                        </a>
+                    </div>
+                    <div id="prod-manual-url-wrap" style="display:none; margin-top:6px;">
+                        <input type="text" id="prod-manual-url-input" class="pos-input" placeholder="https://... or photo path" 
+                            oninput="syncManualImageUrl(this.value)">
+                    </div>
                 </div>
 
                 <button type="submit" class="place-order-btn">Save Product</button>

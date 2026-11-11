@@ -1131,6 +1131,158 @@ function toggleProductStockTracking(checked) {
     }
 }
 
+function setProductPhotoPreview(url) {
+    const previewWrap = document.getElementById('prod-photo-preview-wrap');
+    const previewImg = document.getElementById('prod-photo-preview-img');
+    const placeholder = document.getElementById('prod-photo-placeholder');
+    const hiddenInput = document.getElementById('prod-form-image');
+    const statusText = document.getElementById('prod-photo-status');
+    const manualInput = document.getElementById('prod-manual-url-input');
+
+    if (hiddenInput) hiddenInput.value = url || '';
+    if (manualInput) manualInput.value = url || '';
+    if (statusText) statusText.textContent = '';
+
+    if (url) {
+        if (previewImg) previewImg.src = url;
+        if (previewWrap) previewWrap.style.display = 'flex';
+        if (placeholder) placeholder.style.display = 'none';
+    } else {
+        if (previewImg) previewImg.src = '';
+        if (previewWrap) previewWrap.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        const fileInput = document.getElementById('prod-photo-file-input');
+        if (fileInput) fileInput.value = '';
+    }
+}
+
+function clearProductPhoto() {
+    setProductPhotoPreview('');
+}
+
+function toggleManualImageUrl() {
+    const wrap = document.getElementById('prod-manual-url-wrap');
+    if (wrap) {
+        wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function syncManualImageUrl(val) {
+    const clean = (val || '').trim();
+    const hiddenInput = document.getElementById('prod-form-image');
+    if (hiddenInput) hiddenInput.value = clean;
+    const previewWrap = document.getElementById('prod-photo-preview-wrap');
+    const previewImg = document.getElementById('prod-photo-preview-img');
+    const placeholder = document.getElementById('prod-photo-placeholder');
+    if (clean) {
+        if (previewImg) previewImg.src = clean;
+        if (previewWrap) previewWrap.style.display = 'flex';
+        if (placeholder) placeholder.style.display = 'none';
+    } else {
+        if (previewWrap) previewWrap.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+    }
+}
+
+function compressAndUploadImage(file) {
+    if (!file || !file.type.startsWith('image/')) {
+        alert('Please select a valid image file (PNG, JPG, WebP).');
+        return;
+    }
+
+    const statusText = document.getElementById('prod-photo-status');
+    if (statusText) {
+        statusText.textContent = 'Optimizing...';
+        statusText.style.color = '#3b82f6';
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            // Resize to max 800x800 for blazing speed, instant upload, and minimal disk footprint
+            const maxDim = 800;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // 0.82 JPEG quality creates crisp ~50KB product photos
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+            // Instant visual feedback for user
+            setProductPhotoPreview(compressedDataUrl);
+
+            if (statusText) statusText.textContent = 'Uploading...';
+
+            fetch('/api/upload/product-photo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+                },
+                body: JSON.stringify({
+                    image: compressedDataUrl,
+                    filename: file.name
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.url) {
+                    setProductPhotoPreview(data.url);
+                    if (statusText) {
+                        statusText.textContent = '✓ Saved (' + (data.storage === 'cloudinary' ? 'Cloud CDN' : 'Fast Local') + ')';
+                        statusText.style.color = '#10b981';
+                    }
+                } else {
+                    if (statusText) {
+                        statusText.textContent = '✓ Stored offline';
+                        statusText.style.color = '#f59e0b';
+                    }
+                }
+            })
+            .catch(err => {
+                console.warn('Upload API error, keeping local data URL:', err);
+                if (statusText) {
+                    statusText.textContent = '✓ Stored locally';
+                    statusText.style.color = '#f59e0b';
+                }
+            });
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleProductPhotoSelect(e) {
+    const file = e.target.files && e.target.files[0];
+    if (file) compressAndUploadImage(file);
+}
+
+function handleProductPhotoDrop(e) {
+    e.preventDefault();
+    const zone = document.getElementById('prod-photo-upload-zone');
+    if (zone) {
+        zone.style.borderColor = '#cbd5e1';
+        zone.style.background = '#f8fafc';
+    }
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) compressAndUploadImage(file);
+}
+
 function openAddProductModal() {
     document.getElementById('product-modal-title').innerHTML = '<i class="fa-solid fa-box"></i> Add Product';
     document.getElementById('prod-form-id').value = '';
@@ -1138,7 +1290,7 @@ function openAddProductModal() {
     document.getElementById('prod-form-price').value = '';
     document.getElementById('prod-form-stock').value = '100';
     document.getElementById('prod-form-barcode').value = '';
-    document.getElementById('prod-form-image').value = '';
+    setProductPhotoPreview('');
     // Reset unlimited stock toggle
     const noTrackCb = document.getElementById('prod-form-no-tracking');
     if (noTrackCb) { noTrackCb.checked = false; toggleProductStockTracking(false); }
@@ -1154,7 +1306,17 @@ function openEditProductModal(id) {
     document.getElementById('prod-form-name').value = p.name;
     document.getElementById('prod-form-price').value = p.price;
     document.getElementById('prod-form-barcode').value = p.barcode || '';
-    document.getElementById('prod-form-image').value = p.photo_base64 || '';
+    setProductPhotoPreview(p.photo_base64 || '');
+    if (!p.photo_base64 && p.has_photo) {
+        fetch(`/api/products/${p.id}/photo`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.photo_base64) setProductPhotoPreview(data.photo_base64);
+        })
+        .catch(() => {});
+    }
     // Set unlimited stock toggle based on track_stock
     const noTracking = p.track_stock === 0;
     const noTrackCb = document.getElementById('prod-form-no-tracking');

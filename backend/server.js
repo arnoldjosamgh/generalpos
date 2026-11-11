@@ -127,6 +127,12 @@ const PORT = process.env.PORT || config.port || 3005;
 const JWT_SECRET = process.env.JWT_SECRET || "jomish_super_secret_key";
 const bonjour = new Bonjour();
 
+// Ensure local product uploads directory exists
+const UPLOADS_DIR = path.join(APP_BASE_DIR, "public", "uploads", "products");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 // â”€â”€â”€ Schema-aware TTL Cache (zero extra deps) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Caches GET responses keyed by schema+endpoint. Automatically expires after
 // TTL seconds. Busted explicitly on every write via bustCache().
@@ -4111,8 +4117,18 @@ app.get("/api/products", authenticateToken, (req, res) => {
       const cached = getCache(schema, "products");
       if (cached) return res.json(cached);
     }
-    // Exclude photo_base64 from list for performance — use /api/products/:id/photo for individual photos
-    db.all("SELECT id, name, category, price, stock, barcode, barcode_end, buying_price, track_stock, low_stock_threshold, CASE WHEN photo_base64 IS NOT NULL AND LENGTH(photo_base64) > 50 THEN 1 ELSE 0 END AS has_photo FROM products", [], (err, products) => {
+    // Return photo_base64 if it's a URL or short string; omit legacy large base64 payloads to keep listing fast
+    const prodListSql = `
+      SELECT id, name, category, price, stock, barcode, barcode_end, buying_price, track_stock, low_stock_threshold,
+        CASE 
+          WHEN photo_base64 LIKE '/%' OR photo_base64 LIKE 'http%' THEN photo_base64 
+          WHEN photo_base64 IS NOT NULL AND LENGTH(photo_base64) <= 500 THEN photo_base64 
+          ELSE NULL 
+        END AS photo_base64,
+        CASE WHEN photo_base64 IS NOT NULL AND LENGTH(photo_base64) > 0 THEN 1 ELSE 0 END AS has_photo 
+      FROM products
+    `;
+    db.all(prodListSql, [], (err, products) => {
       if (err) return res.status(500).json({ error: err.message });
       db.all(
         "SELECT product_id, barcode FROM product_barcodes",
@@ -4628,10 +4644,10 @@ app.put("/api/products/:id", authenticateToken, (req, res) => {
     let sql =
       "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, barcode = ?, barcode_end = ?, buying_price = ?, track_stock = ?, low_stock_threshold = ? WHERE id = ?";
 
-    if (photo_base64 && photo_base64.length > 50) {
+    if (photo_base64 !== undefined) {
       sql =
         "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, barcode = ?, barcode_end = ?, buying_price = ?, track_stock = ?, low_stock_threshold = ?, photo_base64 = ? WHERE id = ?";
-      params.splice(9, 0, photo_base64); // insert photo before id
+      params.splice(9, 0, photo_base64 && photo_base64.trim() ? photo_base64.trim() : null); // insert photo before id
     }
 
     db.run(sql, params, function (err) {
@@ -4658,6 +4674,102 @@ app.patch("/api/products/:id/photo", authenticateToken, (req, res) => {
       res.json({ message: "Photo updated" });
     },
   );
+});
+
+// Upload product photo — accepts base64 image data directly from system
+// Saves locally to public/uploads/products/<tenantPrefix>_<timestamp>_<random>.<ext>
+// Or forwards to Cloudinary if configured in config.json / environment variables
+app.post("/api/upload/product-photo", authenticateToken, async (req, res) => {
+  try {
+    const { image, filename } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: "No image data provided" });
+    }
+
+    const schema = req.tenantSchema || getSchema();
+    const prefix = schema.startsWith("t_") ? schema.slice(2) : "public";
+
+    // 1. Check if Cloudinary is configured
+    const cConfig = config.cloudinary || (process.env.CLOUDINARY_CLOUD_NAME ? {
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    } : null);
+
+    if (cConfig && cConfig.cloud_name && cConfig.api_key && cConfig.api_secret) {
+      try {
+        const timestamp = Math.round(Date.now() / 1000);
+        const publicId = `${prefix}_prod_${Date.now()}`;
+        const crypto = require("crypto");
+        const stringToSign = `public_id=${publicId}&timestamp=${timestamp}${cConfig.api_secret}`;
+        const signature = crypto.createHash("sha1").update(stringToSign).digest("hex");
+
+        const formData = new URLSearchParams();
+        formData.append("file", image);
+        formData.append("api_key", cConfig.api_key);
+        formData.append("timestamp", String(timestamp));
+        formData.append("public_id", publicId);
+        formData.append("signature", signature);
+
+        const cRes = await fetch(`https://api.cloudinary.com/v1_1/${cConfig.cloud_name}/image/upload`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          return res.json({
+            url: cData.secure_url || cData.url,
+            storage: "cloudinary",
+            message: "Photo uploaded to Cloudinary successfully"
+          });
+        } else {
+          const cErr = await cRes.text();
+          console.warn("[Cloudinary] Upload failed, falling back to local storage:", cErr);
+        }
+      } catch (cEx) {
+        console.warn("[Cloudinary] Connection error, falling back to local storage:", cEx.message);
+      }
+    }
+
+    // 2. Default: Fast local zero-config storage
+    const uploadsDir = path.join(APP_BASE_DIR, "public", "uploads", "products");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const matches = image.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    let ext = "jpg";
+    let buffer;
+    if (matches) {
+      ext = matches[1].replace("+xml", "") || "jpg";
+      if (ext === "jpeg") ext = "jpg";
+      buffer = Buffer.from(matches[2], "base64");
+    } else {
+      buffer = Buffer.from(image, "base64");
+    }
+
+    if (buffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: "Image file exceeds 10MB limit" });
+    }
+
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeName = `${safePrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const filePath = path.join(uploadsDir, safeName);
+
+    await fs.promises.writeFile(filePath, buffer);
+    const publicUrl = `/uploads/products/${safeName}`;
+
+    res.json({
+      url: publicUrl,
+      storage: "local",
+      size: buffer.length,
+      message: "Photo uploaded successfully"
+    });
+  } catch (err) {
+    console.error("[Product Photo Upload Error]:", err);
+    res.status(500).json({ error: "Failed to upload photo: " + err.message });
+  }
 });
 
 // Get single product photo (so POS can load it on demand)

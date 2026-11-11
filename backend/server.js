@@ -4689,12 +4689,28 @@ app.post("/api/upload/product-photo", authenticateToken, async (req, res) => {
     const schema = req.tenantSchema || getSchema();
     const prefix = schema.startsWith("t_") ? schema.slice(2) : "public";
 
-    // 1. Check if Cloudinary is configured
-    const cConfig = config.cloudinary || (process.env.CLOUDINARY_CLOUD_NAME ? {
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET
-    } : null);
+    // 1. Check if Cloudinary is configured (via individual keys, config.json, or CLOUDINARY_URL)
+    let cConfig = null;
+    const rawUrl = process.env.CLOUDINARY_URL || (config.cloudinary && config.cloudinary.url);
+    if (rawUrl && rawUrl.startsWith("cloudinary://")) {
+      try {
+        const u = new URL(rawUrl);
+        cConfig = {
+          cloud_name: u.hostname,
+          api_key: u.username,
+          api_secret: u.password
+        };
+      } catch (_) {}
+    }
+    if (!cConfig) {
+      const c = config.cloudinary || {};
+      const cloud_name = (process.env.CLOUDINARY_CLOUD_NAME || c.cloud_name || "").trim();
+      const api_key = (process.env.CLOUDINARY_API_KEY || c.api_key || "").trim();
+      const api_secret = (process.env.CLOUDINARY_API_SECRET || c.api_secret || "").trim();
+      if (cloud_name && api_key && api_secret) {
+        cConfig = { cloud_name, api_key, api_secret };
+      }
+    }
 
     if (cConfig && cConfig.cloud_name && cConfig.api_key && cConfig.api_secret) {
       try {
@@ -4718,8 +4734,13 @@ app.post("/api/upload/product-photo", authenticateToken, async (req, res) => {
 
         if (cRes.ok) {
           const cData = await cRes.json();
+          let cUrl = cData.secure_url || cData.url;
+          // Auto-optimize delivery: WebP/AVIF format + auto quality + responsive limit
+          if (cUrl && cUrl.includes("/image/upload/")) {
+            cUrl = cUrl.replace("/image/upload/", "/image/upload/f_auto,q_auto,w_800,c_limit/");
+          }
           return res.json({
-            url: cData.secure_url || cData.url,
+            url: cUrl,
             storage: "cloudinary",
             message: "Photo uploaded to Cloudinary successfully"
           });

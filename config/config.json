@@ -11,8 +11,8 @@
     "ssl": { "rejectUnauthorized": false }
   },
   "cloudinary": {
-    "cloud_name": "",
-    "api_key": "",
-    "api_secret": ""
+    "cloud_name": "icbnlz6q",
+    "api_key": "985856495263256",
+    "api_secret": "mHnrGkWird9n4G7k0kIpYeaA6qc"
   }
 }

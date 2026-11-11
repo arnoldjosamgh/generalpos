@@ -922,7 +922,7 @@ function filterOrdersList(search) {
 }
 
 function reprintReceipt(orderId) {
-    alert(`Reprinting receipt for Order #${orderId}...`);
+    viewReceiptDetails(orderId);
 }
 
 // ============================================================================
@@ -2814,9 +2814,98 @@ function hidePrintAnimation() {
     }
 }
 
+function triggerBrowserPrint(htmlContent, title) {
+    let oldFrame = document.getElementById('receipt-print-frame');
+    if (oldFrame) {
+        try { oldFrame.remove(); } catch (_) {}
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'receipt-print-frame';
+    // Non-zero dimensions placed offscreen so Chromium/Edge doesn't suppress print execution
+    iframe.style.cssText = 'position:fixed; top:-9999px; left:-9999px; width:80mm; height:120mm; border:none; z-index:-1; opacity:0; pointer-events:none;';
+    document.body.appendChild(iframe);
+
+    let doc;
+    try {
+        doc = iframe.contentWindow.document;
+    } catch (e) {
+        console.warn('Cannot access iframe document, using direct print:', e);
+        window.print();
+        return;
+    }
+
+    doc.open();
+    doc.write(`
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="utf-8">
+                <title>${title || 'Receipt'}</title>
+                <style>
+                    @page {
+                        size: 80mm auto;
+                        margin: 0;
+                    }
+                    @media print {
+                        html, body {
+                            width: 80mm !important;
+                            max-width: 80mm !important;
+                            margin: 0 !important;
+                            padding: 2mm 3mm !important;
+                            background: #fff !important;
+                            color: #000 !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                    }
+                    body {
+                        font-family: 'Courier New', Courier, monospace, sans-serif;
+                        font-size: 12px;
+                        line-height: 1.4;
+                        color: #000;
+                        margin: 0;
+                        padding: 4px;
+                    }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 2px 0; }
+                </style>
+            </head>
+            <body>
+                ${htmlContent}
+            </body>
+        </html>
+    `);
+    doc.close();
+
+    // Ensure animation overlay is dismissed so user can see print dialog / window
+    hidePrintAnimation();
+
+    let printDone = false;
+    const executePrint = () => {
+        if (printDone) return;
+        printDone = true;
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (err) {
+            console.warn('[Iframe print failed, falling back to window.print]:', err);
+            window.print();
+        }
+        setTimeout(() => {
+            if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }, 3000);
+    };
+
+    iframe.onload = executePrint;
+    setTimeout(() => {
+        if (!printDone) executePrint();
+    }, 400);
+}
+
 // Generic print receipt helper using custom animation + silent direct Windows spooler printing
 async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
-    // 1. Trigger the custom thermal printer dispensing animation
+    // 1. Show the print animation
     showPrintAnimation(
         companyData.name || 'JOMISH POS',
         receiptMeta.receipt_no || title,
@@ -2873,81 +2962,40 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
         });
 
         if (printRes.ok) {
-            printedSilently = true;
-            console.log('[SILENT PRINT] Direct Windows print sent successfully to:', printerName);
+            const printData = await printRes.json().catch(() => ({}));
+            // ONLY treat as printed silently if local hardware print explicitly reported success
+            if (printData && printData.printed === true) {
+                printedSilently = true;
+                console.log('[SILENT PRINT] Direct Windows print sent successfully to:', printerName);
+            }
         }
     } catch (e) {
         console.warn('[SILENT PRINT] Backend spooler print failed, checking fallback:', e);
     }
 
-    // 4. If silent spooler succeeded, let the animation finish and close cleanly without any dialog!
+    // 4. If silent spooler succeeded on local server, let animation finish
     if (printedSilently) {
-        setTimeout(hidePrintAnimation, 2200);
+        setTimeout(hidePrintAnimation, 2000);
         return;
     }
 
-    // 5. Fallback (e.g. running on cloud Render without local print server):
-    // Use an invisible iframe for window.print()
-    let iframe = document.getElementById('receipt-print-frame');
-    if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'receipt-print-frame';
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-    }
-
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(`
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="utf-8">
-                <title>${title || 'Receipt'}</title>
-                <style>
-                    @page { size: 80mm auto; margin: 2mm 3mm; }
-                    @media print { body { width: 100%; margin: 0; padding: 0; } }
-                    body {
-                        font-family: 'Courier New', Courier, monospace;
-                        font-size: 12px;
-                        line-height: 1.4;
-                        color: #000;
-                        padding: 6px;
-                    }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { padding: 2px 0; }
-                </style>
-            </head>
-            <body>
-                ${htmlContent}
-            </body>
-        </html>
-    `);
-    doc.close();
-
-    setTimeout(() => {
-        try {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-        } catch (_) {
-        } finally {
-            setTimeout(hidePrintAnimation, 1200);
-        }
-    }, 1100);
+    // 5. Always trigger reliable browser print dialog
+    hidePrintAnimation();
+    triggerBrowserPrint(htmlContent, title);
 }
 
 function printPreviewedReceipt() {
-    if (!currentPreviewedReceipt) return;
     const printContent = document.getElementById('receipt-preview-content');
     if (!printContent) return;
+
+    if (!currentPreviewedReceipt) {
+        triggerBrowserPrint(printContent.innerHTML, 'Receipt');
+        return;
+    }
+
     const rcptNo = currentPreviewedReceipt.receipt_no || currentPreviewedReceipt.id;
     const curr = companyData.currency || 'Sh';
-    const total = `${parseFloat(currentPreviewedReceipt.order_total_amount || currentPreviewedReceipt.amount || 0).toLocaleString()} ${curr}`;
+    const total = `${parseFloat(currentPreviewedReceipt.order_total_amount || currentPreviewedReceipt.total_amount || currentPreviewedReceipt.amount || 0).toLocaleString()} ${curr}`;
 
     printReceiptHtml(printContent.innerHTML, `Receipt #${rcptNo}`, {
         receipt_no: rcptNo,

@@ -3117,12 +3117,38 @@ app.get("/api/receipt/details/:id", authenticateToken, (req, res) => {
      FROM transactions t
      LEFT JOIN employees e ON t.recorded_by = e.id
      LEFT JOIN pos_orders po ON po.transaction_id = t.id
-     WHERE t.id = ? OR t.receipt_no = ? OR po.id = ?
+     WHERE t.id = ? OR t.receipt_no = ? OR po.id = ? OR po.invoice_number = ?
      LIMIT 1`,
-    [identifier, identifier, identifier],
+    [identifier, identifier, identifier, identifier],
     (err, tx) => {
       if (err) return res.status(500).json({ error: err.message });
-      if (!tx) return res.status(404).json({ error: "Receipt or transaction not found" });
+      if (!tx) {
+        // Fallback: check pos_orders directly
+        return db.get(
+          `SELECT po.*,
+                  po.id AS pos_order_id,
+                  po.total_amount AS order_total_amount,
+                  po.buyer_name AS order_buyer_name,
+                  po.buyer_phone AS order_buyer_phone,
+                  po.served_by AS order_served_by,
+                  po.payment_method AS order_payment_method,
+                  po.amount_paid AS order_amount_paid,
+                  COALESCE(po.invoice_number, po.id) AS receipt_no,
+                  po.order_date AS transaction_date
+           FROM pos_orders po
+           WHERE po.id = ? OR po.invoice_number = ?
+           LIMIT 1`,
+          [identifier, identifier],
+          (poErr, po) => {
+            if (poErr) return res.status(500).json({ error: poErr.message });
+            if (!po) return res.status(404).json({ error: "Receipt or transaction not found" });
+            db.all("SELECT * FROM order_items WHERE pos_order_id = ?", [po.id], (itemErr, items) => {
+              po.items = items || [];
+              res.json({ receipt: po });
+            });
+          }
+        );
+      }
 
       if (tx.pos_order_id) {
         db.all(
@@ -3727,13 +3753,30 @@ app.post("/api/system/print-raw", authenticateToken, (req, res) => {
     const tempFile = path.join(os.tmpdir(), `jomish_receipt_${Date.now()}.bin`);
     fs.writeFileSync(tempFile, printBuffer);
 
+    let targetPrinter = (printerName || "").trim();
+    if (platform === "win32" && (!targetPrinter || targetPrinter === "LPT1")) {
+      try {
+        const { execSync } = require("child_process");
+        const defPrn = execSync(
+          'powershell -NoProfile -Command "(Get-CimInstance Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -ExpandProperty Name)"',
+          { timeout: 4000 }
+        ).toString().trim();
+        if (defPrn) targetPrinter = defPrn;
+      } catch (_) {}
+    }
+
     let printCmd;
     if (platform === "win32") {
-      if (printerName && printerName !== "LPT1" && printerName !== "") {
+      if (targetPrinter && targetPrinter !== "LPT1") {
         const scriptPath = path.join(APP_BASE_DIR, "scripts", "raw_print.ps1");
-        printCmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" "${tempFile}" "${printerName}"`;
+        printCmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" "${tempFile}" "${targetPrinter}"`;
       } else {
-        printCmd = `cmd.exe /c copy /B "${tempFile}" LPT1`;
+        try { fs.unlinkSync(tempFile); } catch (e) {}
+        return res.json({
+          success: true,
+          printed: false,
+          message: "No local hardware printer attached to server",
+        });
       }
     } else {
       const parallelPrinter = "/dev/lp0";
@@ -3764,9 +3807,10 @@ app.post("/api/system/print-raw", authenticateToken, (req, res) => {
         try {
           fs.unlinkSync(tempFile);
         } catch (e) {}
-        return res.status(200).json({
+        return res.json({
           success: true,
-          message: "Receipt generated (no local printer, returning raw data)",
+          printed: false,
+          message: "Receipt generated (no hardware printer attached directly to cloud server)",
           rawEscPos: base64Data,
         });
       }
@@ -3780,12 +3824,14 @@ app.post("/api/system/print-raw", authenticateToken, (req, res) => {
           fs.unlinkSync(tempFile);
         } catch (e) {}
         if (err) {
-          console.error("[PRINT ERROR]", err.message);
-          return res
-            .status(500)
-            .json({ error: "Failed to print: " + err.message });
+          console.warn("[PRINT SPOOLER ERROR]", err.message);
+          return res.json({
+            success: false,
+            printed: false,
+            error: "Local spooler error: " + err.message
+          });
         }
-        res.json({ success: true, message: "Printed successfully" });
+        res.json({ success: true, printed: true, message: "Printed successfully" });
       },
     );
   } catch (err) {

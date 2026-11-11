@@ -84,6 +84,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 6. Enforce Role Permissions
     enforceRolePermissions();
+
+    // 7. Initialize Header Default Printer Label
+    updateHeaderPrinterLabel();
 });
 
 // ============================================================================
@@ -1763,50 +1766,166 @@ async function loadCustomRolesSettings() {
 }
 
 async function loadSystemPrintersList() {
-    const select = document.getElementById('setting-default-printer-select');
-    if (!select) return;
+    const cardList  = document.getElementById('printer-cards-list');
+    const hiddenSel = document.getElementById('setting-default-printer-select');
+    const refreshIcon = document.getElementById('printer-refresh-icon');
+
+    if (refreshIcon) refreshIcon.className = 'fa-solid fa-spinner fa-spin';
+    if (cardList) cardList.innerHTML = `<div style="text-align:center;padding:18px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> Detecting printers…</div>`;
+
+    const savedPref = localStorage.getItem('jomish_default_printer') || '';
 
     try {
         const res = await fetch('/api/system/printers', {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
         });
+
+        if (refreshIcon) refreshIcon.className = 'fa-solid fa-rotate-right';
+
         if (res.ok) {
             const data = await res.json();
             const printers = data.printers || [];
-            const savedPref = localStorage.getItem('jomish_default_printer') || data.defaultPrinter || '';
+
+            // Auto-remember Windows default if nothing saved yet
+            const activePrinter = savedPref || data.defaultPrinter || '';
+            if (!savedPref && activePrinter) {
+                localStorage.setItem('jomish_default_printer', activePrinter);
+            }
+
+            if (hiddenSel) {
+                hiddenSel.innerHTML = printers.map(p =>
+                    `<option value="${escapeHtml(p.name)}" ${p.name === activePrinter ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+                ).join('');
+            }
+
+            if (!cardList) return;
 
             if (printers.length === 0) {
-                select.innerHTML = '<option value="">No local printers detected (Will use browser default)</option>';
+                cardList.innerHTML = `
+                    <div style="text-align:center;padding:20px;color:#94a3b8;font-size:0.85rem;border:1px dashed #e2e8f0;border-radius:8px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-bottom:6px;display:block;font-size:1.3rem;"></i>
+                        No local printers detected.<br>
+                        <span style="font-size:0.75rem;">Make sure you're running Jomish locally (not cloud) and printers are installed in Windows.</span>
+                    </div>`;
                 return;
             }
 
-            select.innerHTML = printers.map(p => {
-                const isSelected = p.name === savedPref;
-                return `<option value="${escapeHtml(p.name)}" ${isSelected ? 'selected' : ''}>${escapeHtml(p.name)} ${p.port ? `(${p.port})` : ''} ${p.isDefault ? '• Windows Default' : ''}</option>`;
+            cardList.innerHTML = printers.map(p => {
+                const isActive = p.name === activePrinter;
+                return `
+                <div onclick="selectPrinterCard('${escapeHtml(p.name)}')"
+                    id="printer-card-${btoa(encodeURIComponent(p.name)).replace(/[^a-zA-Z0-9]/g,'')}"
+                    style="display:flex; align-items:center; gap:12px; padding:12px 14px;
+                           border-radius:8px; cursor:pointer; transition:all 0.15s;
+                           border:2px solid ${isActive ? '#6366f1' : '#e2e8f0'};
+                           background:${isActive ? '#eef2ff' : '#f8fafc'};">
+                    <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                background:${isActive ? '#6366f1' : '#e2e8f0'};flex-shrink:0;">
+                        <i class="fa-solid fa-print" style="color:${isActive ? '#fff' : '#94a3b8'};font-size:0.95rem;"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;color:#0f172a;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            ${escapeHtml(p.name)}
+                        </div>
+                        <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">
+                            ${p.port ? `Port: ${escapeHtml(p.port)}` : ''}
+                            ${p.isDefault ? ' &nbsp;•&nbsp; <span style="color:#10b981;font-weight:600;">Windows Default</span>' : ''}
+                        </div>
+                    </div>
+                    <div style="flex-shrink:0;">
+                        ${isActive
+                            ? `<span style="background:#6366f1;color:#fff;font-size:0.7rem;font-weight:700;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-check"></i> Active</span>`
+                            : `<span style="background:#f1f5f9;color:#94a3b8;font-size:0.7rem;font-weight:600;padding:3px 8px;border-radius:20px;">Select</span>`
+                        }
+                    </div>
+                </div>`;
             }).join('');
 
-            // If nothing saved yet, remember the detected default
-            if (!localStorage.getItem('jomish_default_printer') && savedPref) {
-                localStorage.setItem('jomish_default_printer', savedPref);
-            }
+            // Update animation overlay subtext
+            updatePrintAnimSubtext(activePrinter);
         }
     } catch (_) {
-        select.innerHTML = '<option value="">Standard Windows Default Printer</option>';
+        if (refreshIcon) refreshIcon.className = 'fa-solid fa-rotate-right';
+        if (cardList) cardList.innerHTML = `
+            <div style="text-align:center;padding:16px;color:#94a3b8;font-size:0.82rem;border:1px dashed #e2e8f0;border-radius:8px;">
+                <i class="fa-solid fa-wifi" style="color:#f87171;margin-bottom:4px;display:block;"></i>
+                Could not reach server to list printers.<br>
+                <span style="font-size:0.72rem;">Server may be cloud-hosted — printer selection requires a local Jomish server.</span>
+            </div>`;
+    }
+}
+
+function selectPrinterCard(printerName) {
+    localStorage.setItem('jomish_default_printer', printerName);
+
+    // Update hidden select
+    const hiddenSel = document.getElementById('setting-default-printer-select');
+    if (hiddenSel) hiddenSel.value = printerName;
+
+    // Update header label and receipt modal target label
+    updateHeaderPrinterLabel(printerName);
+
+    // Re-render cards with new active state
+    loadSystemPrintersList();
+
+    // Show saved toast
+    const statusEl = document.getElementById('printer-save-status');
+    const msgEl    = document.getElementById('printer-save-msg');
+    if (msgEl) msgEl.textContent = `✓ "${printerName}" set as default printer. All subsequent receipts will print here silently.`;
+    if (statusEl) {
+        statusEl.style.display = 'block';
+        clearTimeout(statusEl._hideTimer);
+        statusEl._hideTimer = setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
+    }
+
+    // Update animation overlay
+    updatePrintAnimSubtext(printerName);
+
+    console.log('[PRINTER] Default printer set to:', printerName);
+}
+
+function updateHeaderPrinterLabel(printerName) {
+    const pName = printerName || localStorage.getItem('jomish_default_printer') || '';
+    const label = document.getElementById('header-printer-label');
+    if (label) {
+        label.textContent = pName ? pName : 'Printer';
+        label.title = pName ? `Default Printer: ${pName} (Silent Print Enabled)` : 'No thermal printer selected (Click to configure)';
+    }
+    const modalLabel = document.getElementById('receipt-modal-printer-name');
+    if (modalLabel) {
+        modalLabel.textContent = pName ? pName : 'Windows Default';
+    }
+}
+
+function goToPrinterSettings() {
+    closeModal('view-receipt-modal');
+    switchNavTab('settings');
+    setTimeout(() => {
+        const target = document.getElementById('printer-cards-list') || document.getElementById('setting-default-printer-select');
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+            target.style.boxShadow = '0 0 0 4px rgba(99, 102, 241, 0.35)';
+            setTimeout(() => { target.style.boxShadow = ''; }, 2000);
+        }
+    }, 250);
+}
+
+function updatePrintAnimSubtext(printerName) {
+    const sub = document.getElementById('anim-printer-subtext');
+    if (sub) {
+        sub.textContent = printerName
+            ? `Sending to: ${printerName}`
+            : 'Connecting to Windows Default Printer';
     }
 }
 
 function saveSelectedPrinterPreference() {
+    // Legacy function — kept for compatibility if called from elsewhere
     const select = document.getElementById('setting-default-printer-select');
     if (!select) return;
     const chosen = select.value;
-    if (chosen) {
-        localStorage.setItem('jomish_default_printer', chosen);
-    }
-    const statusEl = document.getElementById('printer-save-status');
-    if (statusEl) {
-        statusEl.style.display = 'block';
-        setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-    }
+    if (chosen) selectPrinterCard(chosen);
 }
 
 function renderCustomRolesList(roles) {
@@ -2723,6 +2842,7 @@ async function viewReceiptDetails(idOrReceipt) {
         contentEl.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Loading receipt...</div>';
     }
     openModal('view-receipt-modal');
+    updateHeaderPrinterLabel();
 
     try {
         const res = await fetch(`/api/receipt/details/${encodeURIComponent(idOrReceipt)}`, {
@@ -2834,10 +2954,15 @@ function showPrintAnimation(brandName, rcptNo, totalAmount) {
     const metaEl = document.getElementById('anim-receipt-meta');
     const totalEl = document.getElementById('anim-receipt-total');
     const paperEl = document.getElementById('pos-anim-paper-content');
+    const statusEl = document.getElementById('anim-status-label');
 
     if (headEl) headEl.textContent = brandName || (companyData.name || 'JOMISH POS');
     if (metaEl) metaEl.innerHTML = `#${rcptNo || 'RECEIPT'}<br>${new Date().toLocaleTimeString()}`;
     if (totalEl) totalEl.textContent = `TOTAL: ${totalAmount || ''}`;
+    if (statusEl) statusEl.textContent = 'Printing Receipt...';
+
+    const defaultPrinter = localStorage.getItem('jomish_default_printer') || '';
+    updatePrintAnimSubtext(defaultPrinter);
 
     // Reset animation
     if (paperEl) {
@@ -2956,16 +3081,31 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
 
     const printerName = localStorage.getItem('jomish_default_printer') || '';
 
-    // 2. Format plain text for silent direct Windows spooler printing
+    // 2. Build structured receiptData for high-quality ESC/POS printer engine
+    const curr = companyData.currency || 'Sh';
+    const receiptData = {
+        brand: companyData.name || 'JOMISH POS',
+        address: companyData.location || companyData.address || 'Kampala, Uganda',
+        contact: companyData.contact_phone || companyData.phone || companyData.email || '',
+        receiptNo: `RECEIPT: #${receiptMeta.receipt_no || title || 'N/A'}`,
+        date: new Date().toLocaleString(),
+        cashier: localStorage.getItem('jomish_name') || 'Cashier',
+        items: (receiptMeta.items && Array.isArray(receiptMeta.items) && receiptMeta.items.length > 0)
+            ? receiptMeta.items.map(it => ({
+                description: `${(it.product_name || it.name || 'Item').slice(0, 18)} x${it.qty || 1}`,
+                total: `${parseFloat(it.total || (it.price * it.qty) || 0).toLocaleString()} ${curr}`
+            }))
+            : [{ description: receiptMeta.description || 'POS SALE', total: `${receiptMeta.total || '0'} ${curr}` }],
+        total: `${receiptMeta.total || '0'} ${curr}`,
+        method: receiptMeta.payment_method || 'CASH'
+    };
+
     const textLines = [
-        `\x1B\x40`, // ESC @ Init
-        `\x1B\x61\x01`, // Center
         companyData.name || 'JOMISH POS',
         companyData.location || 'Kampala, Uganda',
         `RECEIPT: #${receiptMeta.receipt_no || 'N/A'}`,
         new Date().toLocaleString(),
-        `--------------------------------`,
-        `\x1B\x61\x00` // Left
+        `--------------------------------`
     ];
 
     if (receiptMeta.items && Array.isArray(receiptMeta.items) && receiptMeta.items.length > 0) {
@@ -2980,11 +3120,8 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
     }
 
     textLines.push(`--------------------------------`);
-    textLines.push(`\x1B\x61\x02`); // Right
     textLines.push(`TOTAL: ${receiptMeta.total || '0'}`);
-    textLines.push(`\x1B\x61\x01`); // Center
     textLines.push(`Thank you for your business!`);
-    textLines.push(`\n\n\n\x1D\x56\x41\x00`); // Cut paper
 
     const plainReceiptText = textLines.join('\n');
 
@@ -2999,6 +3136,7 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
             },
             body: JSON.stringify({
                 receiptText: plainReceiptText,
+                receiptData: receiptData,
                 printerName: printerName
             })
         });
@@ -3009,15 +3147,17 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
             if (printData && printData.printed === true) {
                 printedSilently = true;
                 console.log('[SILENT PRINT] Direct Windows print sent successfully to:', printerName);
+                const statusLabel = document.getElementById('anim-status-label');
+                if (statusLabel) statusLabel.textContent = '✓ Receipt Printed!';
             }
         }
     } catch (e) {
         console.warn('[SILENT PRINT] Backend spooler print failed, checking fallback:', e);
     }
 
-    // 4. If silent spooler succeeded on local server, let animation finish
+    // 4. If silent spooler succeeded on local server, let animation finish without opening Windows print dialog
     if (printedSilently) {
-        setTimeout(hidePrintAnimation, 2000);
+        setTimeout(hidePrintAnimation, 2200);
         return;
     }
 

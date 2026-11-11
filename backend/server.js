@@ -3769,7 +3769,8 @@ app.post("/api/system/print-raw", authenticateToken, (req, res) => {
     if (platform === "win32") {
       if (targetPrinter && targetPrinter !== "LPT1") {
         const scriptPath = path.join(APP_BASE_DIR, "scripts", "raw_print.ps1");
-        printCmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" "${tempFile}" "${targetPrinter}"`;
+        const safePrinter = targetPrinter.replace(/["`$]/g, "");
+        printCmd = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" "${tempFile}" "${safePrinter}"`;
       } else {
         try { fs.unlinkSync(tempFile); } catch (e) {}
         return res.json({

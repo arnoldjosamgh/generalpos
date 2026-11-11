@@ -1530,8 +1530,12 @@
                 </div>
 
                 <div class="form-field" style="margin-bottom:12px;">
-                    <label class="field-label">Barcode / Code</label>
-                    <input type="text" id="prod-form-barcode" class="pos-input" placeholder="e.g. BCP003">
+                    <label class="field-label"><i class="fa-solid fa-barcode" style="color:#6366f1;"></i> Barcode / Code <span style="font-size:0.72rem; color:#94a3b8; font-weight:400;">(optional — scan or type)</span></label>
+                    <input type="text" id="prod-form-barcode" class="pos-input"
+                        placeholder="Scan barcode or type manually…"
+                        onkeydown="handleBarcodeScanInput(event)"
+                        autocomplete="off">
+                    <span id="prod-barcode-status" style="font-size:0.75rem; color:#64748b; margin-top:4px; display:block; min-height:1.1em;"></span>
                 </div>
 
                 <div class="form-field" style="margin-bottom:18px;">

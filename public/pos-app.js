@@ -1160,6 +1160,39 @@ function clearProductPhoto() {
     setProductPhotoPreview('');
 }
 
+// Barcode scanner handler for the Add/Edit Product modal.
+// Scanners emit rapid keystrokes ending with Enter; this intercepts that Enter,
+// confirms the captured value visually, then moves focus to the product name field
+// so the cashier can fill in the rest without touching the barcode input again.
+function handleBarcodeScanInput(e) {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+        e.preventDefault(); // Don't submit the form on Enter inside this input
+        const val = (e.target.value || '').trim();
+        const statusEl = document.getElementById('prod-barcode-status');
+        if (val.length >= 1) {
+            // Visual confirmation — green flash
+            e.target.style.borderColor = '#10b981';
+            e.target.style.background = '#f0fdf4';
+            if (statusEl) {
+                statusEl.textContent = '✓ Barcode captured: ' + val;
+                statusEl.style.color = '#10b981';
+            }
+            setTimeout(() => {
+                e.target.style.borderColor = '';
+                e.target.style.background = '';
+            }, 1500);
+            // Move focus to name field if it's still empty (normal flow after scan)
+            const nameEl = document.getElementById('prod-form-name');
+            if (nameEl && !nameEl.value.trim()) nameEl.focus();
+        } else {
+            if (statusEl) {
+                statusEl.textContent = 'No barcode — will be skipped.';
+                statusEl.style.color = '#94a3b8';
+            }
+        }
+    }
+}
+
 function toggleManualImageUrl() {
     const wrap = document.getElementById('prod-manual-url-wrap');
     if (wrap) {
@@ -1290,12 +1323,19 @@ function openAddProductModal() {
     document.getElementById('prod-form-price').value = '';
     document.getElementById('prod-form-stock').value = '100';
     document.getElementById('prod-form-barcode').value = '';
+    const barcodeStatus = document.getElementById('prod-barcode-status');
+    if (barcodeStatus) { barcodeStatus.textContent = ''; barcodeStatus.style.color = '#64748b'; }
     setProductPhotoPreview('');
     // Reset unlimited stock toggle
     const noTrackCb = document.getElementById('prod-form-no-tracking');
     if (noTrackCb) { noTrackCb.checked = false; toggleProductStockTracking(false); }
     populateCategorySelect();
     openModal('product-modal');
+    // Auto-focus barcode so a scanner fills it immediately on open
+    setTimeout(() => {
+        const bcInput = document.getElementById('prod-form-barcode');
+        if (bcInput) bcInput.focus();
+    }, 150);
 }
 
 function openEditProductModal(id) {
@@ -1306,6 +1346,8 @@ function openEditProductModal(id) {
     document.getElementById('prod-form-name').value = p.name;
     document.getElementById('prod-form-price').value = p.price;
     document.getElementById('prod-form-barcode').value = p.barcode || '';
+    const barcodeStatus = document.getElementById('prod-barcode-status');
+    if (barcodeStatus) { barcodeStatus.textContent = ''; barcodeStatus.style.color = '#64748b'; }
     setProductPhotoPreview(p.photo_base64 || '');
     if (!p.photo_base64 && p.has_photo) {
         fetch(`/api/products/${p.id}/photo`, {
@@ -1333,7 +1375,7 @@ async function handleSaveProduct(e) {
     const name = document.getElementById('prod-form-name').value.trim();
     const category = document.getElementById('prod-form-category').value;
     const price = parseFloat(document.getElementById('prod-form-price').value) || 0;
-    const barcode = document.getElementById('prod-form-barcode').value.trim();
+    const barcode = document.getElementById('prod-form-barcode').value.trim() || null;
     const photo = document.getElementById('prod-form-image').value.trim();
 
     // Unlimited stock / no inventory tracking

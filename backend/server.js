@@ -3700,29 +3700,70 @@ app.post("/api/system/set-static-ip", authenticateToken, (req, res) => {
 // ==== GET DETECTED SYSTEM PRINTERS (WINDOWS & POS) ====
 app.get("/api/system/printers", authenticateToken, (req, res) => {
   const platform = os.platform();
+  const presets = [
+    { name: "RETSOL RTP-4800", isDefault: false, port: "USB002 (Thermal)", isPreset: true },
+    { name: "HSPOS Series", isDefault: false, port: "USB002 (Thermal)", isPreset: true },
+    { name: "EPSON TM-T20 / TM-T88", isDefault: false, port: "USB / LAN", isPreset: true },
+    { name: "Xprinter XP-80 / XP-58", isDefault: false, port: "USB (Thermal)", isPreset: true },
+    { name: "POS-80 / POS-58", isDefault: false, port: "USB Generic", isPreset: true },
+    { name: "Standard Windows Default Printer", isDefault: true, port: "System Default", isPreset: true }
+  ];
+
   if (platform === "win32") {
     // Run PowerShell to get list of installed printers and identify default
     const psCmd = `powershell -NoProfile -Command "Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default, PortName | ConvertTo-Json -Compress"`;
-    exec(psCmd, { timeout: 8000 }, (err, stdout) => {
-      if (err) {
-        return res.json({ printers: [], defaultPrinter: null, error: err.message });
+    exec(psCmd, { timeout: 6000 }, (err, stdout) => {
+      let printers = [];
+      let defaultPrinter = null;
+
+      if (!err && stdout) {
+        try {
+          const cleanOut = stdout.trim();
+          const sIdx = cleanOut.indexOf("[");
+          const oIdx = cleanOut.indexOf("{");
+          let parsed;
+          if (sIdx !== -1) {
+            const eIdx = cleanOut.lastIndexOf("]");
+            parsed = JSON.parse(cleanOut.slice(sIdx, eIdx + 1));
+          } else if (oIdx !== -1) {
+            const eIdx = cleanOut.lastIndexOf("}");
+            parsed = [JSON.parse(cleanOut.slice(oIdx, eIdx + 1))];
+          } else {
+            parsed = JSON.parse(cleanOut);
+          }
+          if (!Array.isArray(parsed)) parsed = [parsed];
+          printers = parsed
+            .filter(p => p && p.Name)
+            .map(p => ({
+              name: p.Name,
+              isDefault: Boolean(p.Default),
+              port: p.PortName || ""
+            }));
+          const def = printers.find(p => p.isDefault) || printers[0];
+          if (def) defaultPrinter = def.name;
+        } catch (_) {}
       }
-      try {
-        let parsed = JSON.parse(stdout || "[]");
-        if (!Array.isArray(parsed)) parsed = [parsed];
-        const printers = parsed.map(p => ({
-          name: p.Name,
-          isDefault: Boolean(p.Default),
-          port: p.PortName
-        }));
-        const defaultP = printers.find(p => p.isDefault) || printers[0] || null;
-        res.json({ printers, defaultPrinter: defaultP ? defaultP.name : null });
-      } catch (e) {
-        res.json({ printers: [], defaultPrinter: null, error: e.message });
+
+      // If CIM returned nothing, try Get-Printer fallback
+      if (printers.length === 0) {
+        try {
+          const { execSync } = require("child_process");
+          const altOut = execSync('powershell -NoProfile -Command "Get-Printer | Select-Object Name, PortName | ConvertTo-Json -Compress"', { timeout: 4000 }).toString().trim();
+          const parsed = JSON.parse(altOut);
+          const list = Array.isArray(parsed) ? parsed : [parsed];
+          printers = list.filter(p => p && p.Name).map(p => ({
+            name: p.Name,
+            isDefault: false,
+            port: p.PortName || ""
+          }));
+          if (printers[0]) defaultPrinter = printers[0].name;
+        } catch (_) {}
       }
+
+      res.json({ printers, defaultPrinter, presets });
     });
   } else {
-    // Linux CUPS or USB
+    // Linux CUPS or Cloud container
     exec("lpstat -a 2>/dev/null", (err, stdout) => {
       const printers = [];
       if (!err && stdout) {
@@ -3731,7 +3772,7 @@ app.get("/api/system/printers", authenticateToken, (req, res) => {
           if (parts[0]) printers.push({ name: parts[0], isDefault: false });
         });
       }
-      res.json({ printers, defaultPrinter: printers[0] ? printers[0].name : null });
+      res.json({ printers, defaultPrinter: printers[0] ? printers[0].name : null, presets });
     });
   }
 });

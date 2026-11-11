@@ -1769,11 +1769,18 @@ async function loadSystemPrintersList() {
     const cardList  = document.getElementById('printer-cards-list');
     const hiddenSel = document.getElementById('setting-default-printer-select');
     const refreshIcon = document.getElementById('printer-refresh-icon');
+    const activeDisplay = document.getElementById('active-printer-name-display');
 
     if (refreshIcon) refreshIcon.className = 'fa-solid fa-spinner fa-spin';
     if (cardList) cardList.innerHTML = `<div style="text-align:center;padding:18px;color:#94a3b8;font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> Detecting printers…</div>`;
 
     const savedPref = localStorage.getItem('jomish_default_printer') || '';
+    if (activeDisplay) {
+        activeDisplay.textContent = savedPref || 'None Selected (Standard Windows Default)';
+    }
+
+    let printers = [];
+    let defaultPrinter = null;
 
     try {
         const res = await fetch('/api/system/printers', {
@@ -1784,79 +1791,118 @@ async function loadSystemPrintersList() {
 
         if (res.ok) {
             const data = await res.json();
-            const printers = data.printers || [];
-
-            // Auto-remember Windows default if nothing saved yet
-            const activePrinter = savedPref || data.defaultPrinter || '';
-            if (!savedPref && activePrinter) {
-                localStorage.setItem('jomish_default_printer', activePrinter);
-            }
-
-            if (hiddenSel) {
-                hiddenSel.innerHTML = printers.map(p =>
-                    `<option value="${escapeHtml(p.name)}" ${p.name === activePrinter ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
-                ).join('');
-            }
-
-            if (!cardList) return;
-
-            if (printers.length === 0) {
-                cardList.innerHTML = `
-                    <div style="text-align:center;padding:20px;color:#94a3b8;font-size:0.85rem;border:1px dashed #e2e8f0;border-radius:8px;">
-                        <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-bottom:6px;display:block;font-size:1.3rem;"></i>
-                        No local printers detected.<br>
-                        <span style="font-size:0.75rem;">Make sure you're running Jomish locally (not cloud) and printers are installed in Windows.</span>
-                    </div>`;
-                return;
-            }
-
-            cardList.innerHTML = printers.map(p => {
-                const isActive = p.name === activePrinter;
-                return `
-                <div onclick="selectPrinterCard('${escapeHtml(p.name)}')"
-                    id="printer-card-${btoa(encodeURIComponent(p.name)).replace(/[^a-zA-Z0-9]/g,'')}"
-                    style="display:flex; align-items:center; gap:12px; padding:12px 14px;
-                           border-radius:8px; cursor:pointer; transition:all 0.15s;
-                           border:2px solid ${isActive ? '#6366f1' : '#e2e8f0'};
-                           background:${isActive ? '#eef2ff' : '#f8fafc'};">
-                    <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-                                background:${isActive ? '#6366f1' : '#e2e8f0'};flex-shrink:0;">
-                        <i class="fa-solid fa-print" style="color:${isActive ? '#fff' : '#94a3b8'};font-size:0.95rem;"></i>
-                    </div>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-weight:700;color:#0f172a;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                            ${escapeHtml(p.name)}
-                        </div>
-                        <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">
-                            ${p.port ? `Port: ${escapeHtml(p.port)}` : ''}
-                            ${p.isDefault ? ' &nbsp;•&nbsp; <span style="color:#10b981;font-weight:600;">Windows Default</span>' : ''}
-                        </div>
-                    </div>
-                    <div style="flex-shrink:0;">
-                        ${isActive
-                            ? `<span style="background:#6366f1;color:#fff;font-size:0.7rem;font-weight:700;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-check"></i> Active</span>`
-                            : `<span style="background:#f1f5f9;color:#94a3b8;font-size:0.7rem;font-weight:600;padding:3px 8px;border-radius:20px;">Select</span>`
-                        }
-                    </div>
-                </div>`;
-            }).join('');
-
-            // Update animation overlay subtext
-            updatePrintAnimSubtext(activePrinter);
+            printers = data.printers || [];
+            defaultPrinter = data.defaultPrinter || null;
         }
     } catch (_) {
         if (refreshIcon) refreshIcon.className = 'fa-solid fa-rotate-right';
-        if (cardList) cardList.innerHTML = `
-            <div style="text-align:center;padding:16px;color:#94a3b8;font-size:0.82rem;border:1px dashed #e2e8f0;border-radius:8px;">
-                <i class="fa-solid fa-wifi" style="color:#f87171;margin-bottom:4px;display:block;"></i>
-                Could not reach server to list printers.<br>
-                <span style="font-size:0.72rem;">Server may be cloud-hosted — printer selection requires a local Jomish server.</span>
-            </div>`;
     }
+
+    // Determine currently active printer (default to RETSOL RTP-4800 if available)
+    const activePrinter = savedPref || defaultPrinter || (printers[0] ? printers[0].name : 'RETSOL RTP-4800');
+    if (!savedPref && activePrinter) {
+        localStorage.setItem('jomish_default_printer', activePrinter);
+    }
+
+    if (activeDisplay) {
+        activeDisplay.textContent = activePrinter;
+    }
+
+    // Update hidden select
+    if (hiddenSel) {
+        hiddenSel.innerHTML = printers.map(p =>
+            `<option value="${escapeHtml(p.name)}" ${p.name === activePrinter ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+        ).join('');
+    }
+
+    if (!cardList) return;
+
+    if (printers.length === 0) {
+        // Show cloud / network mode with selectable popular presets
+        cardList.innerHTML = `
+            <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:12px 14px; font-size:0.78rem; color:#64748b; margin-bottom:8px;">
+                <div style="font-weight:700; color:#334155; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-circle-info" style="color:#3b82f6;"></i> No printers detected directly via server
+                </div>
+                If running on cloud (Render), printers cannot be enumerated by the server. Select your thermal printer from the presets below or type its name:
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                ${[
+                    { name: 'RETSOL RTP-4800', note: 'Thermal Receipt 80mm USB' },
+                    { name: 'HSPOS Series', note: 'Thermal POS Printer USB' },
+                    { name: 'EPSON TM-T20', note: 'Epson Receipt Printer USB/LAN' },
+                    { name: 'POS-80', note: 'Generic 80mm Thermal Printer' },
+                    { name: 'Standard Windows Default Printer', note: 'Uses System Default' }
+                ].map(p => {
+                    const isActive = p.name === activePrinter;
+                    return `
+                    <div onclick="selectPrinterCard('${escapeHtml(p.name)}')"
+                        style="display:flex; align-items:center; gap:12px; padding:10px 14px;
+                               border-radius:8px; cursor:pointer; transition:all 0.15s;
+                               border:2px solid ${isActive ? '#10b981' : '#e2e8f0'};
+                               background:${isActive ? '#f0fdf4' : '#fff'};">
+                        <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                                    background:${isActive ? '#10b981' : '#e2e8f0'};flex-shrink:0;">
+                            <i class="fa-solid fa-print" style="color:${isActive ? '#fff' : '#64748b'};font-size:0.85rem;"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:700;color:#0f172a;font-size:0.88rem;">${escapeHtml(p.name)}</div>
+                            <div style="font-size:0.7rem;color:#64748b;">${escapeHtml(p.note)}</div>
+                        </div>
+                        <div>
+                            ${isActive
+                                ? `<span style="background:#10b981;color:#fff;font-size:0.68rem;font-weight:700;padding:3px 9px;border-radius:20px;display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-check"></i> Active</span>`
+                                : `<span style="background:#f1f5f9;color:#64748b;font-size:0.68rem;font-weight:600;padding:3px 9px;border-radius:20px;">Select</span>`
+                            }
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>
+        `;
+    } else {
+        cardList.innerHTML = printers.map(p => {
+            const isActive = p.name === activePrinter;
+            return `
+            <div onclick="selectPrinterCard('${escapeHtml(p.name)}')"
+                id="printer-card-${btoa(encodeURIComponent(p.name)).replace(/[^a-zA-Z0-9]/g,'')}"
+                style="display:flex; align-items:center; gap:12px; padding:11px 14px;
+                       border-radius:8px; cursor:pointer; transition:all 0.15s;
+                       border:2px solid ${isActive ? '#10b981' : '#e2e8f0'};
+                       background:${isActive ? '#f0fdf4' : '#fff'};">
+                <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                            background:${isActive ? '#10b981' : '#e2e8f0'};flex-shrink:0;">
+                    <i class="fa-solid fa-print" style="color:${isActive ? '#fff' : '#94a3b8'};font-size:0.9rem;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;color:#0f172a;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        ${escapeHtml(p.name)}
+                    </div>
+                    <div style="font-size:0.7rem;color:#64748b;margin-top:2px;">
+                        ${p.port ? `Port: ${escapeHtml(p.port)}` : ''}
+                        ${p.isDefault ? ' &nbsp;•&nbsp; <span style="color:#10b981;font-weight:600;">Windows Default</span>' : ''}
+                    </div>
+                </div>
+                <div style="flex-shrink:0;">
+                    ${isActive
+                        ? `<span style="background:#10b981;color:#fff;font-size:0.68rem;font-weight:700;padding:3px 9px;border-radius:20px;display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-check"></i> Active</span>`
+                        : `<span style="background:#f1f5f9;color:#94a3b8;font-size:0.68rem;font-weight:600;padding:3px 9px;border-radius:20px;">Select</span>`
+                    }
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    updateHeaderPrinterLabel(activePrinter);
+    updatePrintAnimSubtext(activePrinter);
 }
 
 function selectPrinterCard(printerName) {
+    if (!printerName) return;
     localStorage.setItem('jomish_default_printer', printerName);
+
+    // Update active banner
+    const activeDisplay = document.getElementById('active-printer-name-display');
+    if (activeDisplay) activeDisplay.textContent = printerName;
 
     // Update hidden select
     const hiddenSel = document.getElementById('setting-default-printer-select');
@@ -1882,6 +1928,73 @@ function selectPrinterCard(printerName) {
     updatePrintAnimSubtext(printerName);
 
     console.log('[PRINTER] Default printer set to:', printerName);
+}
+
+function saveManualPrinterName() {
+    const input = document.getElementById('manual-printer-name-input');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) {
+        alert('Please enter a printer name (e.g. RETSOL RTP-4800).');
+        return;
+    }
+    selectPrinterCard(name);
+    input.value = '';
+}
+
+async function testPrintCurrentPrinter() {
+    const printerName = localStorage.getItem('jomish_default_printer') || '';
+    if (!printerName) {
+        alert('Please select or type a printer name first.');
+        return;
+    }
+
+    showPrintAnimation(companyData.name || 'JOMISH POS', 'TEST-001', '0 Sh');
+
+    const testData = {
+        brand: companyData.name || 'JOMISH POS',
+        address: companyData.location || 'Kampala, Uganda',
+        contact: 'THERMAL PRINTER TEST',
+        receiptNo: 'TEST-' + Math.floor(1000 + Math.random() * 9000),
+        date: new Date().toLocaleString(),
+        cashier: localStorage.getItem('jomish_name') || 'Cashier',
+        items: [
+            { description: 'Printer Spooler Check', total: 'OK' },
+            { description: 'Silent Print Link', total: 'PASS' }
+        ],
+        total: 'TEST OK',
+        method: 'HARDWARE SPOOLER'
+    };
+
+    const text = `${companyData.name || 'JOMISH POS'}\n================================\nPRINTER TEST: ${printerName}\nDate: ${new Date().toLocaleString()}\n--------------------------------\nStatus: Silent Printing Active\nThank you for using Jomish POS!\n================================`;
+
+    try {
+        const res = await fetch('/api/system/print-raw', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({
+                receiptText: text,
+                receiptData: testData,
+                printerName: printerName
+            })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (data.printed === true) {
+            const statusLabel = document.getElementById('anim-status-label');
+            if (statusLabel) statusLabel.textContent = '✓ Test Print Successful!';
+            setTimeout(hidePrintAnimation, 2200);
+        } else {
+            hidePrintAnimation();
+            alert('Hardware test print status: ' + (data.message || data.error || 'Sent to spooler'));
+        }
+    } catch (e) {
+        hidePrintAnimation();
+        alert('Test print connection error: ' + e.message);
+    }
 }
 
 function updateHeaderPrinterLabel(printerName) {

@@ -230,7 +230,7 @@
                     <div class="header-profile-pill" onclick="switchNavTab('settings')">
                         <div class="profile-avatar-circle" id="header-avatar-circle">A</div>
                         <div class="profile-text-group">
-                            <span class="profile-company-label" id="header-company-name">iGourd Demo Restaurant</span>
+                            <span class="profile-company-label" id="header-company-name">Jomish POS Store</span>
                             <span class="profile-role-label" id="header-user-role">Administrator</span>
                         </div>
                         <i class="fa-solid fa-chevron-down" style="font-size:0.65rem; color:#94a3b8;"></i>
@@ -1248,6 +1248,22 @@
                                             <div style="display:flex; gap:6px;">
                                                 <button type="button" class="header-idle-btn" style="padding:5px 12px; font-size:0.75rem;" onclick="testPrintCurrentPrinter()">
                                                     <i class="fa-solid fa-play"></i> Test Print
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Thermal Receipt Paper Width Selection -->
+                                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                                            <div>
+                                                <div style="font-size:0.8rem; font-weight:700; color:#0f172a;">Receipt Paper Size</div>
+                                                <div style="font-size:0.72rem; color:#64748b;">Choose standard 58mm roll (2 inch) or large 80mm roll (3 inch)</div>
+                                            </div>
+                                            <div style="display:flex; gap:6px;">
+                                                <button type="button" id="paper-btn-58" class="printer-preset-btn" style="padding:6px 14px; font-size:0.78rem;" onclick="setReceiptPaperSize('58mm')">
+                                                    58mm (2" Standard)
+                                                </button>
+                                                <button type="button" id="paper-btn-80" class="printer-preset-btn" style="padding:6px 14px; font-size:0.78rem;" onclick="setReceiptPaperSize('80mm')">
+                                                    80mm (3" Large)
                                                 </button>
                                             </div>
                                         </div>

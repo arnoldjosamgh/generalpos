@@ -15,11 +15,21 @@
  *   { type: 'cut' }           → paper cut
  *   { type: 'qrcode', value } → QR code
  *   { type: 'table', columns } → two-column key/value row
+ *
+ * PAPER_WIDTH: characters per line for standard 58mm thermal paper at default font.
+ *   58mm paper → 32 chars  (narrower, often small portables)
+ *   80mm paper → 48 chars  (most common POS thermal printers)
+ * Set to match your hardware. Default: 48 (80mm paper).
  */
 
 'use strict';
 
 const net = require('net');
+
+// ── Paper width configuration ─────────────────────────────────────────────────
+// 32 chars = standard 58mm thermal paper (safe default for all thermal printers)
+// 42-48 chars = 80mm thermal paper
+const DEFAULT_PAPER_WIDTH = 32;
 
 // Gracefully load the encoder — it's an ES module wrapped for CJS
 let ReceiptPrinterEncoder;
@@ -34,10 +44,13 @@ try {
 
 // ── Fallback: simple hand-rolled ESC/POS buffer builder ─────────────────────
 // Used when the npm library is not installed (e.g. inside the pkg .exe).
-function buildFallbackBuffer(lines) {
+function buildFallbackBuffer(lines, paperWidth = DEFAULT_PAPER_WIDTH) {
     const parts = [];
     const ESC = 0x1B;
     const GS = 0x1D;
+
+    const cols = parseInt(paperWidth, 10) || DEFAULT_PAPER_WIDTH;
+    const ruleLine = '-'.repeat(cols);
 
     const cmd = (...bytes) => parts.push(Buffer.from(bytes));
     const txt = (t) => parts.push(Buffer.from(t + '\n', 'binary'));
@@ -59,7 +72,7 @@ function buildFallbackBuffer(lines) {
             }
             case 'rule':
                 cmd(ESC, 0x61, 0);
-                txt('--------------------------------');
+                txt(ruleLine);
                 break;
             case 'newline':
                 txt('');
@@ -68,7 +81,7 @@ function buildFallbackBuffer(lines) {
                 cmd(ESC, 0x61, 0);
                 const key = String(line.key || '');
                 const val = String(line.value || '');
-                const pad = Math.max(1, 32 - key.length - val.length);
+                const pad = Math.max(1, cols - key.length - val.length);
                 txt(key + ' '.repeat(pad) + val);
                 break;
             }
@@ -83,14 +96,16 @@ function buildFallbackBuffer(lines) {
 }
 
 // ── Primary: build buffer using the encoder library ──────────────────────────
-function buildBuffer(lines) {
+function buildBuffer(lines, paperWidth = DEFAULT_PAPER_WIDTH) {
+    const cols = parseInt(paperWidth, 10) || DEFAULT_PAPER_WIDTH;
     if (!ReceiptPrinterEncoder) {
-        return buildFallbackBuffer(lines);
+        return buildFallbackBuffer(lines, cols);
     }
 
     try {
-        const encoder = new ReceiptPrinterEncoder();
+        const encoder = new ReceiptPrinterEncoder({ columns: cols });
         let enc = encoder.initialize();
+        const ruleLine = '-'.repeat(cols);
 
         for (const line of lines) {
             switch (line.type) {
@@ -105,7 +120,7 @@ function buildBuffer(lines) {
                     break;
                 }
                 case 'rule':
-                    enc = enc.align('left').line('--------------------------------');
+                    enc = enc.align('left').line(ruleLine);
                     break;
                 case 'newline':
                     enc = enc.newline();
@@ -114,7 +129,7 @@ function buildBuffer(lines) {
                     enc = enc.align('left');
                     const key = String(line.key || '');
                     const val = String(line.value || '');
-                    const pad = Math.max(1, 32 - key.length - val.length);
+                    const pad = Math.max(1, cols - key.length - val.length);
                     enc = enc.line(key + ' '.repeat(pad) + val);
                     break;
                 case 'cut':
@@ -130,7 +145,7 @@ function buildBuffer(lines) {
         return Buffer.from(result.buffer || result);
     } catch (err) {
         console.warn('[ThermalPrinter] Encoder failed, using fallback:', err.message);
-        return buildFallbackBuffer(lines);
+        return buildFallbackBuffer(lines, cols);
     }
 }
 
@@ -152,7 +167,8 @@ function receiptTextToLines(text) {
 }
 
 // ── Build a fully structured receipt from POS data ───────────────────────────
-function buildReceiptLines(data) {
+function buildReceiptLines(data, paperWidth = DEFAULT_PAPER_WIDTH) {
+    const cols = parseInt(paperWidth, 10) || DEFAULT_PAPER_WIDTH;
     const lines = [];
 
     if (data.brand) lines.push({ type: 'text', text: data.brand, align: 'center', bold: true, size: 'large' });
@@ -167,7 +183,10 @@ function buildReceiptLines(data) {
     if (data.cashier) lines.push({ type: 'text', text: data.cashier, align: 'left' });
 
     lines.push({ type: 'rule' });
-    lines.push({ type: 'text', text: 'QTY  ITEM                  TOTAL', align: 'left' });
+    const colHeader = cols >= 42
+        ? 'QTY  ITEM' + ' '.repeat(Math.max(1, cols - 16)) + 'TOTAL'
+        : 'QTY  ITEM                  TOTAL';
+    lines.push({ type: 'text', text: colHeader.slice(0, cols), align: 'left' });
     lines.push({ type: 'rule' });
 
     if (Array.isArray(data.items)) {

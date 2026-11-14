@@ -2058,7 +2058,7 @@ function runMigrations(fromVersion) {
         // v155: For default/demo schema only, seed demo products if products empty.
         // In clean-slate tenant databases, new businesses start with NO products.
         const activeSchema = (asyncLocalStorage.getStore() || 'public').toLowerCase();
-        if (activeSchema === 'public' || activeSchema === 't_igourd') {
+        if (activeSchema === 'public' || activeSchema === 't_jomish' || activeSchema === 't_demo') {
             db.get('SELECT COUNT(*) as count FROM products', [], (err, row) => {
                 if (!err && (!row || parseInt(row.count) < 3)) {
                     const sampleDishes = [

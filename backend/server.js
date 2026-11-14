@@ -2324,9 +2324,9 @@ app.get("/api/company/info", authenticateToken, (req, res) => {
     db.get("SELECT * FROM companies WHERE UPPER(prefix) = ?", [prefix], (err, row) => {
       if (err || !row) {
         return res.json({
-          name: "iGourd Demo Restaurant",
+          name: "Jomish POS Store",
           prefix: prefix,
-          business_type: "restaurant",
+          business_type: "supermarket",
           location: "Kampala, Uganda",
           logo_url: "favicon.png",
           currency: "Sh",
@@ -3783,23 +3783,27 @@ app.get("/api/system/printers", authenticateToken, (req, res) => {
 });
 
 app.post("/api/system/print-raw", authenticateToken, (req, res) => {
-  const { receiptText, receiptData, printerName } = req.body;
+  const { receiptText, receiptData, printerName, paperWidth } = req.body;
   if (!receiptText && !receiptData)
     return res.status(400).json({ error: "No receipt data provided" });
 
   const platform = os.platform();
 
   try {
+    let targetPrinter = (printerName || "").trim();
+
+    // Determine characters per line: 32 chars fits 58mm roll (standard safe width); 42-48 for 80mm
+    const cols = (paperWidth === 80 || paperWidth === "80mm" || /80|t20|tm-t/i.test(targetPrinter)) ? 42 : 32;
+
     // Build ESC/POS binary buffer using the encoder library
     const lines = receiptData
-      ? buildReceiptLines(receiptData)
+      ? buildReceiptLines(receiptData, cols)
       : receiptTextToLines(receiptText);
-    const printBuffer = buildBuffer(lines);
+    const printBuffer = buildBuffer(lines, cols);
 
     const tempFile = path.join(os.tmpdir(), `jomish_receipt_${Date.now()}.bin`);
     fs.writeFileSync(tempFile, printBuffer);
 
-    let targetPrinter = (printerName || "").trim();
     if (platform === "win32" && (!targetPrinter || targetPrinter === "LPT1")) {
       try {
         const { execSync } = require("child_process");
@@ -9380,9 +9384,9 @@ server
                   prefix, name, status, business_type, location, logo_url, currency, theme_color, theme_accent, theme_sidebar, enabled_tabs
                 ) VALUES (?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
-                  "IGOURD",
-                  "iGourd Demo Restaurant",
-                  "restaurant",
+                  "JOMISH",
+                  "Jomish POS Store",
+                  "supermarket",
                   "Kampala, Uganda",
                   "favicon.png",
                   "Sh",
@@ -9392,7 +9396,7 @@ server
                   JSON.stringify(["register", "orders", "pending", "customer", "inventory", "shift", "returns", "invoice", "debtors", "creditors", "transactions", "finance", "settings"])
                 ],
                 () => {
-                  console.log("[STARTUP] Seeded default company 'iGourd Demo Restaurant' (IGOURD).");
+                  console.log("[STARTUP] Seeded default company 'Jomish POS Store' (JOMISH).");
                 }
               );
             } else {

@@ -1,5 +1,5 @@
 /**
- * Jomish POS / iGourd - Complete Frontend Controller
+ * Jomish POS - Complete Frontend Controller
  * Pixel-accurate layout implementation matching Picture 1, 2, and 3
  */
 
@@ -8,7 +8,7 @@ let currentUser = null;
 let userPermissions = {};
 let companyData = {
     name: 'Jomish POS Supermarket & Store',
-    prefix: 'IGOURD',
+    prefix: 'JOMISH',
     business_type: 'supermarket',
     location: 'Kampala, Uganda',
     currency: 'Sh',
@@ -123,9 +123,9 @@ function applyCompanyBranding() {
     }
 
     // 2. Header & Sidebar Logos and Titles
-    const brandName = companyData.name || 'iGourd Demo Restaurant';
+    const brandName = companyData.name || 'Jomish POS';
     document.getElementById('header-company-name').textContent = brandName;
-    document.getElementById('sidebar-brand-name').textContent = brandName.split(' ')[0] || 'igourd';
+    document.getElementById('sidebar-brand-name').textContent = brandName.split(' ')[0] || 'Jomish';
     document.getElementById('saver-brand-text').textContent = brandName;
 
     // Location
@@ -1894,11 +1894,18 @@ async function loadSystemPrintersList() {
 
     updateHeaderPrinterLabel(activePrinter);
     updatePrintAnimSubtext(activePrinter);
+    updatePaperSizeButtons();
 }
 
 function selectPrinterCard(printerName) {
     if (!printerName) return;
     localStorage.setItem('jomish_default_printer', printerName);
+
+    if (printerName.includes('58') && !localStorage.getItem('jomish_paper_size')) {
+        setReceiptPaperSize('58mm');
+    } else if (printerName.includes('80') && !localStorage.getItem('jomish_paper_size')) {
+        setReceiptPaperSize('80mm');
+    }
 
     // Update active banner
     const activeDisplay = document.getElementById('active-printer-name-display');
@@ -1930,6 +1937,52 @@ function selectPrinterCard(printerName) {
     console.log('[PRINTER] Default printer set to:', printerName);
 }
 
+function setReceiptPaperSize(size) {
+    if (!size) return;
+    localStorage.setItem('jomish_paper_size', size);
+    updatePaperSizeButtons();
+    const statusEl = document.getElementById('printer-save-status');
+    const msgEl    = document.getElementById('printer-save-msg');
+    if (msgEl) msgEl.textContent = `✓ Receipt paper size set to ${size}.`;
+    if (statusEl) {
+        statusEl.style.display = 'block';
+        clearTimeout(statusEl._hideTimer);
+        statusEl._hideTimer = setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+    }
+}
+
+function updatePaperSizeButtons() {
+    const curSize = localStorage.getItem('jomish_paper_size') || '58mm';
+    const btn58 = document.getElementById('paper-btn-58');
+    const btn80 = document.getElementById('paper-btn-80');
+    if (btn58) {
+        if (curSize === '58mm') {
+            btn58.style.background = 'var(--primary, #0284c7)';
+            btn58.style.color = '#fff';
+            btn58.style.borderColor = 'var(--primary, #0284c7)';
+            btn58.style.fontWeight = '700';
+        } else {
+            btn58.style.background = '#fff';
+            btn58.style.color = '#475569';
+            btn58.style.borderColor = '#cbd5e1';
+            btn58.style.fontWeight = '500';
+        }
+    }
+    if (btn80) {
+        if (curSize === '80mm') {
+            btn80.style.background = 'var(--primary, #0284c7)';
+            btn80.style.color = '#fff';
+            btn80.style.borderColor = 'var(--primary, #0284c7)';
+            btn80.style.fontWeight = '700';
+        } else {
+            btn80.style.background = '#fff';
+            btn80.style.color = '#475569';
+            btn80.style.borderColor = '#cbd5e1';
+            btn80.style.fontWeight = '500';
+        }
+    }
+}
+
 function saveManualPrinterName() {
     const input = document.getElementById('manual-printer-name-input');
     if (!input) return;
@@ -1949,24 +2002,10 @@ async function testPrintCurrentPrinter() {
         return;
     }
 
-    showPrintAnimation(companyData.name || 'JOMISH POS', 'TEST-001', '0 Sh');
+    showPrintAnimation('Jomish POS', 'TEST', '');
 
-    const testData = {
-        brand: companyData.name || 'JOMISH POS',
-        address: companyData.location || 'Kampala, Uganda',
-        contact: 'THERMAL PRINTER TEST',
-        receiptNo: 'TEST-' + Math.floor(1000 + Math.random() * 9000),
-        date: new Date().toLocaleString(),
-        cashier: localStorage.getItem('jomish_name') || 'Cashier',
-        items: [
-            { description: 'Printer Spooler Check', total: 'OK' },
-            { description: 'Silent Print Link', total: 'PASS' }
-        ],
-        total: 'TEST OK',
-        method: 'HARDWARE SPOOLER'
-    };
-
-    const text = `${companyData.name || 'JOMISH POS'}\n================================\nPRINTER TEST: ${printerName}\nDate: ${new Date().toLocaleString()}\n--------------------------------\nStatus: Silent Printing Active\nThank you for using Jomish POS!\n================================`;
+    // For test print: cleanly print "Printer installed successfully" as requested
+    const text = 'Printer installed successfully\n\n';
 
     try {
         const res = await fetch('/api/system/print-raw', {
@@ -1977,23 +2016,27 @@ async function testPrintCurrentPrinter() {
             },
             body: JSON.stringify({
                 receiptText: text,
-                receiptData: testData,
-                printerName: printerName
+                printerName: printerName,
+                paperWidth: localStorage.getItem('jomish_paper_size') || '58mm'
             })
         });
 
         const data = await res.json().catch(() => ({}));
         if (data.printed === true) {
             const statusLabel = document.getElementById('anim-status-label');
-            if (statusLabel) statusLabel.textContent = '✓ Test Print Successful!';
+            if (statusLabel) statusLabel.textContent = '✓ Printer installed successfully';
             setTimeout(hidePrintAnimation, 2200);
         } else {
             hidePrintAnimation();
-            alert('Hardware test print status: ' + (data.message || data.error || 'Sent to spooler'));
+            // Browser print fallback: print a clean minimal slip
+            triggerBrowserPrint(
+                '<div style="text-align:center; padding:18px 4px; font-family:\'Courier New\', monospace; font-size:13px; font-weight:bold;">Printer installed successfully</div>',
+                'Printer Test'
+            );
         }
     } catch (e) {
         hidePrintAnimation();
-        alert('Test print connection error: ' + e.message);
+        alert('Test print error: ' + e.message);
     }
 }
 
@@ -2013,6 +2056,7 @@ function updateHeaderPrinterLabel(printerName) {
 function goToPrinterSettings() {
     closeModal('view-receipt-modal');
     switchNavTab('settings');
+    updatePaperSizeButtons();
     setTimeout(() => {
         const target = document.getElementById('printer-cards-list') || document.getElementById('setting-default-printer-select');
         if (target) {
@@ -3115,6 +3159,12 @@ function triggerBrowserPrint(htmlContent, title) {
         return;
     }
 
+    const printerName = localStorage.getItem('jomish_default_printer') || '';
+    const paperSize = localStorage.getItem('jomish_paper_size') || (printerName.includes('80') ? '80mm' : '58mm');
+    const is80 = paperSize === '80mm';
+    const maxWidth = is80 ? '72mm' : '52mm';
+    const fontSize = is80 ? '12px' : '10.5px';
+
     doc.open();
     doc.write(`
         <!DOCTYPE html>
@@ -3124,15 +3174,18 @@ function triggerBrowserPrint(htmlContent, title) {
                 <title>${title || 'Receipt'}</title>
                 <style>
                     @page {
-                        size: 80mm auto;
+                        size: auto;
                         margin: 0;
+                    }
+                    * {
+                        box-sizing: border-box !important;
                     }
                     @media print {
                         html, body {
-                            width: 80mm !important;
-                            max-width: 80mm !important;
-                            margin: 0 !important;
-                            padding: 2mm 3mm !important;
+                            width: 100% !important;
+                            max-width: ${maxWidth} !important;
+                            margin: 0 auto !important;
+                            padding: 1mm 2mm !important;
                             background: #fff !important;
                             color: #000 !important;
                             -webkit-print-color-adjust: exact;
@@ -3141,18 +3194,35 @@ function triggerBrowserPrint(htmlContent, title) {
                     }
                     body {
                         font-family: 'Courier New', Courier, monospace, sans-serif;
-                        font-size: 12px;
-                        line-height: 1.4;
+                        font-size: ${fontSize};
+                        line-height: 1.35;
                         color: #000;
-                        margin: 0;
-                        padding: 4px;
+                        margin: 0 auto;
+                        padding: 2px 4px;
+                        width: 100%;
+                        max-width: ${maxWidth};
+                        word-break: break-word;
                     }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { padding: 2px 0; }
+                    table {
+                        width: 100% !important;
+                        border-collapse: collapse !important;
+                        table-layout: fixed !important;
+                    }
+                    th, td {
+                        padding: 2px 1px !important;
+                        word-break: break-word !important;
+                        overflow-wrap: break-word !important;
+                    }
+                    img {
+                        max-width: 100% !important;
+                        height: auto !important;
+                    }
                 </style>
             </head>
             <body>
-                ${htmlContent}
+                <div style="width:100%; max-width:${maxWidth}; margin:0 auto;">
+                    ${htmlContent}
+                </div>
             </body>
         </html>
     `);
@@ -3250,7 +3320,8 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
             body: JSON.stringify({
                 receiptText: plainReceiptText,
                 receiptData: receiptData,
-                printerName: printerName
+                printerName: printerName,
+                paperWidth: localStorage.getItem('jomish_paper_size') || '58mm'
             })
         });
 

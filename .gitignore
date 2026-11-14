@@ -27,7 +27,29 @@ updates/staging/
 
 # OS files
 .DS_Store
-# Scratch scripts
+# Config with live credentials — keep local only, never commit
+config/config.json
+
+# Debug, test, and dev-only scripts
+check_*.js
+test_*.js
+fix_*.js
+query_db.js
+seed_*.js
+
+# Scratch / temp files
+commitmsg.txt
+temp.txt
+products_test.json
+
+# SQLite database files (Postgres is production DB)
+*.sqlite
+database.sqlite
+
+# Arduino / hardware libraries (not part of web app)
+Thermal-Printer-I2C-master/
+
+# Scratch
 scratch/
 
 # Backup archives and dumps

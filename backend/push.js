@@ -4,6 +4,9 @@ const { asyncLocalStorage } = require('./database'); // To handle multi-tenancy 
 
 const PUBLIC_VAPID_KEY = 'BDpy4RrJ8ch4fFlX6BeLYhXzFXhOvldEnzIsAvFW_vDqAloZ87zcLynHJvy9qrk6n17MJy8dpMhfAD-gAsZ4FbY';
 const PRIVATE_VAPID_KEY = process.env.VAPID_PRIVATE_KEY || 'LDM5uJIa4znYcj4bTzDGWduXcmKcvhzGc9WmHcJcRfk';
+if (!process.env.VAPID_PRIVATE_KEY) {
+  console.warn('[PUSH] VAPID_PRIVATE_KEY not set in environment — using bundled default key. Set VAPID_PRIVATE_KEY in production for security.');
+}
 
 // Configure Web Push
 webpush.setVapidDetails(

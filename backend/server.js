@@ -82,19 +82,20 @@ if (process.env.ENABLE_WHATSAPP === "true" || (!process.env.RENDER && process.en
   console.log("[WHATSAPP] Headless Chromium disabled in cloud production (saves ~350 MB RAM). Set ENABLE_WHATSAPP=true to activate.");
 }
 
-// WhatsApp REST API
-app.get("/api/whatsapp/status", (req, res) => {
+// WhatsApp REST API  (authenticateToken is defined below; JS routes are lazy — it is fully
+// initialized before any request is ever processed, so the reference is safe.)
+app.get("/api/whatsapp/status", (req, res, next) => authenticateToken(req, res, next), (req, res) => {
   res.json(getWhatsAppStatus());
 });
 
-app.get("/api/whatsapp/qr", async (req, res) => {
+app.get("/api/whatsapp/qr", (req, res, next) => authenticateToken(req, res, next), async (req, res) => {
   const qrDataUrl = await getWhatsAppQR();
   if (!qrDataUrl)
     return res.status(404).json({ error: "No QR code available" });
   res.json({ qrDataUrl });
 });
 
-app.post("/api/whatsapp/send", async (req, res) => {
+app.post("/api/whatsapp/send", (req, res, next) => authenticateToken(req, res, next), async (req, res) => {
   try {
     const { to, message } = req.body;
     if (!to || !message) {
@@ -124,7 +125,11 @@ try {
 }
 
 const PORT = process.env.PORT || config.port || 3005;
-const JWT_SECRET = process.env.JWT_SECRET || "jomish_super_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? null : "jomish_dev_secret_only");
+if (!JWT_SECRET) {
+  console.error("[FATAL] JWT_SECRET environment variable is required in production. Set it in your .env or hosting dashboard and restart.");
+  process.exit(1);
+}
 const bonjour = new Bonjour();
 
 // Ensure local product uploads directory exists

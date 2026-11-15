@@ -57,71 +57,38 @@
             position: relative;
         }
 
-        /* ── Left Illustration Column (Matching Pic 3) ── */
+        /* ── Left Visual Panel (Banner Photo) ── */
         .login-visual-panel {
             flex: 1.1;
-            background: linear-gradient(135deg, #10b981 0%, #06b6d4 45%, #0284c7 100%);
-            padding: 40px 30px;
+            background: #0f172a;
+            padding: 0;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            align-items: stretch;
+            justify-content: stretch;
             position: relative;
             overflow: hidden;
             color: #ffffff;
         }
 
+        .login-visual-panel .login-banner-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+        }
+
         .visual-decor-circle {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            pointer-events: none;
-        }
-
-        .vd-1 {
-            width: 320px;
-            height: 320px;
-            top: -80px;
-            left: -80px;
-        }
-
-        .vd-2 {
-            width: 220px;
-            height: 220px;
-            bottom: -50px;
-            right: -50px;
-            background: rgba(0, 0, 0, 0.08);
+            display: none;
         }
 
         .isometric-illustration {
-            width: 100%;
-            max-width: 340px;
-            height: auto;
-            filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.25));
-            animation: floatIllustration 5s ease-in-out infinite;
-        }
-
-        @keyframes floatIllustration {
-
-            0%,
-            100% {
-                transform: translateY(0);
-            }
-
-            50% {
-                transform: translateY(-8px);
-            }
+            display: none;
         }
 
         .visual-footer-info {
-            margin-top: 25px;
-            text-align: center;
-            font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            display: none;
         }
 
         /* ── Right Form Column (Exact Match to Pic 3) ── */
@@ -405,11 +372,9 @@
             }
 
             .login-visual-panel {
-                padding: 25px 20px;
-            }
-
-            .isometric-illustration {
-                max-width: 220px;
+                min-height: 220px;
+                max-height: 280px;
+                flex: none;
             }
 
             .login-form-panel {
@@ -426,51 +391,7 @@
 
         <!-- Left Visual Panel -->
         <div class="login-visual-panel">
-            <div class="visual-decor-circle vd-1"></div>
-            <div class="visual-decor-circle vd-2"></div>
-
-            <!-- SVG Illustration of Analytics & Modern Dashboard (Matching Pic 3) -->
-            <svg class="isometric-illustration" viewBox="0 0 400 320" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <g filter="url(#drop-sh)">
-                    <!-- Isometric Main Board -->
-                    <path d="M70 120 L210 50 L340 120 L200 200 Z" fill="#ffffff" fill-opacity="0.95" />
-                    <path d="M70 120 L200 200 L200 220 L70 140 Z" fill="#0284c7" />
-                    <path d="M200 200 L340 120 L340 140 L200 220 Z" fill="#0369a1" />
-
-                    <!-- Analytics Screen Card (Cyan/Blue layers) -->
-                    <path d="M90 140 L190 85 L290 140 L190 200 Z" fill="#f8fafc" />
-
-                    <!-- Chart Bars in Isometric Perspective -->
-                    <path d="M120 145 L135 137 L135 110 L120 118 Z" fill="#38bdf8" />
-                    <path d="M135 137 L150 145 L150 118 L135 110 Z" fill="#0284c7" />
-                    <path d="M120 118 L135 110 L150 118 L135 126 Z" fill="#7dd3fc" />
-
-                    <path d="M160 167 L175 159 L175 120 L160 128 Z" fill="#10b981" />
-                    <path d="M175 159 L190 167 L190 128 L175 120 Z" fill="#059669" />
-                    <path d="M160 128 L175 120 L190 128 L175 136 Z" fill="#6ee7b7" />
-
-                    <path d="M200 145 L215 137 L215 90 L200 98 Z" fill="#f59e0b" />
-                    <path d="M215 137 L230 145 L230 98 L215 90 Z" fill="#d97706" />
-                    <path d="M200 98 L215 90 L230 98 L215 106 Z" fill="#fcd34d" />
-
-                    <!-- Standing Figure Silhouette / Operator -->
-                    <circle cx="280" cy="180" r="14" fill="#0f172a" />
-                    <path d="M272 196 L288 196 L294 250 L266 250 Z" fill="#1e293b" />
-                    <path d="M275 250 L273 280 L280 280 L282 250 Z" fill="#0284c7" />
-                    <path d="M285 250 L287 280 L294 280 L292 250 Z" fill="#0284c7" />
-                </g>
-                <defs>
-                    <filter id="drop-sh" x="40" y="30" width="320" height="260" filterUnits="userSpaceOnUse"
-                        color-interpolation-filters="sRGB">
-                        <feDropShadow dx="0" dy="12" stdDeviation="10" flood-opacity="0.3" />
-                    </filter>
-                </defs>
-            </svg>
-
-            <div class="visual-footer-info">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                <span>Multi-Tenant Cloud Sync &amp; Local Offline Resilient</span>
-            </div>
+            <img class="login-banner-img" src="login-banner.jpg" alt="Jomish POS System" />
         </div>
 
         <!-- Right Form Panel -->

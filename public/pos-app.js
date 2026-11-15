@@ -1602,8 +1602,8 @@ async function loadActiveShiftInfo() {
                     statusBanner.style.background = '#f0fdf4';
                     statusBanner.style.borderColor = '#86efac';
                 }
-                if (statusTitle) statusTitle.textContent = `Active Register Shift (#${data.id})`;
-                if (statusSub) statusSub.textContent = `Opened: ${data.start_time ? new Date(data.start_time).toLocaleString() : 'Just now'} • All accounts calculated between shift start and end`;
+                if (statusTitle) statusTitle.textContent = `Active Shift (#${data.id}) — ${data.register_name || 'Till 1'}`;
+                if (statusSub) statusSub.textContent = `Cashier: ${data.cashier_name || currentUser.name || 'Staff'} • Started: ${data.start_time ? new Date(data.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Just now'} • Your drawer accounts calculated between start and end`;
                 if (statusBadge) {
                     statusBadge.textContent = 'OPEN';
                     statusBadge.style.background = '#dcfce7';
@@ -1658,9 +1658,58 @@ async function loadActiveShiftInfo() {
             }
             if (activeNavTab === 'shift') {
                 loadShiftTransactions();
+                loadStoreActiveShifts();
             }
         }
     } catch (_) {}
+}
+
+async function loadStoreActiveShifts() {
+    const card = document.getElementById('store-all-shifts-card');
+    const list = document.getElementById('store-all-shifts-list');
+    const countBadge = document.getElementById('store-active-shifts-count');
+    if (!card || !list) return;
+
+    try {
+        const res = await fetch('/api/pos/all-active-shifts', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        const data = await res.json();
+        const shifts = data.active_shifts || [];
+        if (shifts.length === 0) {
+            card.style.display = 'none';
+            return;
+        }
+
+        card.style.display = 'block';
+        if (countBadge) countBadge.textContent = `${shifts.length} Register${shifts.length > 1 ? 's' : ''} Active`;
+
+        const curr = companyData.currency || 'Sh';
+        list.innerHTML = shifts.map(s => {
+            const isMe = currentActiveShift && currentActiveShift.id === s.id;
+            const timeStr = s.start_time ? new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            return `
+            <div style="background:${isMe ? '#f0fdf4' : '#ffffff'}; border:1px solid ${isMe ? '#86efac' : '#e2e8f0'}; border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="font-size:0.85rem; color:#0f172a;">
+                        <i class="fa-solid fa-desktop" style="color:${isMe ? '#16a34a' : '#64748b'}; margin-right:4px;"></i>
+                        ${escapeHtml(s.register_name || 'Till')}
+                    </strong>
+                    ${isMe ? '<span style="font-size:0.68rem; background:#dcfce7; color:#15803d; font-weight:700; padding:1px 6px; border-radius:10px;">THIS PC</span>' : ''}
+                </div>
+                <div style="font-size:0.75rem; color:#475569;">
+                    Cashier: <strong>${escapeHtml(s.display_name || s.cashier_name || 'Staff')}</strong>
+                </div>
+                <div style="font-size:0.72rem; color:#64748b; display:flex; justify-content:space-between; margin-top:2px; border-top:1px dashed #e2e8f0; padding-top:4px;">
+                    <span>Started: ${timeStr}</span>
+                    <span style="font-weight:700; color:#10b981;">Sales: ${Number(s.total_sales || 0).toLocaleString()} ${curr}</span>
+                </div>
+            </div>
+            `;
+        }).join('');
+    } catch (_) {
+        if (card) card.style.display = 'none';
+    }
 }
 
 function openStartShiftModal() {
@@ -1670,12 +1719,16 @@ function openStartShiftModal() {
     if (timeDisplay) timeDisplay.textContent = new Date().toLocaleString();
     const floatInp = document.getElementById('start-shift-float');
     if (floatInp) floatInp.value = '0';
+    const regInp = document.getElementById('start-shift-register-name');
+    if (regInp) regInp.value = localStorage.getItem('jomish_pos_register_name') || 'Till 1';
     openModal('start-shift-modal');
 }
 
 async function handleSaveStartShift(e) {
     e.preventDefault();
     const start_cash = parseFloat(document.getElementById('start-shift-float').value) || 0;
+    const register_name = document.getElementById('start-shift-register-name')?.value.trim() || 'Till 1';
+    localStorage.setItem('jomish_pos_register_name', register_name);
 
     try {
         const res = await fetch('/api/pos/start-shift', {
@@ -1684,13 +1737,13 @@ async function handleSaveStartShift(e) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
             },
-            body: JSON.stringify({ start_cash })
+            body: JSON.stringify({ start_cash, register_name })
         });
         const data = await res.json();
         if (res.ok) {
             closeModal('start-shift-modal');
             const curr = companyData.currency || 'Sh';
-            alert(`✓ Shift started successfully!\nOpening Cash Float: ${start_cash.toLocaleString()} ${curr}\nAll register sales and drawer movements are now actively tracked.`);
+            alert(`✓ Shift started successfully!\nStation: ${register_name}\nCashier: ${currentUser.name}\nOpening Float: ${start_cash.toLocaleString()} ${curr}\nYour register sales are now actively tracked.`);
             await loadActiveShiftInfo();
         } else {
             alert('Could not start shift: ' + (data.error || 'Server error'));
@@ -1871,6 +1924,11 @@ async function openCloseShiftModal() {
             shiftData = { ...shiftData, ...preview };
         }
     } catch (_) {}
+
+    const cashierLabel = document.getElementById('close-shift-cashier-label');
+    if (cashierLabel) cashierLabel.textContent = shiftData.cashier_name || currentUser.name || 'Staff';
+    const regLabel = document.getElementById('close-shift-register-label');
+    if (regLabel) regLabel.textContent = shiftData.register_name || 'Till 1';
 
     const floatEl = document.getElementById('close-shift-float-val');
     if (floatEl) floatEl.textContent = `${Number(shiftData.start_cash || 0).toLocaleString()} ${curr}`;

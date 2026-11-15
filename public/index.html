@@ -478,6 +478,23 @@
                         </div>
 
                         <div class="tab-content-container">
+                            <!-- Store Multi-Shift Bar (Shows when multiple registers are running concurrently in supermarket) -->
+                            <div id="store-all-shifts-card" style="display:none; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:14px 18px; margin-bottom:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                                    <div style="font-weight:700; color:#0f172a; font-size:0.9rem; display:flex; align-items:center; gap:8px;">
+                                        <i class="fa-solid fa-network-wired" style="color:#0284c7;"></i>
+                                        <span>Supermarket Concurrent Registers</span>
+                                        <span id="store-active-shifts-count" style="font-size:0.75rem; background:#0284c7; color:#fff; padding:1px 8px; border-radius:12px; font-weight:700;">1 Active</span>
+                                    </div>
+                                    <div style="font-size:0.75rem; color:#64748b;">
+                                        All computers run independently • Each cashier reconciles their own drawer
+                                    </div>
+                                </div>
+                                <div id="store-all-shifts-list" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px;">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
                             <!-- Active Shift Banner -->
                             <div id="shift-status-banner" style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                                 <div style="display:flex; align-items:center; gap:10px;">
@@ -2305,6 +2322,15 @@
                 </div>
 
                 <div class="form-field" style="margin-bottom:12px;">
+                    <label class="field-label">Computer / Register Station</label>
+                    <input type="text" id="start-shift-register-name" class="pos-input"
+                        placeholder="e.g. Till 1, Counter 2, Fast Checkout" value="Till 1" required>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">
+                        Identifies this computer in multi-register stores. Remembered for this browser.
+                    </div>
+                </div>
+
+                <div class="form-field" style="margin-bottom:12px;">
                     <label class="field-label">Opening Cash Float / Imprest (in Drawer)</label>
                     <input type="number" id="start-shift-float" class="pos-input"
                         style="font-size:1.25rem; font-weight:800;" placeholder="0" min="0" value="0" required>
@@ -2338,6 +2364,13 @@
 
             <form onsubmit="handleSaveCloseShift(event)">
                 <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px; font-size:0.85rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #e2e8f0;">
+                        <div>
+                            <span style="color:#64748b;">Closing Cashier:</span>
+                            <strong id="close-shift-cashier-label" style="color:#0f172a; margin-left:4px;">Cashier</strong>
+                        </div>
+                        <span id="close-shift-register-label" style="background:#e0f2fe; color:#0369a1; font-weight:700; font-size:0.75rem; padding:2px 8px; border-radius:4px;">Till 1</span>
+                    </div>
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
                         <span style="color:#64748b;">Starting Float:</span>
                         <strong id="close-shift-float-val" style="color:#0284c7;">0 Sh</strong>

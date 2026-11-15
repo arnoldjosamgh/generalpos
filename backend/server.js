@@ -5526,6 +5526,32 @@ function ensureCashierShiftsSchema(callback) {
     db.run("UPDATE cashier_shifts SET status = 'CLOSED' WHERE end_time IS NOT NULL AND status = 'OPEN'", () => {});
     db.run("ALTER TABLE cashier_shifts ADD COLUMN cashier_name TEXT", () => {});
     db.run("ALTER TABLE cashier_shifts ADD COLUMN register_name TEXT", () => {});
+
+    // Ensure store_tills table exists for configurable tills
+    db.run(`CREATE TABLE IF NOT EXISTS store_tills (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'ACTIVE',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`, () => {
+      // Seed default tills if empty
+      db.get("SELECT COUNT(*) as c FROM store_tills", [], (e, row) => {
+        if (!e && row && row.c === 0) {
+          db.run("INSERT INTO store_tills (name, description) VALUES ('Till 1', 'Main Checkout'), ('Till 2', 'Fast Lane / Express'), ('Till 3', 'Customer Service Counter') ON CONFLICT DO NOTHING", () => {});
+        }
+      });
+    });
+
+    // Ensure store_settings table exists for admin capacity limits
+    db.run(`CREATE TABLE IF NOT EXISTS store_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )`, () => {
+      db.run("INSERT INTO store_settings (key, value) VALUES ('max_tills_per_shift', '5') ON CONFLICT DO NOTHING", () => {});
+      db.run("INSERT INTO store_settings (key, value) VALUES ('target_workers_capacity', '10') ON CONFLICT DO NOTHING", () => {});
+    });
+
     _ensuredCashierShiftSchemas.add(schema);
     if (typeof callback === "function") callback();
   });
@@ -5548,7 +5574,7 @@ app.get("/api/pos/current-shift", authenticateToken, (req, res) => {
 
 // 2. Start Shift API — Cashier / Staff starts shift with opening cash float (Supports multiple concurrent shifts across registers)
 app.post("/api/pos/start-shift", authenticateToken, (req, res) => {
-  ensureCashierShiftsSchema(() => {
+  ensureCashierShiftsSchema(async () => {
     const cashierId = req.user.id;
     const cashierName = req.user.name || "Cashier";
     const registerName = req.body.register_name ? String(req.body.register_name).trim() : "Till 1";
@@ -5561,10 +5587,35 @@ app.post("/api/pos/start-shift", authenticateToken, (req, res) => {
     db.get(
       "SELECT * FROM cashier_shifts WHERE cashier_id = ? AND status = 'OPEN' AND end_time IS NULL ORDER BY id DESC LIMIT 1",
       [cashierId],
-      (err, openShift) => {
+      async (err, openShift) => {
         if (err) return res.status(500).json({ error: err.message });
         if (openShift) {
           return res.json({ success: true, message: "You already have an active shift running", shift: openShift });
+        }
+
+        // 1. Check max active tills per shift configured by Admin
+        const settingsRow = await new Promise((r) => db.get("SELECT value FROM store_settings WHERE key = 'max_tills_per_shift'", [], (e, row) => r(row)));
+        const maxTills = settingsRow && settingsRow.value ? parseInt(settingsRow.value, 10) : 5;
+
+        const activeCountRow = await new Promise((r) => db.get("SELECT COUNT(*) as count FROM cashier_shifts WHERE status = 'OPEN' AND end_time IS NULL", [], (e, row) => r(row)));
+        const activeCount = activeCountRow ? activeCountRow.count : 0;
+
+        if (activeCount >= maxTills) {
+          return res.status(400).json({
+            error: `Maximum active tills capacity (${maxTills}) is currently in use for this shift. Please close an inactive shift or increase allowed tills in Settings.`
+          });
+        }
+
+        // 2. Check if requested register_name is already occupied by an open shift
+        const occupiedTill = await new Promise((r) => db.get(
+          "SELECT cashier_name FROM cashier_shifts WHERE register_name = ? AND status = 'OPEN' AND end_time IS NULL AND cashier_id != ? LIMIT 1",
+          [registerName, cashierId],
+          (e, row) => r(row)
+        ));
+        if (occupiedTill) {
+          return res.status(400).json({
+            error: `Station '${registerName}' is already occupied by ${occupiedTill.cashier_name}. Please choose another register station.`
+          });
         }
 
         const now = new Date().toISOString();
@@ -5906,6 +5957,360 @@ app.get("/api/pos/all-active-shifts", authenticateToken, (req, res) => {
           }
         }));
         res.json({ active_shifts: enriched, count: enriched.length });
+      }
+    );
+  });
+});
+
+// ── STORE TILLS & SHIFTS CONFIGURATION (ADMIN) ───────────────────────────
+app.get("/api/pos/store-config", authenticateToken, (req, res) => {
+  ensureCashierShiftsSchema(() => {
+    db.all("SELECT * FROM store_tills WHERE status = 'ACTIVE' ORDER BY id ASC", [], (err, tillRows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      db.all("SELECT key, value FROM store_settings", [], (err2, settingRows) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+
+        const settingsMap = {};
+        (settingRows || []).forEach(r => { settingsMap[r.key] = r.value; });
+
+        db.get("SELECT COUNT(*) as count FROM employees WHERE is_active = 1", [], (err3, empRow) => {
+          const totalWorkers = (empRow && empRow.count) ? empRow.count : 0;
+
+          db.all("SELECT id, register_name, cashier_name, cashier_id, start_time FROM cashier_shifts WHERE status = 'OPEN' AND end_time IS NULL", [], (err4, activeShiftRows) => {
+            const activeShifts = activeShiftRows || [];
+            const occupiedTills = activeShifts.map(s => s.register_name);
+
+            res.json({
+              tills: tillRows || [],
+              total_tills: (tillRows || []).length,
+              max_tills_per_shift: parseInt(settingsMap.max_tills_per_shift || "5", 10),
+              target_workers_capacity: parseInt(settingsMap.target_workers_capacity || String(totalWorkers || 10), 10),
+              total_workers: totalWorkers,
+              active_shifts_count: activeShifts.length,
+              active_shifts: activeShifts,
+              occupied_tills: occupiedTills
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+app.post("/api/pos/store-config", authenticateToken, (req, res) => {
+  const isAllowed = ["admin", "manager", "ceo", "tech"].includes((req.user.role || "").toLowerCase()) ||
+    (req.user.permissions && req.user.permissions.can_edit_settings);
+  if (!isAllowed) return res.status(403).json({ error: "Access Denied: Only Admins/Managers can configure store tills." });
+
+  ensureCashierShiftsSchema(async () => {
+    const { max_tills_per_shift, target_workers_capacity, new_till_name, new_till_desc } = req.body;
+
+    try {
+      if (max_tills_per_shift !== undefined) {
+        const val = Math.max(1, parseInt(max_tills_per_shift, 10) || 5);
+        await new Promise((resolve, reject) => {
+          db.run(
+            "INSERT INTO store_settings (key, value) VALUES ('max_tills_per_shift', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [String(val)],
+            (err) => err ? reject(err) : resolve()
+          );
+        });
+      }
+
+      if (target_workers_capacity !== undefined) {
+        const val = Math.max(1, parseInt(target_workers_capacity, 10) || 10);
+        await new Promise((resolve, reject) => {
+          db.run(
+            "INSERT INTO store_settings (key, value) VALUES ('target_workers_capacity', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [String(val)],
+            (err) => err ? reject(err) : resolve()
+          );
+        });
+      }
+
+      if (new_till_name && new_till_name.trim()) {
+        const tName = new_till_name.trim();
+        const tDesc = (new_till_desc || "").trim();
+        await new Promise((resolve, reject) => {
+          db.run(
+            "INSERT INTO store_tills (name, description) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET description = excluded.description, status = 'ACTIVE'",
+            [tName, tDesc],
+            (err) => err ? reject(err) : resolve()
+          );
+        });
+      }
+
+      emitToTenant(getSchema(), "db_updated", { module: "store_config" });
+      res.json({ success: true, message: "Store tills and capacity configuration saved." });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+});
+
+app.delete("/api/pos/tills/:id", authenticateToken, (req, res) => {
+  const isAllowed = ["admin", "manager", "ceo", "tech"].includes((req.user.role || "").toLowerCase()) ||
+    (req.user.permissions && req.user.permissions.can_edit_settings);
+  if (!isAllowed) return res.status(403).json({ error: "Access Denied." });
+
+  ensureCashierShiftsSchema(() => {
+    db.run("DELETE FROM store_tills WHERE id = ?", [req.params.id], function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, message: "Till deleted successfully" });
+    });
+  });
+});
+
+// ── ADMIN SHIFT DASHBOARD & EXACT SHIFT AUDIT ───────────────────────────
+app.get("/api/pos/shifts", authenticateToken, (req, res) => {
+  ensureCashierShiftsSchema(async () => {
+    const { search, cashier_id, register_name, status, date, from_date, to_date, limit } = req.query;
+
+    let whereClauses = ["1=1"];
+    let params = [];
+
+    // Filter by search: Exact shift ID (e.g. 12 or #12) or cashier/register name
+    if (search && search.trim()) {
+      const s = search.trim();
+      const numMatch = s.replace("#", "").trim();
+      if (/^\d+$/.test(numMatch)) {
+        whereClauses.push("(cs.id = ? OR LOWER(cs.cashier_name) LIKE ? OR LOWER(cs.register_name) LIKE ?)");
+        params.push(parseInt(numMatch, 10), `%${s.toLowerCase()}%`, `%${s.toLowerCase()}%`);
+      } else {
+        whereClauses.push("(LOWER(cs.cashier_name) LIKE ? OR LOWER(cs.register_name) LIKE ?)");
+        params.push(`%${s.toLowerCase()}%`, `%${s.toLowerCase()}%`);
+      }
+    }
+
+    if (cashier_id) {
+      whereClauses.push("cs.cashier_id = ?");
+      params.push(parseInt(cashier_id, 10));
+    }
+
+    if (register_name && register_name !== "ALL") {
+      whereClauses.push("cs.register_name = ?");
+      params.push(register_name);
+    }
+
+    if (status && status !== "ALL") {
+      whereClauses.push("cs.status = ?");
+      params.push(status.toUpperCase());
+    }
+
+    if (date) {
+      whereClauses.push("DATE(cs.start_time) = DATE(?)");
+      params.push(date);
+    } else {
+      if (from_date) {
+        whereClauses.push("DATE(cs.start_time) >= DATE(?)");
+        params.push(from_date);
+      }
+      if (to_date) {
+        whereClauses.push("DATE(cs.start_time) <= DATE(?)");
+        params.push(to_date);
+      }
+    }
+
+    const maxRows = parseInt(limit, 10) || 100;
+    const sql = `
+      SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+      FROM cashier_shifts cs
+      LEFT JOIN employees e ON cs.cashier_id = e.id
+      WHERE ${whereClauses.join(" AND ")}
+      ORDER BY cs.id DESC
+      LIMIT ?
+    `;
+
+    db.all(sql, [...params, maxRows], async (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const list = rows || [];
+
+      // For open shifts, compute live totals so admin sees accurate live figures
+      const enriched = await Promise.all(list.map(async (sh) => {
+        if (sh.status === "OPEN" && !sh.end_time) {
+          try {
+            const sum = await computeShiftSummary(sh.start_time, null, sh.start_cash, null, sh.cashier_id);
+            return { ...sh, ...sum };
+          } catch (_) {
+            return sh;
+          }
+        }
+        return sh;
+      }));
+
+      // Compute aggregate totals across all filtered shifts
+      let totalSales = 0;
+      let totalCashSales = 0;
+      let totalMomoSales = 0;
+      let totalExpectedDrawer = 0;
+      let totalCounted = 0;
+      let totalDiff = 0;
+      let openCount = 0;
+      let closedCount = 0;
+
+      for (const sh of enriched) {
+        totalSales += Number(sh.total_sales || 0);
+        totalCashSales += Number(sh.cash_sales || 0);
+        totalMomoSales += Number(sh.momo_sales || 0);
+        totalExpectedDrawer += Number(sh.cash_in_drawer || sh.end_cash || 0);
+        totalCounted += Number(sh.counted_cash || 0);
+        totalDiff += Number(sh.difference || 0);
+        if (sh.status === "OPEN") openCount++;
+        else closedCount++;
+      }
+
+      res.json({
+        shifts: enriched,
+        totals: {
+          total_shifts: enriched.length,
+          total_sales: totalSales,
+          total_cash_sales: totalCashSales,
+          total_momo_sales: totalMomoSales,
+          total_expected_drawer: totalExpectedDrawer,
+          total_counted: totalCounted,
+          total_difference: totalDiff,
+          open_shifts_count: openCount,
+          closed_shifts_count: closedCount
+        }
+      });
+    });
+  });
+});
+
+// GET Exact Shift Details (Full audit of orders, payments, receipts, and cash movements)
+app.get("/api/pos/shifts/:id", authenticateToken, (req, res) => {
+  ensureCashierShiftsSchema(async () => {
+    const shiftId = parseInt(req.params.id, 10);
+    if (isNaN(shiftId)) return res.status(400).json({ error: "Invalid shift ID" });
+
+    db.get(
+      `SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+       FROM cashier_shifts cs
+       LEFT JOIN employees e ON cs.cashier_id = e.id
+       WHERE cs.id = ?`,
+      [shiftId],
+      async (err, shift) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!shift) return res.status(404).json({ error: "Shift not found" });
+
+        const startIso = shift.start_time;
+        const endIso = shift.end_time || new Date().toISOString();
+
+        // If shift is currently open, compute live summary
+        let activeSummary = {};
+        if (shift.status === "OPEN" && !shift.end_time) {
+          try {
+            activeSummary = await computeShiftSummary(startIso, null, shift.start_cash, null, shift.cashier_id);
+          } catch (_) {}
+        }
+        const fullShift = { ...shift, ...activeSummary };
+
+        // 1. Fetch POS orders for this cashier within shift window
+        db.all(
+          `SELECT
+            id,
+            transaction_id,
+            total_amount,
+            payment_method,
+            buyer_name,
+            buyer_phone,
+            order_date,
+            discount_amount
+           FROM pos_orders
+           WHERE order_date >= ? AND order_date <= ? AND cashier_id = ?
+           ORDER BY order_date DESC`,
+          [startIso, endIso, shift.cashier_id],
+          (err2, orders) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+
+            // 2. Fetch finance transactions (cash in, float additions, expense payouts)
+            db.all(
+              `SELECT
+                id,
+                type,
+                amount,
+                description,
+                transaction_date,
+                payment_status
+               FROM transactions
+               WHERE transaction_date >= ? AND transaction_date <= ? AND recorded_by = ?
+               ORDER BY transaction_date DESC`,
+              [startIso, endIso, shift.cashier_id],
+              (err3, txs) => {
+                if (err3) return res.status(500).json({ error: err3.message });
+
+                res.json({
+                  shift: fullShift,
+                  orders: orders || [],
+                  transactions: txs || [],
+                  orders_count: (orders || []).length,
+                  transactions_count: (txs || []).length
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
+// POST Compare Shifts Side-by-Side
+app.post("/api/pos/shifts/compare", authenticateToken, (req, res) => {
+  ensureCashierShiftsSchema(async () => {
+    const { shift_ids } = req.body;
+    if (!shift_ids || !Array.isArray(shift_ids) || shift_ids.length < 2) {
+      return res.status(400).json({ error: "Please select at least 2 shifts to compare." });
+    }
+
+    const placeholders = shift_ids.map(() => "?").join(",");
+    db.all(
+      `SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+       FROM cashier_shifts cs
+       LEFT JOIN employees e ON cs.cashier_id = e.id
+       WHERE cs.id IN (${placeholders})
+       ORDER BY cs.id ASC`,
+      shift_ids,
+      async (err, shifts) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        const results = await Promise.all((shifts || []).map(async (sh) => {
+          let summary = sh;
+          if (sh.status === "OPEN" && !sh.end_time) {
+            try {
+              const live = await computeShiftSummary(sh.start_time, null, sh.start_cash, null, sh.cashier_id);
+              summary = { ...sh, ...live };
+            } catch (_) {}
+          }
+
+          const endIso = sh.end_time || new Date().toISOString();
+          const ordCountRow = await new Promise((r) => {
+            db.get(
+              "SELECT COUNT(*) as count FROM pos_orders WHERE order_date >= ? AND order_date <= ? AND cashier_id = ?",
+              [sh.start_time, endIso, sh.cashier_id],
+              (e, row) => r(row)
+            );
+          });
+          const orderCount = ordCountRow ? ordCountRow.count : 0;
+          const avgOrderValue = orderCount > 0 ? Math.round(Number(summary.total_sales || 0) / orderCount) : 0;
+
+          const startMs = new Date(sh.start_time).getTime();
+          const endMs = new Date(endIso).getTime();
+          const durationMinutes = Math.max(0, Math.round((endMs - startMs) / 60000));
+          const hours = Math.floor(durationMinutes / 60);
+          const mins = durationMinutes % 60;
+
+          return {
+            ...summary,
+            orders_count: orderCount,
+            avg_order_value: avgOrderValue,
+            duration_minutes: durationMinutes,
+            duration_text: `${hours}h ${mins}m`
+          };
+        }));
+
+        res.json({ comparison: results });
       }
     );
   });

@@ -458,26 +458,47 @@
                     <!-- ==========================================
                          TAB 6: SHIFT
                          ========================================== -->
-                    <section class="pos-view-pane" id="view-pane-shift">
-                        <div class="tab-search-bar-wrap">
-                            <div class="tab-search-input-box">
-                                <input type="text" id="shift-search-input" class="tab-search-input"
-                                    placeholder="Search shift history by cashier or date..."
-                                    oninput="filterShiftHistory(this.value)">
-                                <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                    <section class="pos-view-pane" id="view-pane-shift" style="padding:0; overflow:hidden;">
+                        <!-- Shift Sub-Navigation Bar (Cashier Till vs Admin Shift Analytics) -->
+                        <div class="pos-fin-subnav-bar">
+                            <div class="pos-fin-subnav-tabs">
+                                <button type="button" class="pos-fin-subtab-btn active" id="shift-subtab-btn-register"
+                                    onclick="switchShiftSubView('register')">
+                                    <i class="fa-solid fa-cash-register"></i>
+                                    <span>My Register Till</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="shift-subtab-btn-admin"
+                                    onclick="switchShiftSubView('admin')">
+                                    <i class="fa-solid fa-chart-line"></i>
+                                    <span>Admin Shift Analytics &amp; Compare</span>
+                                </button>
                             </div>
-                            <button id="btn-shift-start" class="header-upload-pill" style="background:#16a34a; font-weight:700;" onclick="openStartShiftModal()">
-                                <i class="fa-solid fa-play"></i> Start Shift
-                            </button>
-                            <button id="btn-shift-cashin" class="header-upload-pill" style="background:#10b981;" onclick="openCashInModal()">+
-                                Cash In (Float)</button>
-                            <button id="btn-shift-expense" class="header-upload-pill" style="background:#ef4444;"
-                                onclick="openExpenseModal()">- Record Expense</button>
-                            <button id="btn-shift-close" class="header-upload-pill" style="background:#0f172a;"
-                                onclick="openCloseShiftModal()">🔒 Close Shift</button>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <button type="button" class="pos-fin-icon-btn" title="Refresh Shifts"
+                                    onclick="refreshActiveShiftTab()"><i class="fa-solid fa-rotate"></i></button>
+                            </div>
                         </div>
 
-                        <div class="tab-content-container">
+                        <!-- 1. CASHIER REGISTER TILL VIEW -->
+                        <div id="shift-subview-register" class="pos-fin-subview active" style="padding:20px; overflow-y:auto; flex:1;">
+                            <div class="tab-search-bar-wrap" style="margin-bottom:16px;">
+                                <div class="tab-search-input-box">
+                                    <input type="text" id="shift-search-input" class="tab-search-input"
+                                        placeholder="Search this shift's transactions by description, type, or payment method..."
+                                        oninput="filterShiftHistory(this.value)">
+                                    <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
+                                </div>
+                                <button id="btn-shift-start" class="header-upload-pill" style="background:#16a34a; font-weight:700;" onclick="openStartShiftModal()">
+                                    <i class="fa-solid fa-play"></i> Start Shift
+                                </button>
+                                <button id="btn-shift-cashin" class="header-upload-pill" style="background:#10b981;" onclick="openCashInModal()">+
+                                    Cash In (Float)</button>
+                                <button id="btn-shift-expense" class="header-upload-pill" style="background:#ef4444;"
+                                    onclick="openExpenseModal()">- Record Expense</button>
+                                <button id="btn-shift-close" class="header-upload-pill" style="background:#0f172a;"
+                                    onclick="openCloseShiftModal()">🔒 Close Shift</button>
+                            </div>
+
                             <!-- Store Multi-Shift Bar (Shows when multiple registers are running concurrently in supermarket) -->
                             <div id="store-all-shifts-card" style="display:none; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:14px 18px; margin-bottom:18px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
@@ -564,7 +585,139 @@
                                     <tbody id="shift-tx-table-tbody">
                                         <tr>
                                             <td colspan="5" style="text-align:center; padding:25px; color:#64748b;">
-                                                Loading shift logs...</td>
+                                                 Loading shift logs...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 2. ADMIN SHIFT ANALYTICS & COMPARISON VIEW -->
+                        <div id="shift-subview-admin" class="pos-fin-subview" style="display:none; padding:20px; overflow-y:auto; flex:1;">
+                            <!-- Admin Aggregated Totals KPI Row -->
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:20px;">
+                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.75rem; color:#64748b; font-weight:700;">TOTAL SHIFTS</div>
+                                    <div style="font-size:1.4rem; font-weight:800; color:#0f172a; margin-top:4px;" id="admin-shift-kpi-count">0</div>
+                                    <div style="font-size:0.7rem; color:#10b981;" id="admin-shift-kpi-active-badge">0 Active Currently</div>
+                                </div>
+                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.75rem; color:#64748b; font-weight:700;">TOTAL SHIFT SALES</div>
+                                    <div style="font-size:1.4rem; font-weight:800; color:#10b981; margin-top:4px;" id="admin-shift-kpi-sales">0 Sh</div>
+                                    <div style="font-size:0.7rem; color:#64748b;">Gross across all filtered shifts</div>
+                                </div>
+                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.75rem; color:#64748b; font-weight:700;">CASH SALES</div>
+                                    <div style="font-size:1.4rem; font-weight:800; color:#0284c7; margin-top:4px;" id="admin-shift-kpi-cash">0 Sh</div>
+                                    <div style="font-size:0.7rem; color:#64748b;">Physical cash received</div>
+                                </div>
+                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.75rem; color:#64748b; font-weight:700;">MOMO / CARD SALES</div>
+                                    <div style="font-size:1.4rem; font-weight:800; color:#8b5cf6; margin-top:4px;" id="admin-shift-kpi-momo">0 Sh</div>
+                                    <div style="font-size:0.7rem; color:#64748b;">Digital &amp; cashless payments</div>
+                                </div>
+                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.75rem; color:#64748b; font-weight:700;">NET DRAWER VARIANCE</div>
+                                    <div style="font-size:1.4rem; font-weight:800; color:#f59e0b; margin-top:4px;" id="admin-shift-kpi-diff">0 Sh</div>
+                                    <div style="font-size:0.7rem; color:#64748b;">Total over/short discrepancy</div>
+                                </div>
+                            </div>
+
+                            <!-- Look For Exact Shift Toolbar -->
+                            <div class="pos-table-card" style="padding:16px; margin-bottom:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+                                    <strong style="font-size:0.95rem; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                                        <i class="fa-solid fa-magnifying-glass" style="color:var(--primary);"></i>
+                                        <span>Look For Exact Shift &amp; Filter Comparison</span>
+                                    </strong>
+                                    <div style="display:flex; gap:8px;">
+                                        <button type="button" class="header-upload-pill" id="btn-compare-shifts" style="background:#0284c7; display:none;" onclick="handleOpenCompareShiftsModal()">
+                                            <i class="fa-solid fa-code-compare"></i> Compare Selected (<span id="compare-count">0</span>)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; align-items:center;">
+                                    <!-- Exact Shift # Search -->
+                                    <div>
+                                        <label class="field-label" style="font-size:0.75rem;">Exact Shift # or Name</label>
+                                        <input type="text" id="admin-shift-search-input" class="pos-input" placeholder="e.g. #14, Sarah, Till 2" oninput="debounceAdminShiftsSearch()">
+                                    </div>
+
+                                    <!-- Cashier Filter -->
+                                    <div>
+                                        <label class="field-label" style="font-size:0.75rem;">Filter by Cashier</label>
+                                        <select id="admin-shift-cashier-select" class="pos-input" onchange="loadAdminShiftsList()">
+                                            <option value="">All Cashiers</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Till / Station Filter -->
+                                    <div>
+                                        <label class="field-label" style="font-size:0.75rem;">Filter by Station / Till</label>
+                                        <select id="admin-shift-till-select" class="pos-input" onchange="loadAdminShiftsList()">
+                                            <option value="ALL">All Stations / Tills</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Status Filter -->
+                                    <div>
+                                        <label class="field-label" style="font-size:0.75rem;">Shift Status</label>
+                                        <select id="admin-shift-status-select" class="pos-input" onchange="loadAdminShiftsList()">
+                                            <option value="ALL">All Statuses</option>
+                                            <option value="OPEN">Open (Currently Active)</option>
+                                            <option value="CLOSED">Closed (Reconciled)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Date Range Filter -->
+                                    <div>
+                                        <label class="field-label" style="font-size:0.75rem;">Date Window</label>
+                                        <select id="admin-shift-date-select" class="pos-input" onchange="handleAdminShiftDateChange(this.value)">
+                                            <option value="ALL">All Time</option>
+                                            <option value="TODAY" selected>Today</option>
+                                            <option value="YESTERDAY">Yesterday</option>
+                                            <option value="LAST_7_DAYS">Last 7 Days</option>
+                                            <option value="THIS_MONTH">This Month</option>
+                                            <option value="CUSTOM">Custom Date...</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div id="admin-shift-custom-date-row" style="display:none; margin-top:10px; display:none; gap:10px; align-items:center;">
+                                    <input type="date" id="admin-shift-from-date" class="pos-input" style="max-width:180px;">
+                                    <span style="color:#64748b; font-size:0.8rem;">to</span>
+                                    <input type="date" id="admin-shift-to-date" class="pos-input" style="max-width:180px;">
+                                    <button type="button" class="header-upload-pill" style="font-size:0.75rem; padding:6px 12px;" onclick="loadAdminShiftsList()">Apply Range</button>
+                                </div>
+                            </div>
+
+                            <!-- Shifts Table Card -->
+                            <div class="pos-table-card">
+                                <table class="pos-data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:36px;"><input type="checkbox" id="shift-select-all-cb" onchange="toggleSelectAllShifts(this.checked)"></th>
+                                            <th>Shift #</th>
+                                            <th>Station / Till</th>
+                                            <th>Cashier</th>
+                                            <th>Start Time</th>
+                                            <th>End Time / Duration</th>
+                                            <th>Opening Float</th>
+                                            <th>Cash Sales</th>
+                                            <th>MoMo Sales</th>
+                                            <th>Total Sales</th>
+                                            <th>Counted vs Expected</th>
+                                            <th>Over / Short</th>
+                                            <th>Status</th>
+                                            <th style="text-align:right;">Audit Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-shifts-table-tbody">
+                                        <tr>
+                                            <td colspan="14" style="text-align:center; padding:30px; color:#64748b;">
+                                                Loading store shifts...
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1426,6 +1579,68 @@
                                         style="display:flex; flex-direction:column; gap:10px;">
                                         <!-- Populated dynamically -->
                                     </div>
+                                </div>
+
+                                <!-- Supermarket Tills & Staff Capacity Configuration -->
+                                <div class="pos-table-card" style="padding:24px; grid-column:span 2;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                                        <div>
+                                            <h3 style="color:#0f172a; display:flex; align-items:center; gap:8px; margin:0;">
+                                                <i class="fa-solid fa-cash-register" style="color:var(--primary);"></i>
+                                                <span>Supermarket Tills &amp; Staff Shift Capacity</span>
+                                            </h3>
+                                            <p style="font-size:0.8rem; color:#64748b; margin:4px 0 0 0;">
+                                                Configure the number of tills/registers in your store, how many tills can operate per shift, and monitor worker capacity.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:18px;">
+                                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+                                            <label class="field-label" style="font-size:0.78rem;">Max Active Tills Per Shift</label>
+                                            <input type="number" id="setting-max-tills-per-shift" class="pos-input" min="1" max="50" value="5" style="font-weight:700; font-size:1.1rem;">
+                                            <span style="font-size:0.72rem; color:#64748b;">Allowed tills running concurrently</span>
+                                        </div>
+
+                                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+                                            <label class="field-label" style="font-size:0.78rem;">Target Workers Capacity</label>
+                                            <input type="number" id="setting-target-workers" class="pos-input" min="1" max="200" value="10" style="font-weight:700; font-size:1.1rem;">
+                                            <span style="font-size:0.72rem; color:#64748b;">Target staff headcount for store</span>
+                                        </div>
+
+                                        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px; display:flex; flex-direction:column; justify-content:center;">
+                                            <span style="font-size:0.72rem; color:#15803d; font-weight:700; text-transform:uppercase;">Registered Store Staff</span>
+                                            <div style="font-size:1.4rem; font-weight:800; color:#16a34a;" id="setting-total-workers-display">0 Workers</div>
+                                            <span style="font-size:0.72rem; color:#64748b;">Active accounts in employee roster</span>
+                                        </div>
+
+                                        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; display:flex; flex-direction:column; justify-content:center;">
+                                            <span style="font-size:0.72rem; color:#1d4ed8; font-weight:700; text-transform:uppercase;">Currently Open Tills</span>
+                                            <div style="font-size:1.4rem; font-weight:800; color:#2563eb;" id="setting-open-tills-display">0 Active</div>
+                                            <span style="font-size:0.72rem; color:#64748b;">Shifts presently in progress</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Registered Tills List -->
+                                    <div style="margin-bottom:14px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                            <strong style="font-size:0.85rem; color:#0f172a;">Registered Tills / Counter Stations</strong>
+                                            <button type="button" class="header-idle-btn" style="font-size:0.75rem;" onclick="toggleAddTillRow(true)">+ Add New Till Station</button>
+                                        </div>
+
+                                        <div id="add-till-form-row" style="display:none; background:#f1f5f9; padding:10px; border-radius:6px; margin-bottom:10px; gap:8px; align-items:center; flex-wrap:wrap;">
+                                            <input type="text" id="new-till-name-input" class="pos-input" style="flex:1; min-width:140px;" placeholder="Till Name (e.g. Till 4)">
+                                            <input type="text" id="new-till-desc-input" class="pos-input" style="flex:2; min-width:180px;" placeholder="Description (e.g. Express Checkout, Bakery Counter)">
+                                            <button type="button" class="header-upload-pill" style="font-size:0.75rem; padding:8px 14px;" onclick="handleSaveNewTill()">Add Till</button>
+                                            <button type="button" class="header-idle-btn" style="font-size:0.75rem; padding:8px 12px;" onclick="toggleAddTillRow(false)">Cancel</button>
+                                        </div>
+
+                                        <div id="settings-tills-list" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
+                                            <!-- Populated dynamically -->
+                                        </div>
+                                    </div>
+
+                                    <button type="button" class="header-upload-pill" style="padding:10px 20px;" onclick="handleSaveTillSettings()">Save Tills &amp; Capacity Limits</button>
                                 </div>
                             </div>
                         </div>
@@ -2322,11 +2537,14 @@
                 </div>
 
                 <div class="form-field" style="margin-bottom:12px;">
-                    <label class="field-label">Computer / Register Station</label>
+                    <label class="field-label">Select Till / Register Station</label>
+                    <select id="start-shift-till-select" class="pos-input" style="font-weight:700; margin-bottom:6px;" onchange="handleStartShiftTillSelect(this.value)">
+                        <!-- Populated dynamically with configured tills -->
+                    </select>
                     <input type="text" id="start-shift-register-name" class="pos-input"
-                        placeholder="e.g. Till 1, Counter 2, Fast Checkout" value="Till 1" required>
-                    <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">
-                        Identifies this computer in multi-register stores. Remembered for this browser.
+                        placeholder="e.g. Till 1, Counter 2, Fast Checkout" value="Till 1" style="display:none;" required>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:3px;" id="start-shift-till-hint">
+                        Choose your assigned register till. Configured by Admin in Settings.
                     </div>
                 </div>
 
@@ -2449,6 +2667,106 @@
                     onclick="closeModal('view-receipt-modal')">
                     Close
                 </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Exact Shift Inspection & Audit Modal -->
+    <div class="pos-modal-overlay" id="exact-shift-modal">
+        <div class="pos-modal-box" style="max-width:880px; max-height:90vh; overflow-y:auto;">
+            <div class="pos-modal-header">
+                <h3 class="pos-modal-title" id="exact-shift-modal-title">
+                    <i class="fa-solid fa-magnifying-glass-chart" style="color:#0284c7;"></i> Exact Shift Audit
+                </h3>
+                <button class="pos-modal-close" onclick="closeModal('exact-shift-modal')">&times;</button>
+            </div>
+
+            <!-- Shift Meta Badge Bar -->
+            <div id="exact-shift-meta-bar" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Financial Reconciliation Grid for this exact shift -->
+            <div id="exact-shift-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Orders in this shift -->
+            <div style="margin-bottom:18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <h4 style="font-size:0.9rem; color:#0f172a; margin:0;">
+                        <i class="fa-solid fa-receipt"></i> Orders Completed in Shift (<span id="exact-shift-orders-count">0</span>)
+                    </h4>
+                    <span id="exact-shift-orders-sum" style="color:#10b981; font-weight:800; font-size:0.95rem;">0 Sh</span>
+                </div>
+                <div class="pos-table-card" style="max-height:220px; overflow-y:auto;">
+                    <table class="pos-data-table">
+                        <thead>
+                            <tr>
+                                <th>Receipt / Order #</th>
+                                <th>Customer</th>
+                                <th>Payment Method</th>
+                                <th>Amount</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exact-shift-orders-tbody">
+                            <tr><td colspan="5" style="text-align:center; padding:16px; color:#64748b;">Loading orders...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Transactions / Cash movements in this shift -->
+            <div style="margin-bottom:16px;">
+                <h4 style="font-size:0.9rem; color:#0f172a; margin-bottom:8px;">
+                    <i class="fa-solid fa-money-bill-transfer"></i> Drawer Float &amp; Expense Movements
+                </h4>
+                <div class="pos-table-card" style="max-height:180px; overflow-y:auto;">
+                    <table class="pos-data-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exact-shift-txs-tbody">
+                            <tr><td colspan="4" style="text-align:center; padding:16px; color:#64748b;">No float or expense movements in this shift.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="header-idle-btn" onclick="printExactShiftSummary()"><i class="fa-solid fa-print"></i> Print Shift Summary</button>
+                <button type="button" class="header-upload-pill" style="background:#0f172a;" onclick="closeModal('exact-shift-modal')">Close Audit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Side-by-Side Shift Comparison Modal -->
+    <div class="pos-modal-overlay" id="compare-shifts-modal">
+        <div class="pos-modal-box" style="max-width:960px; max-height:90vh; overflow-y:auto;">
+            <div class="pos-modal-header">
+                <h3 class="pos-modal-title">
+                    <i class="fa-solid fa-code-compare" style="color:#0284c7;"></i> Side-by-Side Shift Performance Comparison
+                </h3>
+                <button class="pos-modal-close" onclick="closeModal('compare-shifts-modal')">&times;</button>
+            </div>
+
+            <p style="font-size:0.8rem; color:#64748b; margin-bottom:14px;">
+                Comparing performance, duration, order volume, payment mix, and cash drawer reconciliations across selected shifts.
+            </p>
+
+            <div id="compare-shifts-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; margin-bottom:16px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+                <button type="button" class="header-upload-pill" style="background:#0f172a;" onclick="closeModal('compare-shifts-modal')">Close Comparison</button>
             </div>
         </div>
     </div>

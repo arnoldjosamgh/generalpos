@@ -334,12 +334,16 @@ function switchNavTab(tabName, finSubTab) {
     if (tabName === 'pending') loadPendingOrders();
     if (tabName === 'customer') loadCustomerList();
     if (tabName === 'inventory') loadProducts();
-    if (tabName === 'shift') { loadActiveShiftInfo(); loadShiftTransactions(); }
+    if (tabName === 'shift') {
+        loadActiveShiftInfo();
+        loadShiftTransactions();
+        populateAdminShiftFilters();
+    }
     if (tabName === 'kitchen') loadKitchenTokens();
     if (tabName === 'finance') {
         switchFinanceSubTab(finSubTab || activeFinanceSubTab || 'overview');
     }
-    if (tabName === 'settings') loadCustomRolesSettings();
+    if (tabName === 'settings') { loadCustomRolesSettings(); loadStoreTillsSettings(); }
     if (tabName === 'tech') loadTechCompanies();
 }
 
@@ -1712,22 +1716,61 @@ async function loadStoreActiveShifts() {
     }
 }
 
-function openStartShiftModal() {
+async function openStartShiftModal() {
     const staffName = document.getElementById('start-shift-staff-name');
     if (staffName) staffName.textContent = `${currentUser.name || 'Staff'} (${currentUser.role || 'Register User'})`;
     const timeDisplay = document.getElementById('start-shift-time-display');
     if (timeDisplay) timeDisplay.textContent = new Date().toLocaleString();
     const floatInp = document.getElementById('start-shift-float');
     if (floatInp) floatInp.value = '0';
-    const regInp = document.getElementById('start-shift-register-name');
-    if (regInp) regInp.value = localStorage.getItem('jomish_pos_register_name') || 'Till 1';
+
+    // Populate till select dropdown with live occupancy info
+    const tillSel = document.getElementById('start-shift-till-select');
+    if (tillSel) {
+        tillSel.innerHTML = '<option value="" disabled>Loading tills...</option>';
+        try {
+            const r = await fetch('/api/pos/store-config', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+            });
+            if (r.ok) {
+                const cfg = await r.json();
+                const tills = cfg.tills || [];
+                const occupied = cfg.occupied_tills || [];
+                tillSel.innerHTML = tills.map(t => {
+                    const isOccupied = occupied.includes(t.name);
+                    return `<option value="${escapeHtml(t.name)}" ${isOccupied ? 'disabled' : ''}>
+                        ${escapeHtml(t.name)}${t.description ? ' — ' + escapeHtml(t.description) : ''}${isOccupied ? ' (IN USE)' : ''}
+                    </option>`;
+                }).join('');
+                // Pre-select last used till if still free
+                const lastTill = localStorage.getItem('jomish_pos_register_name') || '';
+                if (lastTill) {
+                    const opt = Array.from(tillSel.options).find(o => o.value === lastTill && !o.disabled);
+                    if (opt) tillSel.value = lastTill;
+                }
+                // Fallback: select first free
+                if (!tillSel.value) {
+                    const freeOpt = Array.from(tillSel.options).find(o => !o.disabled);
+                    if (freeOpt) tillSel.value = freeOpt.value;
+                }
+                // Sync hidden text input
+                const regInp = document.getElementById('start-shift-register-name');
+                if (regInp) regInp.value = tillSel.value;
+            }
+        } catch (_) {
+            tillSel.innerHTML = '<option value="Till 1">Till 1</option>';
+        }
+    }
     openModal('start-shift-modal');
 }
 
 async function handleSaveStartShift(e) {
     e.preventDefault();
     const start_cash = parseFloat(document.getElementById('start-shift-float').value) || 0;
-    const register_name = document.getElementById('start-shift-register-name')?.value.trim() || 'Till 1';
+    // Read from dynamic till select, fall back to hidden text input
+    const tillSel = document.getElementById('start-shift-till-select');
+    const register_name = (tillSel && tillSel.value) ? tillSel.value.trim()
+        : (document.getElementById('start-shift-register-name')?.value.trim() || 'Till 1');
     localStorage.setItem('jomish_pos_register_name', register_name);
 
     try {
@@ -4163,4 +4206,593 @@ function renderAvailableCards() {
     if (momoEl) {
         momoEl.textContent = momoDisplay ? momoDisplay.textContent : `0 ${curr}`;
     }
+}
+
+// ============================================================================
+// SHIFT SUB-VIEW SWITCHER
+// ============================================================================
+function switchShiftSubView(subView) {
+    // Toggle subtab buttons
+    document.querySelectorAll('#view-pane-shift .pos-fin-subtab-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById(`shift-subtab-btn-${subView}`);
+    if (btn) btn.classList.add('active');
+
+    // Toggle subview panes
+    ['register', 'admin'].forEach(v => {
+        const el = document.getElementById(`shift-subview-${v}`);
+        if (el) el.style.display = (v === subView) ? '' : 'none';
+    });
+
+    if (subView === 'admin') {
+        populateAdminShiftFilters();
+        loadAdminShiftsList();
+    }
+}
+
+function refreshActiveShiftTab() {
+    const adminView = document.getElementById('shift-subview-admin');
+    if (adminView && adminView.style.display !== 'none') {
+        loadAdminShiftsList();
+    } else {
+        loadActiveShiftInfo();
+        loadShiftTransactions();
+    }
+}
+
+// ============================================================================
+// ADMIN SHIFTS ANALYTICS DASHBOARD
+// ============================================================================
+let _adminShiftDebounce = null;
+let _selectedShiftIds = [];
+
+async function populateAdminShiftFilters() {
+    const cashierSel = document.getElementById('admin-shift-cashier-select');
+    const tillSel = document.getElementById('admin-shift-till-select');
+    if (!cashierSel && !tillSel) return;
+
+    try {
+        // Fetch all closed+open shifts to get unique cashier names
+        const r = await fetch('/api/pos/shifts?status=ALL&limit=500', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (r.ok) {
+            const data = await r.json();
+            const shifts = data.shifts || [];
+
+            if (cashierSel) {
+                const cashiers = [...new Set(shifts.map(s => s.cashier_name).filter(Boolean))].sort();
+                cashierSel.innerHTML = '<option value="">All Cashiers</option>' +
+                    cashiers.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+            }
+        }
+
+        // Populate till filter from store-config
+        if (tillSel) {
+            const r2 = await fetch('/api/pos/store-config', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+            });
+            if (r2.ok) {
+                const cfg = await r2.json();
+                const tills = cfg.tills || [];
+                const existing = Array.from(tillSel.options).map(o => o.value);
+                tills.forEach(t => {
+                    if (!existing.includes(t.name)) {
+                        const opt = document.createElement('option');
+                        opt.value = t.name;
+                        opt.textContent = t.name;
+                        tillSel.appendChild(opt);
+                    }
+                });
+            }
+        }
+    } catch (_) {}
+}
+
+function debounceAdminShiftsSearch() {
+    clearTimeout(_adminShiftDebounce);
+    _adminShiftDebounce = setTimeout(() => loadAdminShiftsList(), 300);
+}
+
+function handleAdminShiftDateChange(val) {
+    const customRow = document.getElementById('admin-shift-custom-date-row');
+    if (customRow) customRow.style.display = (val === 'CUSTOM') ? 'flex' : 'none';
+    if (val !== 'CUSTOM') loadAdminShiftsList();
+}
+
+async function loadAdminShiftsList() {
+    const tbody = document.getElementById('admin-shifts-table-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:24px;color:#64748b;">Loading shifts...</td></tr>`;
+
+    const search  = document.getElementById('admin-shift-search-input')?.value.trim() || '';
+    const cashier = document.getElementById('admin-shift-cashier-select')?.value || '';
+    const till    = document.getElementById('admin-shift-till-select')?.value || '';
+    const status  = document.getElementById('admin-shift-status-select')?.value || 'ALL';
+    const dateOpt = document.getElementById('admin-shift-date-select')?.value || 'TODAY';
+
+    let url = `/api/pos/shifts?status=${encodeURIComponent(status)}&limit=200`;
+    if (search)  url += `&search=${encodeURIComponent(search)}`;
+    if (cashier) url += `&cashier=${encodeURIComponent(cashier)}`;
+    if (till && till !== 'ALL') url += `&till=${encodeURIComponent(till)}`;
+    if (dateOpt && dateOpt !== 'ALL' && dateOpt !== 'CUSTOM') url += `&date_range=${encodeURIComponent(dateOpt)}`;
+    if (dateOpt === 'CUSTOM') {
+        const from = document.getElementById('admin-shift-from-date')?.value;
+        const to   = document.getElementById('admin-shift-to-date')?.value;
+        if (from) url += `&start_date=${encodeURIComponent(from)}`;
+        if (to)   url += `&end_date=${encodeURIComponent(to)}`;
+    }
+
+    try {
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:24px;color:#ef4444;">Error loading shifts: ${escapeHtml(data.error || 'Unknown')}</td></tr>`;
+            return;
+        }
+
+        const shifts   = data.shifts || [];
+        const totals   = data.totals || {};
+        const curr     = companyData.currency || 'Sh';
+
+        // Update KPI cards
+        const kpiCount = document.getElementById('admin-shift-kpi-count');
+        const kpiAct   = document.getElementById('admin-shift-kpi-active-badge');
+        const kpiSales = document.getElementById('admin-shift-kpi-sales');
+        const kpiCash  = document.getElementById('admin-shift-kpi-cash');
+        const kpiMomo  = document.getElementById('admin-shift-kpi-momo');
+        const kpiDiff  = document.getElementById('admin-shift-kpi-diff');
+
+        const activeCount = shifts.filter(s => s.status === 'OPEN').length;
+
+        if (kpiCount) kpiCount.textContent = shifts.length;
+        if (kpiAct)   kpiAct.textContent   = `${activeCount} Active Currently`;
+        if (kpiSales) kpiSales.textContent  = `${Number(totals.total_sales || 0).toLocaleString()} ${curr}`;
+        if (kpiCash)  kpiCash.textContent   = `${Number(totals.total_cash_sales || 0).toLocaleString()} ${curr}`;
+        if (kpiMomo)  kpiMomo.textContent   = `${Number(totals.total_momo_sales || 0).toLocaleString()} ${curr}`;
+
+        const netDiff = Number(totals.total_difference || 0);
+        if (kpiDiff) {
+            kpiDiff.textContent = `${netDiff >= 0 ? '+' : ''}${netDiff.toLocaleString()} ${curr}`;
+            kpiDiff.style.color = netDiff === 0 ? '#10b981' : (netDiff > 0 ? '#0284c7' : '#ef4444');
+        }
+
+        // Reset selection
+        _selectedShiftIds = [];
+        updateCompareButton();
+
+        if (shifts.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:28px;color:#94a3b8;">No shifts found for the selected filters.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = shifts.map(s => {
+            const isOpen   = s.status === 'OPEN';
+            const startStr = s.start_time ? new Date(s.start_time).toLocaleString([], { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+            let durationStr = '—';
+            if (s.start_time) {
+                const startMs = new Date(s.start_time).getTime();
+                const endMs   = s.end_time ? new Date(s.end_time).getTime() : Date.now();
+                const mins    = Math.round((endMs - startMs) / 60000);
+                durationStr   = mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `${mins}m`;
+            }
+            const endStr  = s.end_time ? new Date(s.end_time).toLocaleString([], { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : (isOpen ? '<span style="color:#10b981;font-weight:600;">● LIVE</span>' : '—');
+            const diff    = Number(s.difference || 0);
+            const diffColor = diff === 0 ? '#64748b' : (diff > 0 ? '#0284c7' : '#ef4444');
+            const diffPfx   = diff > 0 ? '+' : '';
+            const statusBadge = isOpen
+                ? `<span style="background:#dcfce7;color:#15803d;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;">OPEN</span>`
+                : `<span style="background:#f1f5f9;color:#475569;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;">CLOSED</span>`;
+
+            return `<tr>
+                <td><input type="checkbox" class="shift-row-cb" value="${s.id}" onchange="handleShiftSelectChange()"></td>
+                <td style="font-weight:700;color:var(--primary);">#${s.id}</td>
+                <td style="font-weight:600;">${escapeHtml(s.register_name || '—')}</td>
+                <td>${escapeHtml(s.cashier_name || s.display_name || '—')}</td>
+                <td style="font-size:0.82rem;color:#475569;">${startStr}</td>
+                <td style="font-size:0.82rem;color:#475569;">${endStr} <span style="font-size:0.72rem;color:#94a3b8;">(${durationStr})</span></td>
+                <td>${Number(s.start_cash || 0).toLocaleString()} ${curr}</td>
+                <td style="color:#0284c7;font-weight:600;">${Number(s.cash_sales || 0).toLocaleString()} ${curr}</td>
+                <td style="color:#8b5cf6;font-weight:600;">${Number(s.momo_sales || 0).toLocaleString()} ${curr}</td>
+                <td style="font-weight:700;color:#10b981;">${Number(s.total_sales || 0).toLocaleString()} ${curr}</td>
+                <td style="font-size:0.82rem;">${isOpen ? '<span style="color:#94a3b8;font-style:italic;">Live / Not closed</span>' : `${Number(s.counted_cash || 0).toLocaleString()} vs ${Number(s.cash_in_drawer || 0).toLocaleString()} ${curr}`}</td>
+                <td style="font-weight:700;color:${diffColor};">${isOpen ? '—' : `${diffPfx}${diff.toLocaleString()} ${curr}`}</td>
+                <td>${statusBadge}</td>
+                <td style="text-align:right;">
+                    <button class="header-idle-btn" style="font-size:0.72rem;padding:5px 10px;" onclick="openExactShiftModal(${s.id})">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i> Audit
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:24px;color:#ef4444;">Connection error loading shifts.</td></tr>`;
+    }
+}
+
+function handleShiftSelectChange() {
+    _selectedShiftIds = Array.from(document.querySelectorAll('.shift-row-cb:checked')).map(cb => Number(cb.value));
+    updateCompareButton();
+}
+
+function toggleSelectAllShifts(checked) {
+    document.querySelectorAll('.shift-row-cb').forEach(cb => { cb.checked = checked; });
+    handleShiftSelectChange();
+}
+
+function updateCompareButton() {
+    const btn   = document.getElementById('btn-compare-shifts');
+    const count = document.getElementById('compare-count');
+    if (!btn) return;
+    if (_selectedShiftIds.length >= 2) {
+        btn.style.display = '';
+        if (count) count.textContent = _selectedShiftIds.length;
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+async function handleOpenCompareShiftsModal() {
+    if (_selectedShiftIds.length < 2) {
+        alert('Select at least 2 shifts to compare.');
+        return;
+    }
+    const grid = document.getElementById('compare-shifts-grid');
+    if (grid) grid.innerHTML = `<div style="text-align:center;padding:24px;color:#64748b;">Loading comparison...</div>`;
+    openModal('compare-shifts-modal');
+
+    try {
+        const res = await fetch('/api/pos/shifts/compare', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ shift_ids: _selectedShiftIds })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.comparison) {
+            if (grid) grid.innerHTML = `<div style="color:#ef4444;padding:16px;">Error: ${escapeHtml(data.error || 'Could not load comparison')}</div>`;
+            return;
+        }
+        const curr = companyData.currency || 'Sh';
+        grid.innerHTML = data.comparison.map((s, i) => {
+            const diff = Number(s.difference || 0);
+            const diffColor = diff === 0 ? '#10b981' : (diff > 0 ? '#0284c7' : '#ef4444');
+            const cashPct = s.total_sales > 0 ? Math.round((s.cash_sales / s.total_sales) * 100) : 0;
+            const momoPct = 100 - cashPct;
+            return `
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;min-width:220px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <span style="font-weight:800;color:var(--primary);font-size:1rem;">Shift #${s.id}</span>
+                    <span style="font-size:0.7rem;background:${s.status==='OPEN'?'#dcfce7':'#f1f5f9'};color:${s.status==='OPEN'?'#15803d':'#475569'};font-weight:700;padding:2px 8px;border-radius:10px;">${s.status}</span>
+                </div>
+                <div style="font-size:0.8rem;color:#475569;margin-bottom:10px;">
+                    <div><strong>${escapeHtml(s.cashier_name||'—')}</strong> @ ${escapeHtml(s.register_name||'—')}</div>
+                    <div style="color:#94a3b8;margin-top:2px;">Duration: ${s.duration_mins >= 60 ? Math.floor(s.duration_mins/60)+'h '+s.duration_mins%60+'m' : s.duration_mins+'m'}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;font-size:0.82rem;">
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#64748b;">Total Sales</span>
+                        <strong style="color:#10b981;">${Number(s.total_sales||0).toLocaleString()} ${curr}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#64748b;">Orders</span>
+                        <strong>${s.order_count||0}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#64748b;">Avg Order</span>
+                        <strong>${Number(s.avg_order_value||0).toLocaleString()} ${curr}</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#0284c7;">Cash</span>
+                        <strong style="color:#0284c7;">${Number(s.cash_sales||0).toLocaleString()} ${curr} (${cashPct}%)</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#8b5cf6;">MoMo</span>
+                        <strong style="color:#8b5cf6;">${Number(s.momo_sales||0).toLocaleString()} ${curr} (${momoPct}%)</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;">
+                        <span style="color:#64748b;">Over/Short</span>
+                        <strong style="color:${diffColor};">${diff >= 0 ? '+' : ''}${diff.toLocaleString()} ${curr}</strong>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (_) {
+        if (grid) grid.innerHTML = `<div style="color:#ef4444;padding:16px;">Connection error loading comparison.</div>`;
+    }
+}
+
+async function openExactShiftModal(shiftId) {
+    openModal('exact-shift-modal');
+    const title   = document.getElementById('exact-shift-modal-title');
+    const metaBar = document.getElementById('exact-shift-meta-bar');
+    const kpisEl  = document.getElementById('exact-shift-kpis');
+    const ordTbody = document.getElementById('exact-shift-orders-tbody');
+    const txTbody  = document.getElementById('exact-shift-txs-tbody');
+    const ordCount = document.getElementById('exact-shift-orders-count');
+    const ordSum   = document.getElementById('exact-shift-orders-sum');
+
+    if (title) title.innerHTML = `<i class="fa-solid fa-magnifying-glass-chart" style="color:#0284c7;"></i> Shift #${shiftId} Audit`;
+    if (metaBar) metaBar.innerHTML = `<span style="color:#64748b;">Loading shift audit...</span>`;
+    if (ordTbody) ordTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">Loading...</td></tr>`;
+    if (txTbody)  txTbody.innerHTML  = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#94a3b8;">Loading...</td></tr>`;
+
+    try {
+        const res = await fetch(`/api/pos/shifts/${shiftId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            if (metaBar) metaBar.innerHTML = `<span style="color:#ef4444;">Error: ${escapeHtml(data.error || 'Could not load shift')}</span>`;
+            return;
+        }
+
+        const s    = data.shift || {};
+        const curr = companyData.currency || 'Sh';
+        const isOpen = s.status === 'OPEN';
+
+        // Meta badge bar
+        if (metaBar) {
+            const startStr = s.start_time ? new Date(s.start_time).toLocaleString() : '—';
+            const endStr   = s.end_time   ? new Date(s.end_time).toLocaleString()   : 'Still Running';
+            metaBar.innerHTML = `
+                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+                    <span><strong>Cashier:</strong> ${escapeHtml(s.cashier_name||'—')}</span>
+                    <span><strong>Station:</strong> ${escapeHtml(s.register_name||'—')}</span>
+                    <span><strong>Started:</strong> ${startStr}</span>
+                    <span><strong>Ended:</strong> ${endStr}</span>
+                </div>
+                <span style="font-size:0.7rem;background:${isOpen?'#dcfce7':'#f1f5f9'};color:${isOpen?'#15803d':'#475569'};font-weight:700;padding:2px 8px;border-radius:10px;">${s.status||'—'}</span>`;
+        }
+
+        // KPI mini cards
+        if (kpisEl) {
+            const diff = Number(s.difference || 0);
+            const kpiItems = [
+                { label:'Opening Float',   val:`${Number(s.start_cash||0).toLocaleString()} ${curr}`,      color:'#0f172a' },
+                { label:'Cash Sales',      val:`${Number(s.cash_sales||0).toLocaleString()} ${curr}`,      color:'#0284c7' },
+                { label:'MoMo Sales',      val:`${Number(s.momo_sales||0).toLocaleString()} ${curr}`,      color:'#8b5cf6' },
+                { label:'Total Sales',     val:`${Number(s.total_sales||0).toLocaleString()} ${curr}`,     color:'#10b981' },
+                { label:'Cash In Added',   val:`+${Number(s.cash_in||0).toLocaleString()} ${curr}`,        color:'#3b82f6' },
+                { label:'Expenses Out',    val:`-${Number(s.expenses||0).toLocaleString()} ${curr}`,       color:'#ef4444' },
+                { label:'Expected Drawer', val:`${Number(s.cash_in_drawer||0).toLocaleString()} ${curr}`,  color:'#f59e0b' },
+                { label:'Counted Cash',    val: isOpen ? '—' : `${Number(s.counted_cash||0).toLocaleString()} ${curr}`, color:'#0f172a' },
+                { label:'Over / Short',    val: isOpen ? '—' : `${diff>=0?'+':''}${diff.toLocaleString()} ${curr}`,     color: diff===0?'#10b981':(diff>0?'#0284c7':'#ef4444') },
+            ];
+            kpisEl.innerHTML = kpiItems.map(k => `
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
+                    <div style="font-size:0.68rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">${k.label}</div>
+                    <div style="font-size:0.95rem;font-weight:800;color:${k.color};">${k.val}</div>
+                </div>`).join('');
+        }
+
+        // Orders in this shift
+        const orders = data.orders || [];
+        if (ordCount) ordCount.textContent = orders.length;
+        const ordTotal = orders.reduce((acc, o) => acc + Number(o.total_amount || o.order_total_amount || 0), 0);
+        if (ordSum) ordSum.textContent = `${ordTotal.toLocaleString()} ${curr}`;
+
+        if (ordTbody) {
+            if (orders.length === 0) {
+                ordTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">No orders completed in this shift.</td></tr>`;
+            } else {
+                ordTbody.innerHTML = orders.map(o => {
+                    const timeStr = o.created_at ? new Date(o.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+                    const pmColors = { CASH:'#0284c7', MOMO:'#8b5cf6', SPLIT:'#f59e0b' };
+                    const pm = (o.payment_method||'').toUpperCase();
+                    return `<tr>
+                        <td style="font-weight:600;color:var(--primary);">#${o.receipt_no || o.id}</td>
+                        <td>${escapeHtml(o.customer_name || 'Walk-in')}</td>
+                        <td><span style="font-size:0.72rem;background:#f1f5f9;padding:2px 7px;border-radius:6px;font-weight:700;color:${pmColors[pm]||'#64748b'};">${o.payment_method||'—'}</span></td>
+                        <td style="font-weight:700;color:#10b981;">${Number(o.total_amount||o.order_total_amount||0).toLocaleString()} ${curr}</td>
+                        <td style="color:#94a3b8;font-size:0.82rem;">${timeStr}</td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+        // Transactions (float movements) in this shift
+        const txs = data.transactions || [];
+        if (txTbody) {
+            if (txs.length === 0) {
+                txTbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:#94a3b8;">No cash movements in this shift.</td></tr>`;
+            } else {
+                const txColors = { CASH_IN:'#3b82f6', FLOAT_IN:'#3b82f6', EXPENSE:'#ef4444', INCOME:'#8b5cf6' };
+                txTbody.innerHTML = txs.map(tx => {
+                    const timeStr = tx.created_at ? new Date(tx.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+                    const color = txColors[tx.type] || '#64748b';
+                    const sign  = tx.type === 'EXPENSE' ? '-' : '+';
+                    return `<tr>
+                        <td><span style="font-weight:700;color:${color};">${tx.type||'—'}</span></td>
+                        <td style="font-weight:700;color:${color};">${sign}${Number(tx.amount||0).toLocaleString()} ${curr}</td>
+                        <td style="color:#475569;">${escapeHtml(tx.description||'—')}</td>
+                        <td style="color:#94a3b8;font-size:0.82rem;">${timeStr}</td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+    } catch (_) {
+        if (metaBar) metaBar.innerHTML = `<span style="color:#ef4444;">Connection error loading shift audit.</span>`;
+    }
+}
+
+function printExactShiftSummary() {
+    const content = document.getElementById('exact-shift-modal')?.querySelector('.pos-modal-box');
+    if (!content) return;
+    triggerBrowserPrint(content.innerHTML, 'Shift Audit Summary');
+}
+
+// ============================================================================
+// SETTINGS — STORE TILLS & CAPACITY CONFIGURATION
+// ============================================================================
+async function loadStoreTillsSettings() {
+    try {
+        const res = await fetch('/api/pos/store-config', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (!res.ok) return;
+        const cfg = await res.json();
+
+        const maxTillsEl = document.getElementById('setting-max-tills-per-shift');
+        if (maxTillsEl) maxTillsEl.value = cfg.max_tills_per_shift || 5;
+
+        const targetWEl = document.getElementById('setting-target-workers');
+        if (targetWEl) targetWEl.value = cfg.target_workers_capacity || 10;
+
+        const totalWEl = document.getElementById('setting-total-workers-display');
+        if (totalWEl) totalWEl.textContent = `${cfg.workers_count || 0} Workers`;
+
+        const openTillsEl = document.getElementById('setting-open-tills-display');
+        if (openTillsEl) openTillsEl.textContent = `${(cfg.occupied_tills || []).length} Active`;
+
+        // Render till list
+        const tillsList = document.getElementById('settings-tills-list');
+        if (tillsList) {
+            const tills = cfg.tills || [];
+            const occupied = cfg.occupied_tills || [];
+            if (tills.length === 0) {
+                tillsList.innerHTML = `<div style="color:#94a3b8;font-size:0.82rem;padding:10px;">No tills configured yet. Add your first till above.</div>`;
+            } else {
+                tillsList.innerHTML = tills.map(t => {
+                    const isActive = occupied.includes(t.name);
+                    return `
+                    <div style="background:#f8fafc;border:1px solid ${isActive?'#bbf7d0':'#e2e8f0'};border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <div>
+                            <div style="font-weight:700;color:#0f172a;font-size:0.88rem;">
+                                <i class="fa-solid fa-desktop" style="color:${isActive?'#16a34a':'#64748b'};margin-right:4px;"></i>
+                                ${escapeHtml(t.name)}
+                                ${isActive ? '<span style="font-size:0.65rem;background:#dcfce7;color:#15803d;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px;">IN USE</span>' : ''}
+                            </div>
+                            ${t.description ? `<div style="font-size:0.75rem;color:#64748b;margin-top:2px;">${escapeHtml(t.description)}</div>` : ''}
+                        </div>
+                        <button class="header-idle-btn" style="font-size:0.72rem;padding:4px 10px;color:#ef4444;border-color:#fecaca;" 
+                            onclick="handleDeleteTill(${t.id}, '${escapeHtml(t.name)}')"
+                            ${isActive ? 'disabled title="Cannot delete a till that is currently in use"' : ''}>
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // Also sync the start-shift till select if it's visible (pre-populate)
+        const startTillSel = document.getElementById('start-shift-till-select');
+        if (startTillSel && startTillSel.options.length <= 1) {
+            const tills = cfg.tills || [];
+            const occupied = cfg.occupied_tills || [];
+            startTillSel.innerHTML = tills.map(t => {
+                const inUse = occupied.includes(t.name);
+                return `<option value="${escapeHtml(t.name)}" ${inUse?'disabled':''}>${escapeHtml(t.name)}${t.description?' — '+escapeHtml(t.description):''}${inUse?' (IN USE)':''}</option>`;
+            }).join('');
+        }
+
+        // Sync admin till filter dropdown in Shift tab
+        const adminTillSel = document.getElementById('admin-shift-till-select');
+        if (adminTillSel) {
+            const tills = cfg.tills || [];
+            const existing = Array.from(adminTillSel.options).map(o => o.value);
+            tills.forEach(t => {
+                if (!existing.includes(t.name)) {
+                    const opt = document.createElement('option');
+                    opt.value = t.name;
+                    opt.textContent = t.name;
+                    adminTillSel.appendChild(opt);
+                }
+            });
+        }
+    } catch (_) {}
+}
+
+function toggleAddTillRow(show) {
+    const row = document.getElementById('add-till-form-row');
+    if (row) row.style.display = show ? 'flex' : 'none';
+    if (show) {
+        const inp = document.getElementById('new-till-name-input');
+        if (inp) { inp.value = ''; inp.focus(); }
+        const desc = document.getElementById('new-till-desc-input');
+        if (desc) desc.value = '';
+    }
+}
+
+async function handleSaveNewTill() {
+    const nameInp = document.getElementById('new-till-name-input');
+    const descInp = document.getElementById('new-till-desc-input');
+    const name = nameInp?.value.trim();
+    const description = descInp?.value.trim() || '';
+
+    if (!name) { alert('Please enter a till name.'); nameInp?.focus(); return; }
+
+    try {
+        const res = await fetch('/api/pos/store-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ new_till_name: name, new_till_desc: description })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toggleAddTillRow(false);
+            await loadStoreTillsSettings();
+        } else {
+            alert('Could not add till: ' + (data.error || 'Server error'));
+        }
+    } catch (_) {
+        alert('Connection error adding till.');
+    }
+}
+
+async function handleDeleteTill(id, name) {
+    if (!confirm(`Delete till "${name}"?\n\nThis cannot be undone. Make sure no one is using this till.`)) return;
+    try {
+        const res = await fetch(`/api/pos/tills/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            await loadStoreTillsSettings();
+        } else {
+            const d = await res.json().catch(() => ({}));
+            alert('Could not delete till: ' + (d.error || 'Server error'));
+        }
+    } catch (_) {
+        alert('Connection error deleting till.');
+    }
+}
+
+async function handleSaveTillSettings() {
+    const maxTills = parseInt(document.getElementById('setting-max-tills-per-shift')?.value) || 5;
+    const targetWorkers = parseInt(document.getElementById('setting-target-workers')?.value) || 10;
+
+    try {
+        const res = await fetch('/api/pos/store-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ max_tills_per_shift: maxTills, target_workers_capacity: targetWorkers })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`✓ Store capacity settings saved!\nMax Tills Per Shift: ${maxTills}\nTarget Staff Capacity: ${targetWorkers}`);
+            await loadStoreTillsSettings();
+        } else {
+            alert('Could not save settings: ' + (data.error || 'Server error'));
+        }
+    } catch (_) {
+        alert('Connection error saving settings.');
+    }
+}
+
+function handleStartShiftTillSelect(val) {
+    // Sync the hidden text input so the form value is always set
+    const regInp = document.getElementById('start-shift-register-name');
+    if (regInp) regInp.value = val;
 }

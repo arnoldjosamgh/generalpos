@@ -334,7 +334,7 @@ function switchNavTab(tabName, finSubTab) {
     if (tabName === 'pending') loadPendingOrders();
     if (tabName === 'customer') loadCustomerList();
     if (tabName === 'inventory') loadProducts();
-    if (tabName === 'shift') loadActiveShiftInfo();
+    if (tabName === 'shift') { loadActiveShiftInfo(); loadShiftTransactions(); }
     if (tabName === 'kitchen') loadKitchenTokens();
     if (tabName === 'finance') {
         switchFinanceSubTab(finSubTab || activeFinanceSubTab || 'overview');
@@ -1656,6 +1656,9 @@ async function loadActiveShiftInfo() {
                 document.getElementById('shift-momo-sales-display').textContent = `0 ${curr}`;
                 document.getElementById('shift-drawer-expected-display').textContent = `0 ${curr}`;
             }
+            if (activeNavTab === 'shift') {
+                loadShiftTransactions();
+            }
         }
     } catch (_) {}
 }
@@ -1697,8 +1700,71 @@ async function handleSaveStartShift(e) {
     }
 }
 
+let _shiftTxCache = [];
+
+async function loadShiftTransactions() {
+    const tbody = document.getElementById('shift-tx-table-tbody');
+    if (!tbody) return;
+    try {
+        const res = await fetch('/api/pos/shift-transactions', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.shift) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:25px;color:#94a3b8;">No active shift — start a shift to track transactions.</td></tr>`;
+            _shiftTxCache = [];
+            return;
+        }
+        _shiftTxCache = data.transactions || [];
+        renderShiftTxTable(_shiftTxCache);
+    } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:25px;color:#ef4444;">Could not load shift transactions.</td></tr>`;
+    }
+}
+
+function renderShiftTxTable(rows) {
+    const tbody = document.getElementById('shift-tx-table-tbody');
+    if (!tbody) return;
+    if (!rows || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:25px;color:#94a3b8;">No transactions in this shift yet.</td></tr>`;
+        return;
+    }
+    const curr = typeof POS_CURRENCY !== 'undefined' ? POS_CURRENCY : 'Sh';
+    tbody.innerHTML = rows.map(tx => {
+        const typeMap = {
+            SALE:     { label: 'Sale',      color: '#10b981', icon: 'fa-cash-register' },
+            CASH_IN:  { label: 'Cash In',   color: '#3b82f6', icon: 'fa-circle-arrow-down' },
+            FLOAT_IN: { label: 'Float In',  color: '#3b82f6', icon: 'fa-circle-arrow-down' },
+            EXPENSE:  { label: 'Expense',   color: '#ef4444', icon: 'fa-circle-arrow-up' },
+            INCOME:   { label: 'Income',    color: '#8b5cf6', icon: 'fa-circle-plus' },
+        };
+        const t = typeMap[tx.type] || { label: tx.type, color: '#64748b', icon: 'fa-circle' };
+        const timeStr = tx.time ? new Date(tx.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const dateStr = tx.time ? new Date(tx.time).toLocaleDateString() : '';
+        const amtSign = (tx.type === 'EXPENSE') ? '-' : '+';
+        const pmLabel = tx.payment_method ? ` <span style="font-size:0.7rem;background:#e2e8f0;padding:1px 5px;border-radius:4px;">${tx.payment_method}</span>` : '';
+        return `<tr>
+            <td><span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;color:${t.color};">
+                <i class="fa-solid ${t.icon}" style="font-size:0.85rem;"></i> ${t.label}${pmLabel}
+            </span></td>
+            <td style="font-weight:700;color:${t.color};">${amtSign}${Number(tx.amount || 0).toLocaleString()} ${curr}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tx.description || ''}">${tx.description || '—'}</td>
+            <td style="color:#64748b;font-size:0.85rem;">${tx.recorded_by || '—'}</td>
+            <td style="color:#64748b;font-size:0.82rem;" title="${dateStr}">${timeStr}</td>
+        </tr>`;
+    }).join('');
+}
+
 function filterShiftHistory(q) {
-    // Search within shift table
+    if (!q || !q.trim()) { renderShiftTxTable(_shiftTxCache); return; }
+    const lower = q.toLowerCase();
+    const filtered = _shiftTxCache.filter(tx =>
+        (tx.type || '').toLowerCase().includes(lower) ||
+        (tx.description || '').toLowerCase().includes(lower) ||
+        (tx.payment_method || '').toLowerCase().includes(lower) ||
+        (tx.recorded_by || '').toLowerCase().includes(lower)
+    );
+    renderShiftTxTable(filtered);
 }
 
 function openCashInModal() {
@@ -2341,24 +2407,95 @@ function renderCustomRolesList(roles) {
     const container = document.getElementById('settings-roles-list');
     if (!container) return;
 
-    container.innerHTML = roles.map(r => `
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+    const systemRoles = ['admin', 'manager', 'cashier', 'kitchen', 'waiter'];
+
+    container.innerHTML = roles.map(r => {
+        const isSystem = systemRoles.includes((r.role_name || '').toLowerCase());
+        return `
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div>
-                <div style="font-weight:700; color:#0f172a; font-size:0.95rem;">${escapeHtml(r.role_name)}</div>
+                <div style="font-weight:700; color:#0f172a; font-size:0.95rem; display:flex; align-items:center; gap:8px;">
+                    ${escapeHtml(r.role_name)}
+                    ${isSystem ? '<span style="font-size:0.68rem; background:#e2e8f0; color:#475569; padding:1px 6px; border-radius:4px; font-weight:600;">System</span>' : ''}
+                </div>
                 <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">
-                    Can sell: ${r.can_sell ? 'Yes' : 'No'} | Add Inv: ${r.can_add_inventory ? 'Yes' : 'No'} | Returns: ${r.can_process_returns ? 'Yes' : 'No'}
+                    Sell: ${r.can_sell ? '✓' : '✗'} | Add Inv: ${r.can_add_inventory ? '✓' : '✗'} | Shifts: ${r.can_manage_shifts ? '✓' : '✗'} | Returns: ${r.can_process_returns ? '✓' : '✗'}
                 </div>
             </div>
             <div style="display:flex; gap:6px;">
-                <button class="header-idle-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditRoleModal('${escapeHtml(r.role_name)}')">Configure</button>
+                <button class="header-idle-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditRoleModal('${escapeHtml(r.role_name)}')"><i class="fa-solid fa-gear"></i> Configure</button>
+                ${!isSystem ? `<button class="header-idle-btn" style="padding:4px 8px; font-size:0.75rem; color:#ef4444; border-color:#fca5a5;" onclick="handleDeleteRole('${escapeHtml(r.role_name)}')"><i class="fa-solid fa-trash"></i></button>` : ''}
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+async function handleDeleteRole(roleName) {
+    if (!confirm(`Are you sure you want to delete role '${roleName}'?`)) return;
+    try {
+        const res = await fetch(`/api/roles/${encodeURIComponent(roleName)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (res.ok) {
+            alert(`Role '${roleName}' deleted.`);
+            await loadCustomRolesSettings();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || 'Could not delete role');
+        }
+    } catch (_) {
+        alert('Server connection error deleting role');
+    }
 }
 
 function openAddRoleModal() {
-    document.getElementById('role-form-name').value = '';
-    document.getElementById('role-form-name').disabled = false;
+    const title = document.getElementById('role-modal-title');
+    if (title) title.innerHTML = '<i class="fa-solid fa-user-shield"></i> Add New Custom Role';
+
+    const nameInput = document.getElementById('role-form-name');
+    if (nameInput) {
+        nameInput.value = '';
+        nameInput.disabled = false;
+    }
+
+    // Default permission checkboxes for a new staff role
+    const setCb = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+
+    setCb('role-tab-register', true);
+    setCb('role-tab-orders', true);
+    setCb('role-tab-pending', false);
+    setCb('role-tab-customer', true);
+    setCb('role-tab-inventory', false);
+    setCb('role-tab-shift', true);
+    setCb('role-tab-returns', false);
+    setCb('role-tab-settings', false);
+    setCb('role-tab-dashboard', false);
+    setCb('role-tab-invoice', false);
+    setCb('role-tab-kitchen', false);
+    setCb('role-tab-debtors', false);
+    setCb('role-tab-creditors', false);
+    setCb('role-tab-transactions', false);
+    setCb('role-tab-finance', false);
+
+    setCb('role-act-sell', true);
+    setCb('role-act-add-order', true);
+    setCb('role-act-add-inv', false);
+    setCb('role-act-reduce-inv', false);
+    setCb('role-act-view-inv', true);
+    setCb('role-act-prices', false);
+    setCb('role-act-discount', false);
+    setCb('role-act-void', false);
+    setCb('role-act-returns', false);
+    setCb('role-act-shifts', true);
+    setCb('role-act-users', false);
+    setCb('role-act-settings', false);
+    setCb('role-act-invoices', false);
+    setCb('role-act-kitchen', false);
+    setCb('role-act-debtors', false);
+    setCb('role-act-creditors', false);
+
     openModal('role-modal');
 }
 
@@ -2366,44 +2503,52 @@ function openEditRoleModal(roleName) {
     const r = allRolesList.find(x => x.role_name === roleName);
     if (!r) return;
 
-    document.getElementById('role-form-name').value = r.role_name;
-    document.getElementById('role-form-name').disabled = true;
+    const title = document.getElementById('role-modal-title');
+    if (title) title.innerHTML = `<i class="fa-solid fa-user-shield"></i> Configure Role: ${escapeHtml(r.role_name)}`;
 
-    document.getElementById('role-tab-register').checked = r.can_see_register !== 0;
-    document.getElementById('role-tab-orders').checked = r.can_see_orders !== 0;
-    document.getElementById('role-tab-pending').checked = r.can_see_pending === 1;
-    document.getElementById('role-tab-customer').checked = r.can_see_customer !== 0;
-    document.getElementById('role-tab-inventory').checked = r.can_see_inventory === 1;
-    document.getElementById('role-tab-shift').checked = r.can_see_shift !== 0;
-    document.getElementById('role-tab-returns').checked = r.can_see_returns === 1;
-    document.getElementById('role-tab-settings').checked = r.can_see_settings === 1;
-    document.getElementById('role-tab-dashboard').checked = r.can_see_dashboard === 1;
+    const nameInput = document.getElementById('role-form-name');
+    if (nameInput) {
+        nameInput.value = r.role_name;
+        nameInput.disabled = true;
+    }
 
-    document.getElementById('role-act-sell').checked = r.can_sell !== 0;
-    document.getElementById('role-act-add-inv').checked = r.can_add_inventory === 1;
-    document.getElementById('role-act-view-inv').checked = r.can_view_inventory !== 0;
-    document.getElementById('role-act-prices').checked = r.can_manage_prices === 1;
-    document.getElementById('role-act-discount').checked = r.can_give_discount === 1;
-    document.getElementById('role-act-void').checked = r.can_void_orders === 1;
-    document.getElementById('role-act-returns').checked = r.can_process_returns === 1;
-    document.getElementById('role-act-shifts').checked = r.can_manage_shifts === 1;
-    document.getElementById('role-act-users').checked = r.can_manage_users === 1;
-    document.getElementById('role-act-settings').checked = r.can_edit_settings === 1;
+    const setCb = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+
+    setCb('role-tab-register', r.can_see_register !== 0);
+    setCb('role-tab-orders', r.can_see_orders !== 0);
+    setCb('role-tab-pending', r.can_see_pending === 1);
+    setCb('role-tab-customer', r.can_see_customer !== 0);
+    setCb('role-tab-inventory', r.can_see_inventory === 1);
+    setCb('role-tab-shift', r.can_see_shift !== 0);
+    setCb('role-tab-returns', r.can_see_returns === 1);
+    setCb('role-tab-settings', r.can_see_settings === 1);
+    setCb('role-tab-dashboard', r.can_see_dashboard === 1);
+
+    setCb('role-act-sell', r.can_sell !== 0);
+    setCb('role-act-add-inv', r.can_add_inventory === 1);
+    setCb('role-act-view-inv', r.can_view_inventory !== 0);
+    setCb('role-act-prices', r.can_manage_prices === 1);
+    setCb('role-act-discount', r.can_give_discount === 1);
+    setCb('role-act-void', r.can_void_orders === 1);
+    setCb('role-act-returns', r.can_process_returns === 1);
+    setCb('role-act-shifts', r.can_manage_shifts === 1);
+    setCb('role-act-users', r.can_manage_users === 1);
+    setCb('role-act-settings', r.can_edit_settings === 1);
 
     // Additional granular flags
-    if (document.getElementById('role-tab-invoice')) document.getElementById('role-tab-invoice').checked = r.can_see_invoice !== 0;
-    if (document.getElementById('role-tab-kitchen')) document.getElementById('role-tab-kitchen').checked = r.can_see_kitchen === 1;
-    if (document.getElementById('role-tab-debtors')) document.getElementById('role-tab-debtors').checked = r.can_see_debtors !== 0;
-    if (document.getElementById('role-tab-creditors')) document.getElementById('role-tab-creditors').checked = r.can_see_creditors !== 0;
-    if (document.getElementById('role-tab-transactions')) document.getElementById('role-tab-transactions').checked = r.can_see_transactions !== 0;
-    if (document.getElementById('role-tab-finance')) document.getElementById('role-tab-finance').checked = r.can_see_finance !== 0;
+    setCb('role-tab-invoice', r.can_see_invoice !== 0);
+    setCb('role-tab-kitchen', r.can_see_kitchen === 1);
+    setCb('role-tab-debtors', r.can_see_debtors !== 0);
+    setCb('role-tab-creditors', r.can_see_creditors !== 0);
+    setCb('role-tab-transactions', r.can_see_transactions !== 0);
+    setCb('role-tab-finance', r.can_see_finance !== 0);
 
-    if (document.getElementById('role-act-add-order')) document.getElementById('role-act-add-order').checked = r.can_add_order !== 0;
-    if (document.getElementById('role-act-reduce-inv')) document.getElementById('role-act-reduce-inv').checked = r.can_reduce_inventory === 1;
-    if (document.getElementById('role-act-invoices')) document.getElementById('role-act-invoices').checked = r.can_manage_invoices === 1;
-    if (document.getElementById('role-act-kitchen')) document.getElementById('role-act-kitchen').checked = r.can_manage_kitchen === 1;
-    if (document.getElementById('role-act-debtors')) document.getElementById('role-act-debtors').checked = r.can_manage_debtors === 1;
-    if (document.getElementById('role-act-creditors')) document.getElementById('role-act-creditors').checked = r.can_manage_creditors === 1;
+    setCb('role-act-add-order', r.can_add_order !== 0);
+    setCb('role-act-reduce-inv', r.can_reduce_inventory === 1);
+    setCb('role-act-invoices', r.can_manage_invoices === 1);
+    setCb('role-act-kitchen', r.can_manage_kitchen === 1);
+    setCb('role-act-debtors', r.can_manage_debtors === 1);
+    setCb('role-act-creditors', r.can_manage_creditors === 1);
 
     openModal('role-modal');
 }

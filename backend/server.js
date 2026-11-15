@@ -2170,12 +2170,12 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
       INSERT INTO roles_config (
         role_name, can_see_register, can_see_orders, can_see_pending, can_see_customer,
         can_see_inventory, can_see_shift, can_see_returns, can_see_settings, can_see_dashboard,
-        can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors,
+        can_see_invoice, can_see_kitchen, can_see_debtors, can_see_creditors, can_see_transactions, can_see_finance,
         can_sell, can_add_order, can_add_inventory, can_reduce_inventory, can_view_inventory, can_manage_prices, can_give_discount,
         can_void_orders, can_process_returns, can_manage_shifts, can_manage_users, can_edit_settings, can_manage_categories,
         can_manage_invoices, can_manage_kitchen, can_manage_debtors, can_manage_creditors
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(role_name) DO UPDATE SET
         can_see_register=excluded.can_see_register,
         can_see_orders=excluded.can_see_orders,
@@ -2190,6 +2190,8 @@ app.put("/api/roles/:name", authenticateToken, (req, res) => {
         can_see_kitchen=excluded.can_see_kitchen,
         can_see_debtors=excluded.can_see_debtors,
         can_see_creditors=excluded.can_see_creditors,
+        can_see_transactions=excluded.can_see_transactions,
+        can_see_finance=excluded.can_see_finance,
         can_sell=excluded.can_sell,
         can_add_order=excluded.can_add_order,
         can_add_inventory=excluded.can_add_inventory,
@@ -5836,6 +5838,65 @@ app.post("/api/pos/end-shift", authenticateToken, (req, res) => {
   });
 });
 
+
+// GET Shift Transactions — returns all transactions (cash-ins, expenses, POS orders) within the current open shift window
+app.get("/api/pos/shift-transactions", authenticateToken, (req, res) => {
+  ensureCashierShiftsSchema(() => {
+    db.get(
+      "SELECT * FROM cashier_shifts WHERE status = 'OPEN' AND end_time IS NULL ORDER BY id DESC LIMIT 1",
+      [],
+      (err, shift) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!shift) return res.json({ shift: null, transactions: [] });
+
+        const startIso = shift.start_time;
+
+        // Fetch finance transactions (CASH_IN, EXPENSE, INCOME) within shift window
+        db.all(
+          `SELECT
+            id,
+            type,
+            amount,
+            description,
+            transaction_date as time,
+            recorded_by
+           FROM transactions
+           WHERE transaction_date >= ?
+           ORDER BY transaction_date ASC`,
+          [startIso],
+          (err2, txRows) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+
+            // Fetch POS orders placed within shift window (summarised rows)
+            db.all(
+              `SELECT
+                id,
+                'SALE' as type,
+                total_amount as amount,
+                COALESCE(customer_name, 'Walk-in') as description,
+                payment_method,
+                order_date as time,
+                cashier_name as recorded_by
+               FROM pos_orders
+               WHERE order_date >= ?
+               ORDER BY order_date ASC`,
+              [startIso],
+              (err3, saleRows) => {
+                if (err3) return res.status(500).json({ error: err3.message });
+
+                // Merge and sort all by time
+                const all = [...(txRows || []), ...(saleRows || [])].sort(
+                  (a, b) => new Date(a.time) - new Date(b.time)
+                );
+                res.json({ shift, transactions: all });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
 
 // Record Cash Addition / Float to Drawer (Cashier receives money for change or float)
 app.post("/api/pos/cash-in", authenticateToken, (req, res) => {

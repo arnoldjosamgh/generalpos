@@ -272,6 +272,17 @@
                          ========================================== -->
                     <section class="pos-view-pane active" id="view-pane-register">
 
+                        <!-- Shift Alert Banner (shown when no shift is open) -->
+                        <div id="register-shift-warning" style="display:none; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:8px 14px; margin:10px 16px 0; font-size:0.8rem; color:#92400e; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-triangle-exclamation" style="color:#d97706;"></i>
+                                <span><strong>No shift currently open.</strong> Start a shift to track your opening cash float and sales.</span>
+                            </div>
+                            <button type="button" onclick="openStartShiftModal()" class="header-upload-pill" style="background:#16a34a; padding:5px 12px; font-size:0.75rem; border:none; cursor:pointer;">
+                                <i class="fa-solid fa-play"></i> Start Shift
+                            </button>
+                        </div>
+
                         <!-- Search Bar on Register Tab -->
                         <div class="tab-search-bar-wrap">
                             <div class="tab-search-input-box">
@@ -455,15 +466,32 @@
                                     oninput="filterShiftHistory(this.value)">
                                 <i class="fa-solid fa-magnifying-glass tab-search-icon"></i>
                             </div>
-                            <button class="header-upload-pill" style="background:#10b981;" onclick="openCashInModal()">+
+                            <button id="btn-shift-start" class="header-upload-pill" style="background:#16a34a; font-weight:700;" onclick="openStartShiftModal()">
+                                <i class="fa-solid fa-play"></i> Start Shift
+                            </button>
+                            <button id="btn-shift-cashin" class="header-upload-pill" style="background:#10b981;" onclick="openCashInModal()">+
                                 Cash In (Float)</button>
-                            <button class="header-upload-pill" style="background:#ef4444;"
+                            <button id="btn-shift-expense" class="header-upload-pill" style="background:#ef4444;"
                                 onclick="openExpenseModal()">- Record Expense</button>
-                            <button class="header-upload-pill" style="background:#0f172a;"
+                            <button id="btn-shift-close" class="header-upload-pill" style="background:#0f172a;"
                                 onclick="openCloseShiftModal()">🔒 Close Shift</button>
                         </div>
 
                         <div class="tab-content-container">
+                            <!-- Active Shift Banner -->
+                            <div id="shift-status-banner" style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span id="shift-status-dot" style="width:10px; height:10px; border-radius:50%; background:#16a34a; display:inline-block; box-shadow:0 0 8px #16a34a;"></span>
+                                    <div>
+                                        <div style="font-weight:800; color:#0f172a; font-size:0.95rem;" id="shift-status-title">Active Register Shift</div>
+                                        <div style="font-size:0.75rem; color:#64748b;" id="shift-status-subtitle">Started: Just now — Sales and float calculated between start and end.</div>
+                                    </div>
+                                </div>
+                                <div id="shift-status-pill-badge" style="font-size:0.75rem; font-weight:700; background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:20px;">
+                                    OPEN
+                                </div>
+                            </div>
+
                             <!-- Active Shift Cards -->
                             <div
                                 style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
@@ -1629,10 +1657,25 @@
                 </div>
 
                 <div class="form-field" style="margin-bottom:12px;">
-                    <label class="field-label">Category</label>
-                    <select id="prod-form-category" class="pos-input" required>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label class="field-label" style="margin-bottom:0;">Category</label>
+                        <button type="button" onclick="toggleQuickCategoryInput()"
+                            style="background:none; border:none; color:var(--primary); font-size:0.75rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                            <i class="fa-solid fa-plus"></i> New Category
+                        </button>
+                    </div>
+                    <select id="prod-form-category" class="pos-input" onchange="handleCategorySelectChange(this.value)" required>
                         <!-- Populated dynamically -->
                     </select>
+                    <div id="quick-category-row" style="display:none; margin-top:8px; gap:8px; align-items:center;">
+                        <input type="text" id="quick-cat-name-input" class="pos-input" placeholder="New Category Name (e.g. Groceries)" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();handleQuickCreateCategory();}">
+                        <button type="button" class="header-upload-pill" style="background:#10b981; padding:7px 12px; font-size:0.8rem; border-radius:6px; cursor:pointer;" onclick="handleQuickCreateCategory()">
+                            <i class="fa-solid fa-check"></i> Add
+                        </button>
+                        <button type="button" class="header-idle-btn" style="padding:7px 10px; font-size:0.8rem; border-radius:6px; cursor:pointer;" onclick="toggleQuickCategoryInput(false)">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Unlimited / No Inventory Tracking Toggle -->
@@ -2241,6 +2284,50 @@
     </div>
 
 
+    <!-- Start Shift Modal -->
+    <div class="pos-modal-overlay" id="start-shift-modal">
+        <div class="pos-modal-box">
+            <div class="pos-modal-header">
+                <h3 class="pos-modal-title"><i class="fa-solid fa-play" style="color:#16a34a;"></i> Start Register Shift</h3>
+                <button class="pos-modal-close" onclick="closeModal('start-shift-modal')">&times;</button>
+            </div>
+
+            <form onsubmit="handleSaveStartShift(event)">
+                <div style="background:#f8fafc; padding:12px 14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:14px; font-size:0.85rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span style="color:#64748b;">Staff Member:</span>
+                        <strong id="start-shift-staff-name" style="color:#0f172a;">Cashier</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:#64748b;">Shift Date &amp; Time:</span>
+                        <span id="start-shift-time-display" style="color:#0f172a; font-weight:600;">Now</span>
+                    </div>
+                </div>
+
+                <div class="form-field" style="margin-bottom:12px;">
+                    <label class="field-label">Opening Cash Float / Imprest (in Drawer)</label>
+                    <input type="number" id="start-shift-float" class="pos-input"
+                        style="font-size:1.25rem; font-weight:800;" placeholder="0" min="0" value="0" required>
+                    <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">
+                        Enter cash amount currently inside your cash drawer (change for customers).
+                    </div>
+                    <!-- Quick preset buttons -->
+                    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                        <button type="button" class="printer-preset-btn" onclick="document.getElementById('start-shift-float').value=0">0 (Empty Till)</button>
+                        <button type="button" class="printer-preset-btn" onclick="document.getElementById('start-shift-float').value=20000">20,000</button>
+                        <button type="button" class="printer-preset-btn" onclick="document.getElementById('start-shift-float').value=50000">50,000</button>
+                        <button type="button" class="printer-preset-btn" onclick="document.getElementById('start-shift-float').value=100000">100,000</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="place-order-btn" style="background:#16a34a; margin-top:8px;">
+                    <i class="fa-solid fa-play"></i> Confirm &amp; Start Shift
+                </button>
+            </form>
+        </div>
+    </div>
+
+
     <!-- Close Shift Modal -->
     <div class="pos-modal-overlay" id="close-shift-modal">
         <div class="pos-modal-box">
@@ -2250,22 +2337,43 @@
             </div>
 
             <form onsubmit="handleSaveCloseShift(event)">
-                <div
-                    style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.88rem;">
-                        <span style="color:#64748b;">Expected Cash in Drawer:</span>
-                        <strong id="close-shift-expected-val" style="color:#0f172a;">0 Sh</strong>
+                <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px; font-size:0.85rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="color:#64748b;">Starting Float:</span>
+                        <strong id="close-shift-float-val" style="color:#0284c7;">0 Sh</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="color:#64748b;">Cash Sales in Shift:</span>
+                        <strong id="close-shift-cash-sales-val" style="color:#10b981;">0 Sh</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="color:#64748b;">MoMo / Card Sales:</span>
+                        <strong id="close-shift-momo-sales-val" style="color:#8b5cf6;">0 Sh</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="color:#64748b;">Cash In (Float Added):</span>
+                        <strong id="close-shift-cash-in-val" style="color:#10b981;">+0 Sh</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="color:#64748b;">Expenses / Payouts:</span>
+                        <strong id="close-shift-expenses-val" style="color:#ef4444;">-0 Sh</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1; font-size:0.95rem;">
+                        <span style="color:#0f172a; font-weight:700;">Expected Cash in Drawer:</span>
+                        <strong id="close-shift-expected-val" style="color:#f59e0b; font-size:1.1rem;">0 Sh</strong>
                     </div>
                 </div>
 
-                <div class="form-field" style="margin-bottom:20px;">
+                <div class="form-field" style="margin-bottom:14px;">
                     <label class="field-label">Counted Physical Cash in Drawer</label>
                     <input type="number" id="close-shift-counted" class="pos-input"
-                        style="font-size:1.3rem; font-weight:800;" placeholder="Enter counted amount" min="0" required>
+                        style="font-size:1.3rem; font-weight:800;" placeholder="Enter counted cash" min="0" required
+                        oninput="calculateShiftReconcileDiff(this.value)">
+                    <div id="close-shift-diff-box" style="display:none; padding:8px 12px; border-radius:6px; margin-top:8px; font-weight:700; font-size:0.85rem;"></div>
                 </div>
 
                 <button type="submit" class="place-order-btn" style="background:#0f172a;">
-                    <i class="fa-solid fa-file-invoice-dollar"></i> Reconcile Shift &amp; Logout
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Reconcile Shift &amp; Close
                 </button>
             </form>
         </div>

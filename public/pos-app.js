@@ -1139,12 +1139,72 @@ function filterInventoryList(q) {
     renderInventoryTable(filtered);
 }
 
-function populateCategorySelect() {
+function populateCategorySelect(selectedCategory = null) {
     const sel = document.getElementById('prod-form-category');
     if (!sel) return;
-    sel.innerHTML = allCategories.map(c => `
-        <option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>
+    let options = allCategories.map(c => `
+        <option value="${escapeHtml(c.name)}" ${selectedCategory === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>
     `).join('');
+    options += `<option value="__NEW__">+ Add New Category...</option>`;
+    sel.innerHTML = options;
+    if (selectedCategory && allCategories.some(c => c.name === selectedCategory)) {
+        sel.value = selectedCategory;
+    }
+}
+
+function handleCategorySelectChange(val) {
+    if (val === '__NEW__') {
+        toggleQuickCategoryInput(true);
+    } else {
+        toggleQuickCategoryInput(false);
+    }
+}
+
+function toggleQuickCategoryInput(show) {
+    const row = document.getElementById('quick-category-row');
+    if (!row) return;
+    const isVisible = show !== undefined ? show : (row.style.display === 'none' || !row.style.display);
+    row.style.display = isVisible ? 'flex' : 'none';
+    if (isVisible) {
+        const inp = document.getElementById('quick-cat-name-input');
+        if (inp) { inp.value = ''; inp.focus(); }
+    } else {
+        const sel = document.getElementById('prod-form-category');
+        if (sel && sel.value === '__NEW__') {
+            sel.value = allCategories[0] ? allCategories[0].name : '';
+        }
+    }
+}
+
+async function handleQuickCreateCategory() {
+    const inp = document.getElementById('quick-cat-name-input');
+    if (!inp) return;
+    const name = inp.value.trim();
+    if (!name) {
+        alert('Please enter a category name');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/categories', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ name })
+        });
+        if (res.ok) {
+            await loadCategories();
+            populateCategorySelect(name);
+            toggleQuickCategoryInput(false);
+        } else {
+            const data = await res.json().catch(() => ({}));
+            alert('Failed to add category: ' + (data.error || 'Duplicate or error'));
+        }
+    } catch (e) {
+        alert('Connection error adding category.');
+    }
 }
 
 function toggleProductStockTracking(checked) {
@@ -1360,6 +1420,7 @@ function openAddProductModal() {
     // Reset unlimited stock toggle
     const noTrackCb = document.getElementById('prod-form-no-tracking');
     if (noTrackCb) { noTrackCb.checked = false; toggleProductStockTracking(false); }
+    toggleQuickCategoryInput(false);
     populateCategorySelect();
     openModal('product-modal');
     // Auto-focus barcode so a scanner fills it immediately on open
@@ -1395,8 +1456,8 @@ function openEditProductModal(id) {
     const noTrackCb = document.getElementById('prod-form-no-tracking');
     if (noTrackCb) { noTrackCb.checked = noTracking; toggleProductStockTracking(noTracking); }
     document.getElementById('prod-form-stock').value = noTracking ? '' : (p.stock || 0);
-    populateCategorySelect();
-    document.getElementById('prod-form-category').value = p.category || '';
+    toggleQuickCategoryInput(false);
+    populateCategorySelect(p.category);
     openModal('product-modal');
 }
 
@@ -1404,7 +1465,11 @@ async function handleSaveProduct(e) {
     e.preventDefault();
     const id = document.getElementById('prod-form-id').value;
     const name = document.getElementById('prod-form-name').value.trim();
-    const category = document.getElementById('prod-form-category').value;
+    let category = document.getElementById('prod-form-category').value;
+    if (!category || category === '__NEW__') {
+        alert('Please select or add a category for this product.');
+        return;
+    }
     const price = parseFloat(document.getElementById('prod-form-price').value) || 0;
     const barcode = document.getElementById('prod-form-barcode').value.trim() || null;
     const photo = document.getElementById('prod-form-image').value.trim();
@@ -1502,6 +1567,9 @@ async function handleDeleteCategory(id) {
 // ============================================================================
 // TAB 6: SHIFT CONTROLLER (Float, Expenses & Drawer Reconcile)
 // ============================================================================
+let currentActiveShift = null;
+let currentShiftExpectedDrawer = 0;
+
 async function loadActiveShiftInfo() {
     try {
         const res = await fetch('/api/active-shift', {
@@ -1510,15 +1578,123 @@ async function loadActiveShiftInfo() {
         if (res.ok) {
             const data = await res.json();
             const curr = companyData.currency || 'Sh';
-            document.getElementById('shift-cashier-name').textContent = currentUser.name || 'Staff';
-            document.getElementById('shift-imprest-display').textContent = `${Number(data.start_cash || localStorage.getItem('pos_shift_imprest') || 0).toLocaleString()} ${curr}`;
-            document.getElementById('shift-cash-sales-display').textContent = `${Number(data.cash_sales || 0).toLocaleString()} ${curr}`;
-            document.getElementById('shift-momo-sales-display').textContent = `${Number(data.momo_sales || 0).toLocaleString()} ${curr}`;
-            
-            const expected = (Number(data.start_cash || 0) + Number(data.cash_sales || 0) + Number(data.cash_in || 0)) - Number(data.expenses || 0);
-            document.getElementById('shift-drawer-expected-display').textContent = `${Math.max(0, expected).toLocaleString()} ${curr}`;
+            const regWarning = document.getElementById('register-shift-warning');
+            const btnStart = document.getElementById('btn-shift-start');
+            const btnClose = document.getElementById('btn-shift-close');
+            const btnCashIn = document.getElementById('btn-shift-cashin');
+            const btnExpense = document.getElementById('btn-shift-expense');
+            const statusBanner = document.getElementById('shift-status-banner');
+            const statusTitle = document.getElementById('shift-status-title');
+            const statusSub = document.getElementById('shift-status-subtitle');
+            const statusBadge = document.getElementById('shift-status-pill-badge');
+            const statusDot = document.getElementById('shift-status-dot');
+
+            if (data.has_active_shift) {
+                currentActiveShift = data;
+                if (regWarning) regWarning.style.display = 'none';
+
+                if (btnStart) btnStart.style.display = 'none';
+                if (btnClose) btnClose.style.display = 'inline-flex';
+                if (btnCashIn) btnCashIn.style.display = 'inline-flex';
+                if (btnExpense) btnExpense.style.display = 'inline-flex';
+
+                if (statusBanner) {
+                    statusBanner.style.background = '#f0fdf4';
+                    statusBanner.style.borderColor = '#86efac';
+                }
+                if (statusTitle) statusTitle.textContent = `Active Register Shift (#${data.id})`;
+                if (statusSub) statusSub.textContent = `Opened: ${data.start_time ? new Date(data.start_time).toLocaleString() : 'Just now'} • All accounts calculated between shift start and end`;
+                if (statusBadge) {
+                    statusBadge.textContent = 'OPEN';
+                    statusBadge.style.background = '#dcfce7';
+                    statusBadge.style.color = '#15803d';
+                }
+                if (statusDot) {
+                    statusDot.style.background = '#16a34a';
+                    statusDot.style.boxShadow = '0 0 8px #16a34a';
+                }
+
+                document.getElementById('shift-cashier-name').textContent = data.cashier_name || currentUser.name || 'Staff';
+                document.getElementById('shift-imprest-display').textContent = `${Number(data.start_cash || 0).toLocaleString()} ${curr}`;
+                document.getElementById('shift-cash-sales-display').textContent = `${Number(data.cash_sales || 0).toLocaleString()} ${curr}`;
+                document.getElementById('shift-momo-sales-display').textContent = `${Number(data.momo_sales || 0).toLocaleString()} ${curr}`;
+
+                const expectedDrawer = (data.cash_in_drawer !== undefined)
+                    ? Number(data.cash_in_drawer)
+                    : (Number(data.start_cash || 0) + Number(data.cash_sales || 0) + Number(data.cash_in || 0)) - Number(data.expenses || 0);
+                currentShiftExpectedDrawer = expectedDrawer;
+                document.getElementById('shift-drawer-expected-display').textContent = `${Math.max(0, expectedDrawer).toLocaleString()} ${curr}`;
+            } else {
+                currentActiveShift = null;
+                currentShiftExpectedDrawer = 0;
+                if (regWarning) regWarning.style.display = 'flex';
+
+                if (btnStart) btnStart.style.display = 'inline-flex';
+                if (btnClose) btnClose.style.display = 'none';
+                if (btnCashIn) btnCashIn.style.display = 'none';
+                if (btnExpense) btnExpense.style.display = 'none';
+
+                if (statusBanner) {
+                    statusBanner.style.background = '#fffbeb';
+                    statusBanner.style.borderColor = '#fcd34d';
+                }
+                if (statusTitle) statusTitle.textContent = 'No Active Register Shift';
+                if (statusSub) statusSub.textContent = 'Click "Start Shift" to enter your opening drawer float and begin tracking register sales.';
+                if (statusBadge) {
+                    statusBadge.textContent = 'CLOSED';
+                    statusBadge.style.background = '#fef3c7';
+                    statusBadge.style.color = '#b45309';
+                }
+                if (statusDot) {
+                    statusDot.style.background = '#f59e0b';
+                    statusDot.style.boxShadow = 'none';
+                }
+
+                document.getElementById('shift-cashier-name').textContent = currentUser.name || 'Staff';
+                document.getElementById('shift-imprest-display').textContent = `0 ${curr}`;
+                document.getElementById('shift-cash-sales-display').textContent = `0 ${curr}`;
+                document.getElementById('shift-momo-sales-display').textContent = `0 ${curr}`;
+                document.getElementById('shift-drawer-expected-display').textContent = `0 ${curr}`;
+            }
         }
     } catch (_) {}
+}
+
+function openStartShiftModal() {
+    const staffName = document.getElementById('start-shift-staff-name');
+    if (staffName) staffName.textContent = `${currentUser.name || 'Staff'} (${currentUser.role || 'Register User'})`;
+    const timeDisplay = document.getElementById('start-shift-time-display');
+    if (timeDisplay) timeDisplay.textContent = new Date().toLocaleString();
+    const floatInp = document.getElementById('start-shift-float');
+    if (floatInp) floatInp.value = '0';
+    openModal('start-shift-modal');
+}
+
+async function handleSaveStartShift(e) {
+    e.preventDefault();
+    const start_cash = parseFloat(document.getElementById('start-shift-float').value) || 0;
+
+    try {
+        const res = await fetch('/api/pos/start-shift', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ start_cash })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            closeModal('start-shift-modal');
+            const curr = companyData.currency || 'Sh';
+            alert(`✓ Shift started successfully!\nOpening Cash Float: ${start_cash.toLocaleString()} ${curr}\nAll register sales and drawer movements are now actively tracked.`);
+            await loadActiveShiftInfo();
+        } else {
+            alert('Could not start shift: ' + (data.error || 'Server error'));
+        }
+    } catch (err) {
+        alert('Server connection error starting shift.');
+    }
 }
 
 function filterShiftHistory(q) {
@@ -1611,14 +1787,87 @@ async function handleSaveExpense(e) {
 
 async function openCloseShiftModal() {
     await loadActiveShiftInfo();
+    const curr = companyData.currency || 'Sh';
+
+    // Populate shift details from active shift preview
+    let shiftData = currentActiveShift || {};
+    try {
+        const res = await fetch('/api/pos/shift-preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({})
+        });
+        if (res.ok) {
+            const preview = await res.json();
+            shiftData = { ...shiftData, ...preview };
+        }
+    } catch (_) {}
+
+    const floatEl = document.getElementById('close-shift-float-val');
+    if (floatEl) floatEl.textContent = `${Number(shiftData.start_cash || 0).toLocaleString()} ${curr}`;
+
+    const cashSalesEl = document.getElementById('close-shift-cash-sales-val');
+    if (cashSalesEl) cashSalesEl.textContent = `${Number(shiftData.cash_sales || 0).toLocaleString()} ${curr}`;
+
+    const momoSalesEl = document.getElementById('close-shift-momo-sales-val');
+    if (momoSalesEl) momoSalesEl.textContent = `${Number(shiftData.momo_sales || 0).toLocaleString()} ${curr}`;
+
+    const cashInEl = document.getElementById('close-shift-cash-in-val');
+    if (cashInEl) cashInEl.textContent = `+${Number(shiftData.cash_in || 0).toLocaleString()} ${curr}`;
+
+    const expensesEl = document.getElementById('close-shift-expenses-val');
+    if (expensesEl) expensesEl.textContent = `-${Number(shiftData.expenses || 0).toLocaleString()} ${curr}`;
+
+    const expectedDrawer = (shiftData.cash_in_drawer !== undefined)
+        ? Number(shiftData.cash_in_drawer)
+        : (Number(shiftData.start_cash || 0) + Number(shiftData.cash_sales || 0) + Number(shiftData.cash_in || 0)) - Number(shiftData.expenses || 0);
+    currentShiftExpectedDrawer = expectedDrawer;
+
     const expectedEl = document.getElementById('close-shift-expected-val');
-    const drawerDisplay = document.getElementById('shift-drawer-expected-display');
-    if (expectedEl && drawerDisplay) {
-        expectedEl.textContent = drawerDisplay.textContent;
-    }
+    if (expectedEl) expectedEl.textContent = `${Number(expectedDrawer).toLocaleString()} ${curr}`;
+
     const countedEl = document.getElementById('close-shift-counted');
-    if (countedEl) countedEl.value = '';
+    if (countedEl) {
+        countedEl.value = '';
+    }
+    const diffBox = document.getElementById('close-shift-diff-box');
+    if (diffBox) diffBox.style.display = 'none';
+
     openModal('close-shift-modal');
+}
+
+function calculateShiftReconcileDiff(val) {
+    const diffBox = document.getElementById('close-shift-diff-box');
+    if (!diffBox) return;
+    if (val === '' || isNaN(val)) {
+        diffBox.style.display = 'none';
+        return;
+    }
+    const counted = parseFloat(val) || 0;
+    const expected = currentShiftExpectedDrawer;
+    const diff = counted - expected;
+    const curr = companyData.currency || 'Sh';
+
+    diffBox.style.display = 'block';
+    if (Math.abs(diff) < 0.01) {
+        diffBox.style.background = '#f0fdf4';
+        diffBox.style.color = '#15803d';
+        diffBox.style.border = '1px solid #86efac';
+        diffBox.innerHTML = `✓ Exact Drawer Match (Count matches expected cash exactly)`;
+    } else if (diff > 0) {
+        diffBox.style.background = '#eff6ff';
+        diffBox.style.color = '#1d4ed8';
+        diffBox.style.border = '1px solid #93c5fd';
+        diffBox.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> Over / Surplus: +${diff.toLocaleString()} ${curr} more in drawer`;
+    } else {
+        diffBox.style.background = '#fef2f2';
+        diffBox.style.color = '#b91c1c';
+        diffBox.style.border = '1px solid #fca5a5';
+        diffBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Short / Deficit: ${diff.toLocaleString()} ${curr} missing from expected`;
+    }
 }
 
 async function handleSaveCloseShift(e) {
@@ -1637,8 +1886,20 @@ async function handleSaveCloseShift(e) {
         const data = await res.json();
         if (res.ok) {
             closeModal('close-shift-modal');
-            alert(`Shift reconciled and closed successfully! Counted cash: ${counted_cash.toLocaleString()}`);
-            handleLogout();
+            const curr = companyData.currency || 'Sh';
+            const diff = Number(data.difference || 0);
+            const diffText = diff === 0
+                ? 'Exact Match (0 discrepancy)'
+                : (diff > 0 ? `+${diff.toLocaleString()} ${curr} (Surplus)` : `${diff.toLocaleString()} ${curr} (Shortage)`);
+            alert(`✓ Shift Reconciled and Closed Successfully!\n\n` +
+                  `Cashier: ${data.cashier_name || currentUser.name}\n` +
+                  `Starting Float: ${Number(data.start_cash || 0).toLocaleString()} ${curr}\n` +
+                  `Cash Sales in Shift: ${Number(data.cash_sales || 0).toLocaleString()} ${curr}\n` +
+                  `MoMo Sales in Shift: ${Number(data.momo_sales || 0).toLocaleString()} ${curr}\n` +
+                  `Expected in Drawer: ${Number(data.cash_in_drawer || data.end_cash || 0).toLocaleString()} ${curr}\n` +
+                  `Actual Counted: ${counted_cash.toLocaleString()} ${curr}\n` +
+                  `Discrepancy: ${diffText}`);
+            await loadActiveShiftInfo();
         } else {
             alert('Could not end shift: ' + (data.error || 'Ensure active shift exists'));
         }

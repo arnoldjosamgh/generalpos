@@ -5538,18 +5538,13 @@ app.get("/api/pos/current-shift", authenticateToken, (req, res) => {
   });
 });
 
-// 2. Start Shift API — Cashier inserts starting income / float (Only Cashier)
+// 2. Start Shift API — Cashier / Staff starts shift with opening cash float
 app.post("/api/pos/start-shift", authenticateToken, (req, res) => {
-  const userRole = (req.user && req.user.role ? req.user.role : "").toUpperCase();
-  if (userRole !== "CASHIER") {
-    return res.status(403).json({ error: "Access Denied: Only Cashiers can start a cashier shift." });
-  }
-
   ensureCashierShiftsSchema(() => {
     const cashierId = req.user.id;
-    const startCash = parseFloat(req.body.start_cash) || 0;
-    if (startCash <= 0) {
-      return res.status(400).json({ error: "Opening cash amount is required and must be greater than zero." });
+    const startCash = req.body.start_cash !== undefined ? parseFloat(req.body.start_cash) || 0 : 0;
+    if (startCash < 0) {
+      return res.status(400).json({ error: "Opening cash amount cannot be negative." });
     }
 
     // Check if an open shift already exists
@@ -5691,13 +5686,8 @@ async function computeShiftSummary(startTime, endTime = null, startCash = 0, cou
   };
 }
 
-// 2b. Shift Preview API — read-only reconciliation for cashier to review before confirming end (Only Cashier)
+// 2b. Shift Preview API — read-only reconciliation for cashier / staff to review before confirming end
 app.post("/api/pos/shift-preview", authenticateToken, (req, res) => {
-  const userRole = (req.user && req.user.role ? req.user.role : "").toUpperCase();
-  if (userRole !== "CASHIER") {
-    return res.status(403).json({ error: "Access Denied: Only Cashiers can preview a cashier shift." });
-  }
-
   ensureCashierShiftsSchema(() => {
     const countedCash = req.body.counted_cash !== undefined ? parseFloat(req.body.counted_cash) || 0 : null;
 
@@ -5727,13 +5717,8 @@ app.post("/api/pos/shift-preview", authenticateToken, (req, res) => {
   });
 });
 
-// 3. End Shift API — Cashier inserts counted cash in drawer; system calculates expected cash and reconciles (Only Cashier)
+// 3. End Shift API — Cashier / Staff reconciles cash in drawer and ends shift
 app.post("/api/pos/end-shift", authenticateToken, (req, res) => {
-  const userRole = (req.user && req.user.role ? req.user.role : "").toUpperCase();
-  if (userRole !== "CASHIER") {
-    return res.status(403).json({ error: "Access Denied: Only Cashiers can end a cashier shift." });
-  }
-
   ensureCashierShiftsSchema(() => {
     const cashierId = req.user.id;
     const countedCash = req.body.counted_cash !== undefined ? parseFloat(req.body.counted_cash) || 0 : null;

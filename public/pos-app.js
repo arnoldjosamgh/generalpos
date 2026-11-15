@@ -1782,21 +1782,28 @@ async function loadSystemPrintersList() {
     let printers = [];
     let defaultPrinter = null;
 
-    try {
-        const res = await fetch('/api/system/printers', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
-        });
+    // Try local server first (where Windows printers actually live), then same-origin
+    const isAlreadyLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const localPort = localStorage.getItem('jomish_local_port') || '3000';
+    const printerEndpoints = isAlreadyLocal
+        ? ['/api/system/printers']
+        : [`http://localhost:${localPort}/api/system/printers`, '/api/system/printers'];
 
-        if (refreshIcon) refreshIcon.className = 'fa-solid fa-rotate-right';
-
-        if (res.ok) {
-            const data = await res.json();
-            printers = data.printers || [];
-            defaultPrinter = data.defaultPrinter || null;
-        }
-    } catch (_) {
-        if (refreshIcon) refreshIcon.className = 'fa-solid fa-rotate-right';
+    for (const endpoint of printerEndpoints) {
+        try {
+            const res = await fetch(endpoint, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                printers = data.printers || [];
+                defaultPrinter = data.defaultPrinter || null;
+                if (printers.length > 0) break; // got real printers from local server
+            }
+        } catch (_) {}
     }
+
+    if (refreshIcon) refreshIcon.className = 'fa-solid fa-rotate-right';
 
     // Determine currently active printer (default to RETSOL RTP-4800 if available)
     const activePrinter = savedPref || defaultPrinter || (printers[0] ? printers[0].name : 'RETSOL RTP-4800');
@@ -1820,12 +1827,24 @@ async function loadSystemPrintersList() {
     if (printers.length === 0) {
         // Show cloud / network mode with selectable popular presets
         cardList.innerHTML = `
-            <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:12px 14px; font-size:0.78rem; color:#64748b; margin-bottom:8px;">
-                <div style="font-weight:700; color:#334155; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
-                    <i class="fa-solid fa-circle-info" style="color:#3b82f6;"></i> No printers detected directly via server
+            <div style="background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px 14px; font-size:0.78rem; color:#78350f; margin-bottom:10px;">
+                <div style="font-weight:700; color:#92400e; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i> Local Server Not Detected on port ${localStorage.getItem('jomish_local_port') || '3000'}
                 </div>
-                If running on cloud (Render), printers cannot be enumerated by the server. Select your thermal printer from the presets below or type its name:
+                Silent (no-dialog) printing requires the <strong>Jomish local server</strong> running on this PC.<br>
+                Make sure the server is running, then set the port below and click <strong>Refresh</strong>.
+                <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                    <label style="font-weight:600;white-space:nowrap;">Local Port:</label>
+                    <input id="local-server-port-input" type="number" value="${localStorage.getItem('jomish_local_port') || '3000'}"
+                        style="width:80px;padding:4px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:0.85rem;"
+                        onchange="localStorage.setItem('jomish_local_port', this.value)">
+                    <button onclick="loadSystemPrintersList()"
+                        style="padding:4px 12px;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                        <i class="fa-solid fa-rotate-right"></i> Retry
+                    </button>
+                </div>
             </div>
+            <div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;font-weight:600;">— Or select your printer name manually —</div>
             <div style="display:flex; flex-direction:column; gap:6px;">
                 ${[
                     { name: 'RETSOL RTP-4800', note: 'Thermal Receipt 80mm USB' },
@@ -3308,35 +3327,40 @@ async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
 
     const plainReceiptText = textLines.join('\n');
 
-    // 3. Attempt silent printing via /api/system/print-raw to the chosen default printer
+    // 3. Attempt silent printing — always try localhost:3000 first (where the Windows printer lives),
+    //    then fall back to the current origin (works when running fully locally).
     let printedSilently = false;
-    try {
-        const printRes = await fetch('/api/system/print-raw', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
-            },
-            body: JSON.stringify({
-                receiptText: plainReceiptText,
-                receiptData: receiptData,
-                printerName: printerName,
-                paperWidth: localStorage.getItem('jomish_paper_size') || '58mm'
-            })
-        });
+    const printPayload = JSON.stringify({
+        receiptText: plainReceiptText,
+        receiptData: receiptData,
+        printerName: printerName,
+        paperWidth: localStorage.getItem('jomish_paper_size') || '58mm'
+    });
+    const authHeader = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` };
 
-        if (printRes.ok) {
-            const printData = await printRes.json().catch(() => ({}));
-            // ONLY treat as printed silently if local hardware print explicitly reported success
-            if (printData && printData.printed === true) {
-                printedSilently = true;
-                console.log('[SILENT PRINT] Direct Windows print sent successfully to:', printerName);
-                const statusLabel = document.getElementById('anim-status-label');
-                if (statusLabel) statusLabel.textContent = '✓ Receipt Printed!';
+    // Build ordered list of endpoints to try: local server first, then same-origin
+    const isAlreadyLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const localPort = localStorage.getItem('jomish_local_port') || '3000';
+    const printEndpoints = isAlreadyLocal
+        ? ['/api/system/print-raw']
+        : [`http://localhost:${localPort}/api/system/print-raw`, '/api/system/print-raw'];
+
+    for (const endpoint of printEndpoints) {
+        try {
+            const printRes = await fetch(endpoint, { method: 'POST', headers: authHeader, body: printPayload });
+            if (printRes.ok) {
+                const printData = await printRes.json().catch(() => ({}));
+                if (printData && printData.printed === true) {
+                    printedSilently = true;
+                    console.log('[SILENT PRINT] Printed via', endpoint, '→ printer:', printerName);
+                    const statusLabel = document.getElementById('anim-status-label');
+                    if (statusLabel) statusLabel.textContent = '✓ Receipt Printed!';
+                    break;
+                }
             }
+        } catch (e) {
+            console.warn('[SILENT PRINT] Endpoint failed:', endpoint, e.message);
         }
-    } catch (e) {
-        console.warn('[SILENT PRINT] Backend spooler print failed, checking fallback:', e);
     }
 
     // 4. If silent spooler succeeded on local server, let animation finish without opening Windows print dialog

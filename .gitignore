@@ -6,9 +6,11 @@
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/*.db-journal
 backend/*.db
 
 # Log files
@@ -36,6 +38,8 @@ test_*.js
 fix_*.js
 query_db.js
 seed_*.js
+cleanup_*.js
+backend/cleanup_*.js
 
 # Scratch / temp files
 commitmsg.txt

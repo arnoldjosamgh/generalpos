@@ -9081,13 +9081,6 @@ app.post("/api/petty-cash", authenticateToken, (req, res) => {
   );
 });
 
-app.delete("/api/petty-cash/:id", authenticateToken, (req, res) => {
-  db.run(`DELETE FROM petty_cash WHERE id=?`, [req.params.id], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
-});
-
 // --- POS OFFLINE BATCH SYNC ---
 app.post("/api/pos/batch-sync", authenticateToken, async (req, res) => {
   const currentSchema = getSchema();

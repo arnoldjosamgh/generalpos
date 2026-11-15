@@ -3401,11 +3401,6 @@ async function printReceiptByTransaction(idOrReceipt) {
     }
 }
 
-// Override reprintReceipt on orders table to use the new viewReceiptDetails modal!
-function reprintReceipt(orderId) {
-    viewReceiptDetails(orderId);
-}
-
 // ============================================================================
 // MODAL CONTROLS & UTILITIES
 // ============================================================================

@@ -6,7 +6,13 @@
 
 const { Pool } = require('pg');
 
-const DATABASE_URL = 'postgresql://neondb_owner:npg_8ZIvKcSJE7Uj@ep-red-mud-aynze134.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+    console.error('[ERROR] DATABASE_URL environment variable is required to run reset_neon.js.');
+    console.error('Example: DATABASE_URL="postgresql://user:pass@host/db" node scripts/reset_neon.js');
+    process.exit(1);
+}
 
 async function resetDatabase() {
     const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });

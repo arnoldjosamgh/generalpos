@@ -20,6 +20,7 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
+
         .printer-preset-btn:hover {
             background: #eef2ff;
             border-color: #6366f1;
@@ -238,10 +239,11 @@
 
                     <!-- Default Thermal Printer Status & Shortcut Button -->
                     <button class="header-idle-btn" type="button" onclick="goToPrinterSettings()"
-                        title="Receipt Printer Settings: Click to view or select your default thermal printer" id="header-printer-btn"
-                        style="display:flex; align-items:center; gap:6px; max-width:160px;">
+                        title="Receipt Printer Settings: Click to view or select your default thermal printer"
+                        id="header-printer-btn" style="display:flex; align-items:center; gap:6px; max-width:160px;">
                         <i class="fa-solid fa-print" style="color:var(--primary);"></i>
-                        <span id="header-printer-label" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.75rem; font-weight:600;">Printer</span>
+                        <span id="header-printer-label"
+                            style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.75rem; font-weight:600;">Printer</span>
                     </button>
 
                     <!-- Idle Screen Trigger Button -->
@@ -1218,75 +1220,100 @@
 
                                     <!-- Default Thermal Receipt Printer Configuration -->
                                     <div style="margin-top:24px; padding-top:20px; border-top:1px solid #e2e8f0;">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                            <h4 style="margin:0; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                                        <div
+                                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                            <h4
+                                                style="margin:0; color:#0f172a; display:flex; align-items:center; gap:8px;">
                                                 <i class="fa-solid fa-print" style="color:var(--primary);"></i>
                                                 <span>Default Receipt Printer (Silent Printing)</span>
                                             </h4>
                                             <button type="button" id="printer-refresh-btn"
                                                 style="background:none; border:1px solid #e2e8f0; border-radius:6px; padding:5px 10px; font-size:0.78rem; color:#64748b; cursor:pointer; display:flex; align-items:center; gap:5px;"
                                                 onclick="loadSystemPrintersList()">
-                                                <i class="fa-solid fa-rotate-right" id="printer-refresh-icon"></i> Refresh
+                                                <i class="fa-solid fa-rotate-right" id="printer-refresh-icon"></i>
+                                                Refresh
                                             </button>
                                         </div>
                                         <p style="font-size:0.8rem; color:#64748b; margin-bottom:14px;">
-                                            Select or type your default thermal printer once. Subsequent receipts will print
+                                            Select or type your default thermal printer once. Subsequent receipts will
+                                            print
                                             automatically in the background — no Windows dialog shown.
                                         </p>
 
                                         <!-- Active Selected Printer Banner -->
-                                        <div id="active-printer-banner" style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                                        <div id="active-printer-banner"
+                                            style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                                             <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                                                <div style="width:34px; height:34px; border-radius:50%; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.95rem; flex-shrink:0;">
+                                                <div
+                                                    style="width:34px; height:34px; border-radius:50%; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.95rem; flex-shrink:0;">
                                                     <i class="fa-solid fa-check"></i>
                                                 </div>
                                                 <div style="min-width:0;">
-                                                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; color:#15803d; font-weight:700;">Active Default Printer</div>
-                                                    <div id="active-printer-name-display" style="font-size:0.95rem; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Detecting printer...</div>
+                                                    <div
+                                                        style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; color:#15803d; font-weight:700;">
+                                                        Active Default Printer</div>
+                                                    <div id="active-printer-name-display"
+                                                        style="font-size:0.95rem; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                                        Detecting printer...</div>
                                                 </div>
                                             </div>
                                             <div style="display:flex; gap:6px;">
-                                                <button type="button" class="header-idle-btn" style="padding:5px 12px; font-size:0.75rem;" onclick="testPrintCurrentPrinter()">
+                                                <button type="button" class="header-idle-btn"
+                                                    style="padding:5px 12px; font-size:0.75rem;"
+                                                    onclick="testPrintCurrentPrinter()">
                                                     <i class="fa-solid fa-play"></i> Test Print
                                                 </button>
                                             </div>
                                         </div>
 
                                         <!-- Thermal Receipt Paper Width Selection -->
-                                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                                        <div
+                                            style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                                             <div>
-                                                <div style="font-size:0.8rem; font-weight:700; color:#0f172a;">Receipt Paper Size</div>
-                                                <div style="font-size:0.72rem; color:#64748b;">Choose standard 58mm roll (2 inch) or large 80mm roll (3 inch)</div>
+                                                <div style="font-size:0.8rem; font-weight:700; color:#0f172a;">Receipt
+                                                    Paper Size</div>
+                                                <div style="font-size:0.72rem; color:#64748b;">Choose standard 58mm roll
+                                                    (2 inch) or large 80mm roll (3 inch)</div>
                                             </div>
                                             <div style="display:flex; gap:6px;">
-                                                <button type="button" id="paper-btn-58" class="printer-preset-btn" style="padding:6px 14px; font-size:0.78rem;" onclick="setReceiptPaperSize('58mm')">
+                                                <button type="button" id="paper-btn-58" class="printer-preset-btn"
+                                                    style="padding:6px 14px; font-size:0.78rem;"
+                                                    onclick="setReceiptPaperSize('58mm')">
                                                     58mm (2" Standard)
                                                 </button>
-                                                <button type="button" id="paper-btn-80" class="printer-preset-btn" style="padding:6px 14px; font-size:0.78rem;" onclick="setReceiptPaperSize('80mm')">
+                                                <button type="button" id="paper-btn-80" class="printer-preset-btn"
+                                                    style="padding:6px 14px; font-size:0.78rem;"
+                                                    onclick="setReceiptPaperSize('80mm')">
                                                     80mm (3" Large)
                                                 </button>
                                             </div>
                                         </div>
 
                                         <!-- Printer card list (Detected Printers) -->
-                                        <div style="font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                        <div
+                                            style="font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
                                             <i class="fa-solid fa-list-check" style="color:var(--primary);"></i>
                                             <span>Detected Hardware Printers</span>
                                         </div>
-                                        <div id="printer-cards-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
-                                            <div style="text-align:center; padding:18px; color:#94a3b8; font-size:0.85rem;">
+                                        <div id="printer-cards-list"
+                                            style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+                                            <div
+                                                style="text-align:center; padding:18px; color:#94a3b8; font-size:0.85rem;">
                                                 <i class="fa-solid fa-spinner fa-spin"></i> Detecting printers...
                                             </div>
                                         </div>
 
                                         <!-- Manual Printer Name Input / Custom Setting -->
-                                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:10px;">
-                                            <div style="font-weight:700; color:#0f172a; font-size:0.82rem; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+                                        <div
+                                            style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:10px;">
+                                            <div
+                                                style="font-weight:700; color:#0f172a; font-size:0.82rem; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
                                                 <i class="fa-solid fa-keyboard" style="color:var(--primary);"></i>
                                                 <span>Set / Type Thermal Printer Manually</span>
                                             </div>
                                             <div style="font-size:0.73rem; color:#64748b; margin-bottom:8px;">
-                                                Type your exact Windows thermal printer name (or click a common preset below):
+                                                Type your exact Windows thermal printer name (or click a common preset
+                                                below):
                                             </div>
                                             <div style="display:flex; gap:8px;">
                                                 <input type="text" id="manual-printer-name-input" class="pos-input"
@@ -1300,21 +1327,34 @@
                                                 </button>
                                             </div>
                                             <!-- Quick Presets -->
-                                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px;">
-                                                <span style="font-size:0.7rem; color:#94a3b8; font-weight:600;">Presets:</span>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('RETSOL RTP-4800')">RETSOL RTP-4800</button>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('HSPOS Series')">HSPOS Series</button>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('EPSON TM-T20')">EPSON TM-T20</button>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('Xprinter XP-80')">Xprinter XP-80</button>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('POS-80')">POS-80</button>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('POS-58')">POS-58</button>
-                                                <button type="button" class="printer-preset-btn" onclick="selectPrinterCard('Standard Windows Default Printer')">Windows Default</button>
+                                            <div
+                                                style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px;">
+                                                <span
+                                                    style="font-size:0.7rem; color:#94a3b8; font-weight:600;">Presets:</span>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('RETSOL RTP-4800')">RETSOL
+                                                    RTP-4800</button>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('HSPOS Series')">HSPOS Series</button>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('EPSON TM-T20')">EPSON TM-T20</button>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('Xprinter XP-80')">Xprinter
+                                                    XP-80</button>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('POS-80')">POS-80</button>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('POS-58')">POS-58</button>
+                                                <button type="button" class="printer-preset-btn"
+                                                    onclick="selectPrinterCard('Standard Windows Default Printer')">Windows
+                                                    Default</button>
                                             </div>
                                         </div>
 
                                         <div id="printer-save-status"
                                             style="font-size:0.78rem; color:#10b981; margin-top:4px; display:none;">
-                                            <i class="fa-solid fa-check"></i> <span id="printer-save-msg">Default printer saved! Silent printing enabled.</span>
+                                            <i class="fa-solid fa-check"></i> <span id="printer-save-msg">Default
+                                                printer saved! Silent printing enabled.</span>
                                         </div>
                                         <!-- Hidden select kept for backward compat with JS -->
                                         <select id="setting-default-printer-select" style="display:none;"></select>
@@ -1630,39 +1670,50 @@
                 </div>
 
                 <div class="form-field" style="margin-bottom:12px;">
-                    <label class="field-label"><i class="fa-solid fa-barcode" style="color:#6366f1;"></i> Barcode / Code <span style="font-size:0.72rem; color:#94a3b8; font-weight:400;">(optional — scan or type)</span></label>
+                    <label class="field-label"><i class="fa-solid fa-barcode" style="color:#6366f1;"></i> Barcode / Code
+                        <span style="font-size:0.72rem; color:#94a3b8; font-weight:400;">(optional — scan or
+                            type)</span></label>
                     <input type="text" id="prod-form-barcode" class="pos-input"
-                        placeholder="Scan barcode or type manually…"
-                        onkeydown="handleBarcodeScanInput(event)"
+                        placeholder="Scan barcode or type manually…" onkeydown="handleBarcodeScanInput(event)"
                         autocomplete="off">
-                    <span id="prod-barcode-status" style="font-size:0.75rem; color:#64748b; margin-top:4px; display:block; min-height:1.1em;"></span>
+                    <span id="prod-barcode-status"
+                        style="font-size:0.75rem; color:#64748b; margin-top:4px; display:block; min-height:1.1em;"></span>
                 </div>
 
                 <div class="form-field" style="margin-bottom:18px;">
                     <label class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
                         <span><i class="fa-solid fa-image" style="color:#3b82f6;"></i> Product Photo</span>
-                        <span id="prod-photo-status" style="font-size:0.75rem; color:#64748b; font-weight:normal;"></span>
+                        <span id="prod-photo-status"
+                            style="font-size:0.75rem; color:#64748b; font-weight:normal;"></span>
                     </label>
-                    
+
                     <!-- Interactive Drag & Drop / File Upload Box -->
-                    <div id="prod-photo-upload-zone" style="border:2px dashed #cbd5e1; border-radius:10px; padding:12px; text-align:center; background:#f8fafc; cursor:pointer; transition:all 0.2s; position:relative;"
+                    <div id="prod-photo-upload-zone"
+                        style="border:2px dashed #cbd5e1; border-radius:10px; padding:12px; text-align:center; background:#f8fafc; cursor:pointer; transition:all 0.2s; position:relative;"
                         onclick="document.getElementById('prod-photo-file-input').click()"
                         ondragover="event.preventDefault(); this.style.borderColor='#3b82f6'; this.style.background='#eff6ff';"
                         ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='#f8fafc';"
                         ondrop="handleProductPhotoDrop(event)">
-                        
-                        <input type="file" id="prod-photo-file-input" accept="image/*" style="display:none;" onchange="handleProductPhotoSelect(event)">
-                        
-                        <div id="prod-photo-placeholder" style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0;">
+
+                        <input type="file" id="prod-photo-file-input" accept="image/*" style="display:none;"
+                            onchange="handleProductPhotoSelect(event)">
+
+                        <div id="prod-photo-placeholder"
+                            style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0;">
                             <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.8rem; color:#94a3b8;"></i>
-                            <div style="font-size:0.85rem; font-weight:600; color:#334155;">Click to browse or drag &amp; drop photo</div>
-                            <div style="font-size:0.72rem; color:#94a3b8;">PNG, JPG, WebP (auto-compressed &amp; optimized)</div>
+                            <div style="font-size:0.85rem; font-weight:600; color:#334155;">Click to browse or drag
+                                &amp; drop photo</div>
+                            <div style="font-size:0.72rem; color:#94a3b8;">PNG, JPG, WebP (auto-compressed &amp;
+                                optimized)</div>
                         </div>
 
-                        <div id="prod-photo-preview-wrap" style="display:none; position:relative; align-items:center; justify-content:center;">
-                            <img id="prod-photo-preview-img" src="" alt="Preview" style="max-height:120px; max-width:100%; border-radius:8px; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-                            <button type="button" onclick="event.stopPropagation(); clearProductPhoto();" 
-                                style="position:absolute; top:-8px; right:calc(50% - 70px); background:#ef4444; color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Remove photo">
+                        <div id="prod-photo-preview-wrap"
+                            style="display:none; position:relative; align-items:center; justify-content:center;">
+                            <img id="prod-photo-preview-img" src="" alt="Preview"
+                                style="max-height:120px; max-width:100%; border-radius:8px; object-fit:contain; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                            <button type="button" onclick="event.stopPropagation(); clearProductPhoto();"
+                                style="position:absolute; top:-8px; right:calc(50% - 70px); background:#ef4444; color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.2);"
+                                title="Remove photo">
                                 <i class="fa-solid fa-xmark" style="font-size:0.75rem;"></i>
                             </button>
                         </div>
@@ -1673,13 +1724,14 @@
 
                     <!-- Optional toggle to enter external link manually -->
                     <div style="margin-top:6px; display:flex; justify-content:flex-end;">
-                        <a href="javascript:void(0)" onclick="toggleManualImageUrl()" style="font-size:0.75rem; color:#3b82f6; text-decoration:none;">
+                        <a href="javascript:void(0)" onclick="toggleManualImageUrl()"
+                            style="font-size:0.75rem; color:#3b82f6; text-decoration:none;">
                             <i class="fa-solid fa-link"></i> Or enter image URL
                         </a>
                     </div>
                     <div id="prod-manual-url-wrap" style="display:none; margin-top:6px;">
-                        <input type="text" id="prod-manual-url-input" class="pos-input" placeholder="https://... or photo path" 
-                            oninput="syncManualImageUrl(this.value)">
+                        <input type="text" id="prod-manual-url-input" class="pos-input"
+                            placeholder="https://... or photo path" oninput="syncManualImageUrl(this.value)">
                     </div>
                 </div>
 
@@ -2236,12 +2288,15 @@
             </div>
 
             <!-- Target Printer Quick Selector Indicator -->
-            <div style="margin-top:12px; font-size:0.78rem; color:#64748b; display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+            <div
+                style="margin-top:12px; font-size:0.78rem; color:#64748b; display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
                 <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
                     <i class="fa-solid fa-print" style="color:var(--primary); flex-shrink:0;"></i>
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Target: <strong id="receipt-modal-printer-name" style="color:#0f172a;">Detecting...</strong></span>
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Target: <strong
+                            id="receipt-modal-printer-name" style="color:#0f172a;">Detecting...</strong></span>
                 </div>
-                <button type="button" onclick="goToPrinterSettings()" style="background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; font-size:0.78rem; text-decoration:underline; flex-shrink:0; padding-left:8px;">
+                <button type="button" onclick="goToPrinterSettings()"
+                    style="background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; font-size:0.78rem; text-decoration:underline; flex-shrink:0; padding-left:8px;">
                     Change
                 </button>
             </div>

@@ -5939,7 +5939,7 @@ app.get("/api/pos/shift-transactions", authenticateToken, (req, res) => {
 app.get("/api/pos/all-active-shifts", authenticateToken, (req, res) => {
   ensureCashierShiftsSchema(() => {
     db.all(
-      `SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+      `SELECT cs.*, COALESCE(NULLIF(TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')), ''), cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
        FROM cashier_shifts cs
        LEFT JOIN employees e ON cs.cashier_id = e.id
        WHERE cs.status = 'OPEN' AND cs.end_time IS NULL
@@ -6114,7 +6114,7 @@ app.get("/api/pos/shifts", authenticateToken, (req, res) => {
 
     const maxRows = parseInt(limit, 10) || 100;
     const sql = `
-      SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+      SELECT cs.*, COALESCE(NULLIF(TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')), ''), cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
       FROM cashier_shifts cs
       LEFT JOIN employees e ON cs.cashier_id = e.id
       WHERE ${whereClauses.join(" AND ")}
@@ -6185,7 +6185,7 @@ app.get("/api/pos/shifts/:id", authenticateToken, (req, res) => {
     if (isNaN(shiftId)) return res.status(400).json({ error: "Invalid shift ID" });
 
     db.get(
-      `SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+      `SELECT cs.*, COALESCE(NULLIF(TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')), ''), cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
        FROM cashier_shifts cs
        LEFT JOIN employees e ON cs.cashier_id = e.id
        WHERE cs.id = ?`,
@@ -6266,7 +6266,7 @@ app.post("/api/pos/shifts/compare", authenticateToken, (req, res) => {
 
     const placeholders = shift_ids.map(() => "?").join(",");
     db.all(
-      `SELECT cs.*, COALESCE(e.name, cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
+      `SELECT cs.*, COALESCE(NULLIF(TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')), ''), cs.cashier_name, 'Cashier #' || cs.cashier_id) as display_name
        FROM cashier_shifts cs
        LEFT JOIN employees e ON cs.cashier_id = e.id
        WHERE cs.id IN (${placeholders})
@@ -10006,3 +10006,4 @@ server
       console.error("Server error:", err);
     }
   });
+

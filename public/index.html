@@ -345,6 +345,100 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- 3. MANAGE TILLS SUBVIEW -->
+                        <div id="shift-subview-tills" class="pos-fin-subview" style="display:none; padding:20px; overflow-y:auto; flex:1;">
+
+                            <!-- Live Status Cards -->
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-bottom:22px;">
+                                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#15803d; font-weight:700; text-transform:uppercase;">Currently Open Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#16a34a; margin-top:4px;" id="tills-open-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Shifts currently running</div>
+                                </div>
+                                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#1d4ed8; font-weight:700; text-transform:uppercase;">Max Tills Per Shift</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#2563eb; margin-top:4px;" id="tills-max-display">5</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Concurrent shift limit</div>
+                                </div>
+                                <div style="background:#faf5ff; border:1px solid #ddd6fe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#7c3aed; font-weight:700; text-transform:uppercase;">Total Registered Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#7c3aed; margin-top:4px;" id="tills-total-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Configured till stations</div>
+                                </div>
+                                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#c2410c; font-weight:700; text-transform:uppercase;">Store Staff</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#ea580c; margin-top:4px;" id="tills-workers-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Registered employees</div>
+                                </div>
+                            </div>
+
+                            <!-- Capacity Settings Row -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Shift Capacity Limits
+                                </h4>
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; align-items:flex-end;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Max Active Tills Per Shift</label>
+                                        <input type="number" id="tills-max-input" class="pos-input" min="1" max="50" value="5"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">How many tills can run concurrently</span>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Target Workers Capacity</label>
+                                        <input type="number" id="tills-workers-input" class="pos-input" min="1" max="500" value="10"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">Total staff headcount goal</span>
+                                    </div>
+                                    <div style="display:flex; align-items:flex-end;">
+                                        <button type="button" class="header-upload-pill" style="padding:11px 22px; width:100%;"
+                                            onclick="handleSaveTillsCapacity()">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Capacity Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add New Till Card -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-circle-plus" style="color:#16a34a;"></i> Add New Till Station
+                                </h4>
+                                <div style="display:grid; grid-template-columns:1fr 2fr auto; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Till Name <span style="color:#ef4444;">*</span></label>
+                                        <input type="text" id="new-till-name-input" class="pos-input"
+                                            placeholder="e.g. Till 4, Counter A, Express" maxlength="60">
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Description (optional)</label>
+                                        <input type="text" id="new-till-desc-input" class="pos-input"
+                                            placeholder="e.g. Bakery Counter, Express Checkout, Entrance Till" maxlength="120">
+                                    </div>
+                                    <button type="button" class="header-upload-pill" style="padding:11px 20px; background:#16a34a;"
+                                        onclick="handleSaveNewTill()">
+                                        <i class="fa-solid fa-plus"></i> Add Till
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Registered Tills List -->
+                            <div class="pos-table-card" style="padding:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                                    <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0;">
+                                        <i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Registered Till Stations
+                                    </h4>
+                                    <button type="button" class="pos-fin-icon-btn" title="Refresh" onclick="loadStoreTillsSettings(); loadTillsSubView();">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </div>
+                                <div id="tills-subview-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px;">
+                                    <div style="color:#94a3b8; font-size:0.85rem; padding:14px;">Loading tills...</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </section>
 
 
@@ -408,6 +502,100 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- 3. MANAGE TILLS SUBVIEW -->
+                        <div id="shift-subview-tills" class="pos-fin-subview" style="display:none; padding:20px; overflow-y:auto; flex:1;">
+
+                            <!-- Live Status Cards -->
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-bottom:22px;">
+                                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#15803d; font-weight:700; text-transform:uppercase;">Currently Open Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#16a34a; margin-top:4px;" id="tills-open-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Shifts currently running</div>
+                                </div>
+                                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#1d4ed8; font-weight:700; text-transform:uppercase;">Max Tills Per Shift</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#2563eb; margin-top:4px;" id="tills-max-display">5</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Concurrent shift limit</div>
+                                </div>
+                                <div style="background:#faf5ff; border:1px solid #ddd6fe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#7c3aed; font-weight:700; text-transform:uppercase;">Total Registered Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#7c3aed; margin-top:4px;" id="tills-total-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Configured till stations</div>
+                                </div>
+                                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#c2410c; font-weight:700; text-transform:uppercase;">Store Staff</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#ea580c; margin-top:4px;" id="tills-workers-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Registered employees</div>
+                                </div>
+                            </div>
+
+                            <!-- Capacity Settings Row -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Shift Capacity Limits
+                                </h4>
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; align-items:flex-end;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Max Active Tills Per Shift</label>
+                                        <input type="number" id="tills-max-input" class="pos-input" min="1" max="50" value="5"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">How many tills can run concurrently</span>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Target Workers Capacity</label>
+                                        <input type="number" id="tills-workers-input" class="pos-input" min="1" max="500" value="10"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">Total staff headcount goal</span>
+                                    </div>
+                                    <div style="display:flex; align-items:flex-end;">
+                                        <button type="button" class="header-upload-pill" style="padding:11px 22px; width:100%;"
+                                            onclick="handleSaveTillsCapacity()">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Capacity Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add New Till Card -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-circle-plus" style="color:#16a34a;"></i> Add New Till Station
+                                </h4>
+                                <div style="display:grid; grid-template-columns:1fr 2fr auto; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Till Name <span style="color:#ef4444;">*</span></label>
+                                        <input type="text" id="new-till-name-input" class="pos-input"
+                                            placeholder="e.g. Till 4, Counter A, Express" maxlength="60">
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Description (optional)</label>
+                                        <input type="text" id="new-till-desc-input" class="pos-input"
+                                            placeholder="e.g. Bakery Counter, Express Checkout, Entrance Till" maxlength="120">
+                                    </div>
+                                    <button type="button" class="header-upload-pill" style="padding:11px 20px; background:#16a34a;"
+                                        onclick="handleSaveNewTill()">
+                                        <i class="fa-solid fa-plus"></i> Add Till
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Registered Tills List -->
+                            <div class="pos-table-card" style="padding:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                                    <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0;">
+                                        <i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Registered Till Stations
+                                    </h4>
+                                    <button type="button" class="pos-fin-icon-btn" title="Refresh" onclick="loadStoreTillsSettings(); loadTillsSubView();">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </div>
+                                <div id="tills-subview-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px;">
+                                    <div style="color:#94a3b8; font-size:0.85rem; padding:14px;">Loading tills...</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </section>
 
 
@@ -452,6 +640,100 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- 3. MANAGE TILLS SUBVIEW -->
+                        <div id="shift-subview-tills" class="pos-fin-subview" style="display:none; padding:20px; overflow-y:auto; flex:1;">
+
+                            <!-- Live Status Cards -->
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-bottom:22px;">
+                                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#15803d; font-weight:700; text-transform:uppercase;">Currently Open Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#16a34a; margin-top:4px;" id="tills-open-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Shifts currently running</div>
+                                </div>
+                                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#1d4ed8; font-weight:700; text-transform:uppercase;">Max Tills Per Shift</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#2563eb; margin-top:4px;" id="tills-max-display">5</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Concurrent shift limit</div>
+                                </div>
+                                <div style="background:#faf5ff; border:1px solid #ddd6fe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#7c3aed; font-weight:700; text-transform:uppercase;">Total Registered Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#7c3aed; margin-top:4px;" id="tills-total-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Configured till stations</div>
+                                </div>
+                                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#c2410c; font-weight:700; text-transform:uppercase;">Store Staff</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#ea580c; margin-top:4px;" id="tills-workers-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Registered employees</div>
+                                </div>
+                            </div>
+
+                            <!-- Capacity Settings Row -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Shift Capacity Limits
+                                </h4>
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; align-items:flex-end;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Max Active Tills Per Shift</label>
+                                        <input type="number" id="tills-max-input" class="pos-input" min="1" max="50" value="5"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">How many tills can run concurrently</span>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Target Workers Capacity</label>
+                                        <input type="number" id="tills-workers-input" class="pos-input" min="1" max="500" value="10"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">Total staff headcount goal</span>
+                                    </div>
+                                    <div style="display:flex; align-items:flex-end;">
+                                        <button type="button" class="header-upload-pill" style="padding:11px 22px; width:100%;"
+                                            onclick="handleSaveTillsCapacity()">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Capacity Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add New Till Card -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-circle-plus" style="color:#16a34a;"></i> Add New Till Station
+                                </h4>
+                                <div style="display:grid; grid-template-columns:1fr 2fr auto; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Till Name <span style="color:#ef4444;">*</span></label>
+                                        <input type="text" id="new-till-name-input" class="pos-input"
+                                            placeholder="e.g. Till 4, Counter A, Express" maxlength="60">
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Description (optional)</label>
+                                        <input type="text" id="new-till-desc-input" class="pos-input"
+                                            placeholder="e.g. Bakery Counter, Express Checkout, Entrance Till" maxlength="120">
+                                    </div>
+                                    <button type="button" class="header-upload-pill" style="padding:11px 20px; background:#16a34a;"
+                                        onclick="handleSaveNewTill()">
+                                        <i class="fa-solid fa-plus"></i> Add Till
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Registered Tills List -->
+                            <div class="pos-table-card" style="padding:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                                    <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0;">
+                                        <i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Registered Till Stations
+                                    </h4>
+                                    <button type="button" class="pos-fin-icon-btn" title="Refresh" onclick="loadStoreTillsSettings(); loadTillsSubView();">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </div>
+                                <div id="tills-subview-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px;">
+                                    <div style="color:#94a3b8; font-size:0.85rem; padding:14px;">Loading tills...</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </section>
 
 
@@ -471,6 +753,11 @@
                                     onclick="switchShiftSubView('admin')">
                                     <i class="fa-solid fa-chart-line"></i>
                                     <span>Admin Shift Analytics &amp; Compare</span>
+                                </button>
+                                <button type="button" class="pos-fin-subtab-btn" id="shift-subtab-btn-tills"
+                                    onclick="switchShiftSubView('tills')">
+                                    <i class="fa-solid fa-desktop"></i>
+                                    <span>Manage Tills</span>
                                 </button>
                             </div>
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -723,6 +1010,100 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- 3. MANAGE TILLS SUBVIEW -->
+                        <div id="shift-subview-tills" class="pos-fin-subview" style="display:none; padding:20px; overflow-y:auto; flex:1;">
+
+                            <!-- Live Status Cards -->
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-bottom:22px;">
+                                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#15803d; font-weight:700; text-transform:uppercase;">Currently Open Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#16a34a; margin-top:4px;" id="tills-open-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Shifts currently running</div>
+                                </div>
+                                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#1d4ed8; font-weight:700; text-transform:uppercase;">Max Tills Per Shift</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#2563eb; margin-top:4px;" id="tills-max-display">5</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Concurrent shift limit</div>
+                                </div>
+                                <div style="background:#faf5ff; border:1px solid #ddd6fe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#7c3aed; font-weight:700; text-transform:uppercase;">Total Registered Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#7c3aed; margin-top:4px;" id="tills-total-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Configured till stations</div>
+                                </div>
+                                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#c2410c; font-weight:700; text-transform:uppercase;">Store Staff</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#ea580c; margin-top:4px;" id="tills-workers-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Registered employees</div>
+                                </div>
+                            </div>
+
+                            <!-- Capacity Settings Row -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Shift Capacity Limits
+                                </h4>
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; align-items:flex-end;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Max Active Tills Per Shift</label>
+                                        <input type="number" id="tills-max-input" class="pos-input" min="1" max="50" value="5"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">How many tills can run concurrently</span>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Target Workers Capacity</label>
+                                        <input type="number" id="tills-workers-input" class="pos-input" min="1" max="500" value="10"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">Total staff headcount goal</span>
+                                    </div>
+                                    <div style="display:flex; align-items:flex-end;">
+                                        <button type="button" class="header-upload-pill" style="padding:11px 22px; width:100%;"
+                                            onclick="handleSaveTillsCapacity()">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Capacity Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add New Till Card -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-circle-plus" style="color:#16a34a;"></i> Add New Till Station
+                                </h4>
+                                <div style="display:grid; grid-template-columns:1fr 2fr auto; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Till Name <span style="color:#ef4444;">*</span></label>
+                                        <input type="text" id="new-till-name-input" class="pos-input"
+                                            placeholder="e.g. Till 4, Counter A, Express" maxlength="60">
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Description (optional)</label>
+                                        <input type="text" id="new-till-desc-input" class="pos-input"
+                                            placeholder="e.g. Bakery Counter, Express Checkout, Entrance Till" maxlength="120">
+                                    </div>
+                                    <button type="button" class="header-upload-pill" style="padding:11px 20px; background:#16a34a;"
+                                        onclick="handleSaveNewTill()">
+                                        <i class="fa-solid fa-plus"></i> Add Till
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Registered Tills List -->
+                            <div class="pos-table-card" style="padding:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                                    <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0;">
+                                        <i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Registered Till Stations
+                                    </h4>
+                                    <button type="button" class="pos-fin-icon-btn" title="Refresh" onclick="loadStoreTillsSettings(); loadTillsSubView();">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </div>
+                                <div id="tills-subview-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px;">
+                                    <div style="color:#94a3b8; font-size:0.85rem; padding:14px;">Loading tills...</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </section>
 
 
@@ -1697,6 +2078,100 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- 3. MANAGE TILLS SUBVIEW -->
+                        <div id="shift-subview-tills" class="pos-fin-subview" style="display:none; padding:20px; overflow-y:auto; flex:1;">
+
+                            <!-- Live Status Cards -->
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-bottom:22px;">
+                                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#15803d; font-weight:700; text-transform:uppercase;">Currently Open Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#16a34a; margin-top:4px;" id="tills-open-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Shifts currently running</div>
+                                </div>
+                                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#1d4ed8; font-weight:700; text-transform:uppercase;">Max Tills Per Shift</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#2563eb; margin-top:4px;" id="tills-max-display">5</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Concurrent shift limit</div>
+                                </div>
+                                <div style="background:#faf5ff; border:1px solid #ddd6fe; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#7c3aed; font-weight:700; text-transform:uppercase;">Total Registered Tills</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#7c3aed; margin-top:4px;" id="tills-total-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Configured till stations</div>
+                                </div>
+                                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+                                    <div style="font-size:0.72rem; color:#c2410c; font-weight:700; text-transform:uppercase;">Store Staff</div>
+                                    <div style="font-size:1.6rem; font-weight:800; color:#ea580c; margin-top:4px;" id="tills-workers-count">0</div>
+                                    <div style="font-size:0.72rem; color:#64748b;">Registered employees</div>
+                                </div>
+                            </div>
+
+                            <!-- Capacity Settings Row -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Shift Capacity Limits
+                                </h4>
+                                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:14px; align-items:flex-end;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Max Active Tills Per Shift</label>
+                                        <input type="number" id="tills-max-input" class="pos-input" min="1" max="50" value="5"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">How many tills can run concurrently</span>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Target Workers Capacity</label>
+                                        <input type="number" id="tills-workers-input" class="pos-input" min="1" max="500" value="10"
+                                            style="font-weight:700; font-size:1.1rem;">
+                                        <span style="font-size:0.72rem; color:#64748b;">Total staff headcount goal</span>
+                                    </div>
+                                    <div style="display:flex; align-items:flex-end;">
+                                        <button type="button" class="header-upload-pill" style="padding:11px 22px; width:100%;"
+                                            onclick="handleSaveTillsCapacity()">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Capacity Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Add New Till Card -->
+                            <div class="pos-table-card" style="padding:18px; margin-bottom:20px;">
+                                <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0 0 14px 0;">
+                                    <i class="fa-solid fa-circle-plus" style="color:#16a34a;"></i> Add New Till Station
+                                </h4>
+                                <div style="display:grid; grid-template-columns:1fr 2fr auto; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Till Name <span style="color:#ef4444;">*</span></label>
+                                        <input type="text" id="new-till-name-input" class="pos-input"
+                                            placeholder="e.g. Till 4, Counter A, Express" maxlength="60">
+                                    </div>
+                                    <div>
+                                        <label class="field-label" style="font-size:0.78rem;">Description (optional)</label>
+                                        <input type="text" id="new-till-desc-input" class="pos-input"
+                                            placeholder="e.g. Bakery Counter, Express Checkout, Entrance Till" maxlength="120">
+                                    </div>
+                                    <button type="button" class="header-upload-pill" style="padding:11px 20px; background:#16a34a;"
+                                        onclick="handleSaveNewTill()">
+                                        <i class="fa-solid fa-plus"></i> Add Till
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Registered Tills List -->
+                            <div class="pos-table-card" style="padding:18px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                                    <h4 style="font-size:0.95rem; font-weight:700; color:#0f172a; margin:0;">
+                                        <i class="fa-solid fa-list-check" style="color:var(--primary);"></i> Registered Till Stations
+                                    </h4>
+                                    <button type="button" class="pos-fin-icon-btn" title="Refresh" onclick="loadStoreTillsSettings(); loadTillsSubView();">
+                                        <i class="fa-solid fa-rotate"></i>
+                                    </button>
+                                </div>
+                                <div id="tills-subview-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px;">
+                                    <div style="color:#94a3b8; font-size:0.85rem; padding:14px;">Loading tills...</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </section>
 
                 </main>

@@ -338,10 +338,13 @@ function switchNavTab(tabName, finSubTab) {
         // Always show register (cashier) subview when navigating to Shift tab
         const regEl   = document.getElementById('shift-subview-register');
         const adminEl = document.getElementById('shift-subview-admin');
+        const tillsEl = document.getElementById('shift-subview-tills');
         if (regEl)   regEl.style.display   = 'flex';
         if (adminEl) adminEl.style.display = 'none';
+        if (tillsEl) tillsEl.style.display = 'none';
         document.getElementById('shift-subtab-btn-register')?.classList.add('active');
         document.getElementById('shift-subtab-btn-admin')?.classList.remove('active');
+        document.getElementById('shift-subtab-btn-tills')?.classList.remove('active');
         loadActiveShiftInfo();
         loadShiftTransactions();
     }
@@ -4219,19 +4222,25 @@ function renderAvailableCards() {
 // ============================================================================
 function switchShiftSubView(subView) {
     // Toggle subtab button styles
-    document.getElementById('shift-subtab-btn-register')?.classList.toggle('active', subView === 'register');
-    document.getElementById('shift-subtab-btn-admin')?.classList.toggle('active', subView === 'admin');
+    ['register', 'admin', 'tills'].forEach(v => {
+        document.getElementById(`shift-subtab-btn-${v}`)?.classList.toggle('active', v === subView);
+    });
 
     // Show/hide panes with explicit display — avoids CSS class specificity fights
     const regEl   = document.getElementById('shift-subview-register');
     const adminEl = document.getElementById('shift-subview-admin');
+    const tillsEl = document.getElementById('shift-subview-tills');
 
-    if (regEl)   { regEl.style.display   = (subView === 'register') ? 'flex' : 'none'; }
-    if (adminEl) { adminEl.style.display = (subView === 'admin')    ? 'flex' : 'none'; }
+    if (regEl)   regEl.style.display   = (subView === 'register') ? 'flex' : 'none';
+    if (adminEl) adminEl.style.display = (subView === 'admin')    ? 'flex' : 'none';
+    if (tillsEl) tillsEl.style.display = (subView === 'tills')    ? 'flex' : 'none';
 
     if (subView === 'admin') {
         populateAdminShiftFilters();
         loadAdminShiftsList();
+    }
+    if (subView === 'tills') {
+        loadTillsSubView();
     }
 }
 
@@ -4801,4 +4810,111 @@ function handleStartShiftTillSelect(val) {
     // Sync the hidden text input so the form value is always set
     const regInp = document.getElementById('start-shift-register-name');
     if (regInp) regInp.value = val;
+}
+
+// ============================================================================
+// MANAGE TILLS SUBVIEW (Shift Tab → Tills)
+// ============================================================================
+async function loadTillsSubView() {
+    const listEl      = document.getElementById('tills-subview-list');
+    const openCountEl = document.getElementById('tills-open-count');
+    const maxDispEl   = document.getElementById('tills-max-display');
+    const totalEl     = document.getElementById('tills-total-count');
+    const workersEl   = document.getElementById('tills-workers-count');
+    const maxInpEl    = document.getElementById('tills-max-input');
+    const workersInpEl= document.getElementById('tills-workers-input');
+
+    if (listEl) listEl.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:14px;">Loading tills...</div>`;
+
+    try {
+        const res = await fetch('/api/pos/store-config', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (!res.ok) throw new Error('Failed to load config');
+        const cfg = await res.json();
+
+        const tills    = cfg.tills || [];
+        const occupied = cfg.occupied_tills || [];
+
+        // Update stat cards
+        if (openCountEl)  openCountEl.textContent  = occupied.length;
+        if (maxDispEl)    maxDispEl.textContent     = cfg.max_tills_per_shift || 5;
+        if (totalEl)      totalEl.textContent       = tills.length;
+        if (workersEl)    workersEl.textContent     = cfg.workers_count || 0;
+
+        // Sync inputs
+        if (maxInpEl)     maxInpEl.value     = cfg.max_tills_per_shift || 5;
+        if (workersInpEl) workersInpEl.value = cfg.target_workers_capacity || 10;
+
+        // Clear add-till inputs
+        const nameInp = document.getElementById('new-till-name-input');
+        const descInp = document.getElementById('new-till-desc-input');
+        // Don't clear these — user may be mid-type
+
+        // Render till cards
+        if (!listEl) return;
+        if (tills.length === 0) {
+            listEl.innerHTML = `
+                <div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;">
+                    <i class="fa-solid fa-desktop" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
+                    No tills configured yet. Add your first till above.
+                </div>`;
+            return;
+        }
+
+        listEl.innerHTML = tills.map(t => {
+            const isActive = occupied.includes(t.name);
+            return `
+            <div style="background:#fff; border:1.5px solid ${isActive ? '#86efac' : '#e2e8f0'}; border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:8px; position:relative;">
+                ${isActive ? `<span style="position:absolute;top:10px;right:10px;font-size:0.65rem;background:#dcfce7;color:#15803d;font-weight:800;padding:2px 8px;border-radius:10px;">● IN USE</span>` : ''}
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:${isActive ? '#dcfce7' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="fa-solid fa-desktop" style="color:${isActive ? '#16a34a' : '#64748b'};font-size:1.2rem;"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:800;color:#0f172a;font-size:0.95rem;">${escapeHtml(t.name)}</div>
+                        <div style="font-size:0.75rem;color:#64748b;margin-top:1px;">${t.description ? escapeHtml(t.description) : '<span style="font-style:italic;color:#cbd5e1;">No description</span>'}</div>
+                    </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-top:8px;border-top:1px dashed #f1f5f9;">
+                    <span style="font-size:0.72rem;color:#94a3b8;">Till ID: ${t.id}</span>
+                    <button class="header-idle-btn" style="font-size:0.72rem;padding:5px 12px;color:#ef4444;border-color:#fecaca;"
+                        onclick="handleDeleteTill(${t.id}, '${escapeHtml(t.name).replace(/'/g, "\\'")}')"
+                        ${isActive ? 'disabled title="Cannot delete a till currently in use"' : 'title="Delete this till station"'}>
+                        <i class="fa-solid fa-trash-can"></i> Delete
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
+
+    } catch (err) {
+        if (listEl) listEl.innerHTML = `<div style="color:#ef4444;padding:14px;">Error loading tills: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+async function handleSaveTillsCapacity() {
+    const maxTills      = parseInt(document.getElementById('tills-max-input')?.value) || 5;
+    const targetWorkers = parseInt(document.getElementById('tills-workers-input')?.value) || 10;
+
+    try {
+        const res = await fetch('/api/pos/store-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
+            },
+            body: JSON.stringify({ max_tills_per_shift: maxTills, target_workers_capacity: targetWorkers })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            // Update the display badge immediately
+            const maxDispEl = document.getElementById('tills-max-display');
+            if (maxDispEl) maxDispEl.textContent = maxTills;
+            alert(`✓ Capacity saved!\nMax Tills Per Shift: ${maxTills}\nTarget Staff: ${targetWorkers}`);
+        } else {
+            alert('Could not save: ' + (data.error || 'Server error'));
+        }
+    } catch (_) {
+        alert('Connection error saving capacity settings.');
+    }
 }

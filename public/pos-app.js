@@ -555,6 +555,22 @@ async function loadProducts() {
     }
 }
 
+function getCategoryIconClass(cat = '', name = '') {
+    const text = (String(cat) + ' ' + String(name)).toLowerCase();
+    if (text.includes('drink') || text.includes('beverage') || text.includes('water') || text.includes('juice') || text.includes('soda') || text.includes('tea') || text.includes('coffee')) return 'fa-mug-hot';
+    if (text.includes('alcohol') || text.includes('beer') || text.includes('wine') || text.includes('liquor') || text.includes('spirits') || text.includes('bar')) return 'fa-wine-glass';
+    if (text.includes('food') || text.includes('meal') || text.includes('dish') || text.includes('snack') || text.includes('restaurant') || text.includes('curry') || text.includes('pizza') || text.includes('pasta')) return 'fa-bowl-food';
+    if (text.includes('meat') || text.includes('chicken') || text.includes('beef') || text.includes('pork') || text.includes('fish') || text.includes('butchery')) return 'fa-drumstick-bite';
+    if (text.includes('fruit') || text.includes('vegetable') || text.includes('produce') || text.includes('fresh') || text.includes('apple')) return 'fa-apple-whole';
+    if (text.includes('bread') || text.includes('bakery') || text.includes('cake') || text.includes('pastry')) return 'fa-bread-slice';
+    if (text.includes('grocery') || text.includes('supermarket') || text.includes('store') || text.includes('mart') || text.includes('soap') || text.includes('sugar') || text.includes('salt')) return 'fa-basket-shopping';
+    if (text.includes('cloth') || text.includes('wear') || text.includes('fashion') || text.includes('shirt') || text.includes('shoe') || text.includes('dress')) return 'fa-shirt';
+    if (text.includes('health') || text.includes('pharma') || text.includes('drug') || text.includes('beauty') || text.includes('cosmetic') || text.includes('lotion')) return 'fa-heart-pulse';
+    if (text.includes('tech') || text.includes('electronic') || text.includes('phone') || text.includes('cable') || text.includes('computer') || text.includes('charger')) return 'fa-laptop';
+    if (text.includes('service') || text.includes('repair') || text.includes('fix')) return 'fa-wrench';
+    return 'fa-box';
+}
+
 function renderRegisterProducts(products) {
     const grid = document.getElementById('register-products-grid');
     if (!grid) return;
@@ -569,7 +585,12 @@ function renderRegisterProducts(products) {
     grid.innerHTML = products.map(p => {
         const cartItem = currentCart.find(item => item.id === p.id);
         const countBadge = cartItem ? `<div class="prod-cart-count-badge">${cartItem.qty}</div>` : '';
-        const imgUrl = p.photo_base64 || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&auto=format&fit=crop&q=80';
+        const catIcon = getCategoryIconClass(p.category, p.name);
+        const hasPhoto = !!(p.photo_base64 && p.photo_base64.length > 20);
+        const imgHtml = hasPhoto
+            ? `<img src="${p.photo_base64}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+               <div class="prod-icon-box" style="display:none;"><i class="fa-solid ${catIcon}"></i></div>`
+            : `<div class="prod-icon-box"><i class="fa-solid ${catIcon}"></i></div>`;
         const isUnlimited = p.track_stock === 0;
         const unlimitedBadge = isUnlimited
             ? `<div style="position:absolute; bottom:4px; left:4px; background:#0284c7; color:#fff; border-radius:8px; padding:1px 6px; font-size:0.65rem; font-weight:800; z-index:3;">∞</div>`
@@ -581,7 +602,7 @@ function renderRegisterProducts(products) {
                 ${unlimitedBadge}
                 <div class="prod-price-tag">${Number(p.price || 0).toLocaleString()}</div>
                 <div class="prod-img-wrap">
-                    <img src="${imgUrl}" alt="${escapeHtml(p.name)}" onerror="this.src='favicon.png'">
+                    ${imgHtml}
                 </div>
                 <div class="prod-title-label">${escapeHtml(p.name)}</div>
             </div>
@@ -1073,7 +1094,14 @@ function renderInventoryTable(products) {
     const curr = companyData.currency || 'Sh';
 
     tbody.innerHTML = products.map(p => {
-        const img = p.photo_base64 || 'favicon.png';
+        const catIcon = getCategoryIconClass(p.category, p.name);
+        const hasPhoto = !!(p.photo_base64 && p.photo_base64.length > 20);
+        const imgDisplay = hasPhoto
+            ? `<div style="width:36px; height:36px; border-radius:6px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#f1f5f9;">
+                   <img src="${p.photo_base64}" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                   <div style="display:none; width:100%; height:100%; align-items:center; justify-content:center; color:#64748b; font-size:0.95rem;"><i class="fa-solid ${catIcon}"></i></div>
+               </div>`
+            : `<div style="width:36px; height:36px; border-radius:6px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:0.95rem;"><i class="fa-solid ${catIcon}"></i></div>`;
         const isUnlimited = p.track_stock === 0;
         const stockColor = isUnlimited ? '#0284c7' : ((p.stock || 0) <= 5 ? '#ef4444' : '#10b981');
         const stockDisplay = isUnlimited
@@ -1085,7 +1113,7 @@ function renderInventoryTable(products) {
 
         return `
             <tr>
-                <td><img src="${img}" style="width:36px; height:36px; border-radius:6px; object-fit:cover;" onerror="this.src='favicon.png'"></td>
+                <td>${imgDisplay}</td>
                 <td><strong>${escapeHtml(p.name)}</strong></td>
                 <td><span class="cat-pill-btn" style="padding:2px 8px; font-size:0.75rem;">${escapeHtml(p.category || 'General')}</span></td>
                 <td><code>${escapeHtml(p.barcode || '—')}</code></td>
@@ -3637,7 +3665,7 @@ function renderFinanceRecentTx() {
     container.innerHTML = recent.slice(0, 6).map(tx => {
         const isInc = tx.isIncome;
         const iconClass = isInc ? 'income' : 'expense';
-        const icon = isInc ? '<i class="fa-solid fa-arrow-down-left"></i>' : '<i class="fa-solid fa-arrow-up-right"></i>';
+        const icon = isInc ? '<i class="fa-solid fa-arrow-down"></i>' : '<i class="fa-solid fa-arrow-up"></i>';
         const dateStr = tx.date ? new Date(tx.date).toLocaleDateString() : 'Today';
 
         return `

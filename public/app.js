@@ -3956,13 +3956,27 @@ function closeIDCard() {
 
 function getCategoryIcon(cat) {
   const c = String(cat || "General").toLowerCase();
-  if (c.includes("beverage") || c.includes("drink") || c.includes("water"))
-    return '<i class="fa-solid fa-cup-togo"></i>';
-  if (c.includes("food") || c.includes("meal"))
+  if (c.includes("beverage") || c.includes("drink") || c.includes("water") || c.includes("juice") || c.includes("soda") || c.includes("tea") || c.includes("coffee"))
+    return '<i class="fa-solid fa-mug-hot"></i>';
+  if (c.includes("alcohol") || c.includes("beer") || c.includes("wine") || c.includes("liquor") || c.includes("bar"))
+    return '<i class="fa-solid fa-wine-glass"></i>';
+  if (c.includes("food") || c.includes("meal") || c.includes("kitchen") || c.includes("dish") || c.includes("curry") || c.includes("pizza") || c.includes("pasta"))
     return '<i class="fa-solid fa-bowl-food"></i>';
-  if (c.includes("pastry") || c.includes("bread") || c.includes("cake"))
+  if (c.includes("meat") || c.includes("chicken") || c.includes("beef") || c.includes("pork") || c.includes("fish"))
+    return '<i class="fa-solid fa-drumstick-bite"></i>';
+  if (c.includes("fruit") || c.includes("vegetable") || c.includes("produce") || c.includes("salad") || c.includes("fresh"))
+    return '<i class="fa-solid fa-apple-whole"></i>';
+  if (c.includes("pastry") || c.includes("bread") || c.includes("cake") || c.includes("bakery"))
     return '<i class="fa-solid fa-bread-slice"></i>';
-  if (c.includes("service")) return '<i class="fa-solid fa-wrench"></i>';
+  if (c.includes("grocery") || c.includes("supermarket") || c.includes("mart") || c.includes("snack") || c.includes("candy"))
+    return '<i class="fa-solid fa-basket-shopping"></i>';
+  if (c.includes("cloth") || c.includes("wear") || c.includes("fashion") || c.includes("shirt"))
+    return '<i class="fa-solid fa-shirt"></i>';
+  if (c.includes("health") || c.includes("pharma") || c.includes("drug") || c.includes("beauty") || c.includes("cosmetic"))
+    return '<i class="fa-solid fa-heart-pulse"></i>';
+  if (c.includes("tech") || c.includes("electronic") || c.includes("phone") || c.includes("computer"))
+    return '<i class="fa-solid fa-laptop"></i>';
+  if (c.includes("service") || c.includes("repair")) return '<i class="fa-solid fa-wrench"></i>';
   return '<i class="fa-solid fa-box"></i>';
 }
 
@@ -14629,7 +14643,7 @@ async function handleCreateTenant(event) {
     showTechStatus(
       "success",
       `
-            <i class="fa-solid fa-check-circle"></i> <strong>Portal created successfully!</strong><br>
+            <i class="fa-solid fa-circle-check"></i> <strong>Portal created successfully!</strong><br>
             <div style="margin-top:10px; font-size:0.9rem;">
                 Company: <strong>${companyName}</strong><br>
                 Admin Login: <code style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:4px;">${email}</code><br>

@@ -5549,6 +5549,7 @@ function ensureCashierShiftsSchema(callback) {
         value TEXT
     )`, () => {
       db.run("INSERT INTO store_settings (key, value) VALUES ('max_tills_per_shift', '5') ON CONFLICT DO NOTHING", () => {});
+      db.run("INSERT INTO store_settings (key, value) VALUES ('total_tills', '2') ON CONFLICT DO NOTHING", () => {});
       db.run("INSERT INTO store_settings (key, value) VALUES ('target_workers_capacity', '10') ON CONFLICT DO NOTHING", () => {});
     });
 
@@ -5965,38 +5966,36 @@ app.get("/api/pos/all-active-shifts", authenticateToken, (req, res) => {
 // ── STORE TILLS & SHIFTS CONFIGURATION (ADMIN) ───────────────────────────
 app.get("/api/pos/store-config", authenticateToken, (req, res) => {
   ensureCashierShiftsSchema(() => {
-    db.all("SELECT * FROM store_tills WHERE status = 'ACTIVE' ORDER BY id ASC", [], (err, tillRows) => {
+    db.all("SELECT key, value FROM store_settings", [], (err, settingRows) => {
       if (err) return res.status(500).json({ error: err.message });
-
-      db.all("SELECT key, value FROM store_settings", [], (err2, settingRows) => {
-        if (err2) return res.status(500).json({ error: err2.message });
-
-        const settingsMap = {};
-        (settingRows || []).forEach(r => { settingsMap[r.key] = r.value; });
-
-        db.get("SELECT COUNT(*) as count FROM employees WHERE is_active = 1", [], (err3, empRow) => {
-          const totalWorkers = (empRow && empRow.count) ? empRow.count : 0;
-
-          db.all("SELECT id, register_name, cashier_name, cashier_id, start_time FROM cashier_shifts WHERE status = 'OPEN' AND end_time IS NULL", [], (err4, activeShiftRows) => {
-            const activeShifts = activeShiftRows || [];
-            const occupiedTills = activeShifts.map(s => s.register_name);
-
-            res.json({
-              tills: tillRows || [],
-              total_tills: (tillRows || []).length,
-              max_tills_per_shift: parseInt(settingsMap.max_tills_per_shift || "5", 10),
-              target_workers_capacity: parseInt(settingsMap.target_workers_capacity || String(totalWorkers || 10), 10),
-              total_workers: totalWorkers,
-              active_shifts_count: activeShifts.length,
-              active_shifts: activeShifts,
-              occupied_tills: occupiedTills
-            });
+      const settingsMap = {};
+      (settingRows || []).forEach(r => { settingsMap[r.key] = r.value; });
+      const totalTills  = parseInt(settingsMap.total_tills || "2", 10);
+      const maxPerShift = parseInt(settingsMap.max_tills_per_shift || String(totalTills), 10);
+      db.get("SELECT COUNT(*) as count FROM employees WHERE is_active = 1", [], (e3, empRow) => {
+        const totalWorkers = empRow ? empRow.count : 0;
+        db.all("SELECT register_name, cashier_name, start_time FROM cashier_shifts WHERE status = 'OPEN' AND end_time IS NULL", [], (e4, activeRows) => {
+          const activeShifts  = activeRows || [];
+          const occupiedTills = activeShifts.map(s => s.register_name);
+          const tills = Array.from({ length: totalTills }, (_, i) => ({
+            id: i + 1,
+            name: `Till ${i + 1}`,
+            occupied: occupiedTills.includes(`Till ${i + 1}`)
+          }));
+          res.json({
+            tills,
+            total_tills: totalTills,
+            max_tills_per_shift: maxPerShift,
+            workers_count: totalWorkers,
+            active_shifts_count: activeShifts.length,
+            active_shifts: activeShifts,
+            occupied_tills: occupiedTills
           });
         });
       });
     });
   });
-});
+});;
 
 app.post("/api/pos/store-config", authenticateToken, (req, res) => {
   const isAllowed = ["admin", "manager", "ceo", "tech"].includes((req.user.role || "").toLowerCase()) ||
@@ -6004,9 +6003,20 @@ app.post("/api/pos/store-config", authenticateToken, (req, res) => {
   if (!isAllowed) return res.status(403).json({ error: "Access Denied: Only Admins/Managers can configure store tills." });
 
   ensureCashierShiftsSchema(async () => {
-    const { max_tills_per_shift, target_workers_capacity, new_till_name, new_till_desc } = req.body;
+    const { max_tills_per_shift, target_workers_capacity, total_tills } = req.body;
 
     try {
+      if (total_tills !== undefined) {
+        const val = Math.max(1, parseInt(total_tills, 10) || 2);
+        await new Promise((resolve, reject) => {
+          db.run(
+            "INSERT INTO store_settings (key, value) VALUES ('total_tills', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [String(val)],
+            (err) => err ? reject(err) : resolve()
+          );
+        });
+      }
+
       if (max_tills_per_shift !== undefined) {
         const val = Math.max(1, parseInt(max_tills_per_shift, 10) || 5);
         await new Promise((resolve, reject) => {

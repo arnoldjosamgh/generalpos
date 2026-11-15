@@ -1733,53 +1733,107 @@ async function openStartShiftModal() {
     const floatInp = document.getElementById('start-shift-float');
     if (floatInp) floatInp.value = '0';
 
-    // Populate till select dropdown with live occupancy info
-    const tillSel = document.getElementById('start-shift-till-select');
-    if (tillSel) {
-        tillSel.innerHTML = '<option value="" disabled>Loading tills...</option>';
-        try {
-            const r = await fetch('/api/pos/store-config', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
-            });
-            if (r.ok) {
-                const cfg = await r.json();
-                const tills = cfg.tills || [];
-                const occupied = cfg.occupied_tills || [];
-                tillSel.innerHTML = tills.map(t => {
-                    const isOccupied = occupied.includes(t.name);
-                    return `<option value="${escapeHtml(t.name)}" ${isOccupied ? 'disabled' : ''}>
-                        ${escapeHtml(t.name)}${t.description ? ' — ' + escapeHtml(t.description) : ''}${isOccupied ? ' (IN USE)' : ''}
-                    </option>`;
-                }).join('');
-                // Pre-select last used till if still free
-                const lastTill = localStorage.getItem('jomish_pos_register_name') || '';
-                if (lastTill) {
-                    const opt = Array.from(tillSel.options).find(o => o.value === lastTill && !o.disabled);
-                    if (opt) tillSel.value = lastTill;
+    const grid = document.getElementById('start-shift-till-grid');
+    const regInp = document.getElementById('start-shift-register-name');
+    if (grid) grid.innerHTML = '<div style="color:#94a3b8;font-size:0.82rem;padding:8px;">Loading tills...</div>';
+
+    try {
+        const r = await fetch('/api/pos/store-config', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (r.ok) {
+            const cfg = await r.json();
+            const totalTills = cfg.total_tills || (cfg.tills ? cfg.tills.length : 2);
+            const occupied = cfg.occupied_tills || [];
+            const activeShifts = cfg.active_shifts || [];
+
+            // Preferred till: last used if still free, otherwise first available
+            const lastTill = localStorage.getItem('jomish_pos_register_name') || '';
+            let selectedTill = '';
+            if (lastTill && !occupied.includes(lastTill)) {
+                selectedTill = lastTill;
+            } else {
+                for (let i = 1; i <= totalTills; i++) {
+                    const tName = `Till ${i}`;
+                    if (!occupied.includes(tName)) {
+                        selectedTill = tName;
+                        break;
+                    }
                 }
-                // Fallback: select first free
-                if (!tillSel.value) {
-                    const freeOpt = Array.from(tillSel.options).find(o => !o.disabled);
-                    if (freeOpt) tillSel.value = freeOpt.value;
-                }
-                // Sync hidden text input
-                const regInp = document.getElementById('start-shift-register-name');
-                if (regInp) regInp.value = tillSel.value;
             }
-        } catch (_) {
-            tillSel.innerHTML = '<option value="Till 1">Till 1</option>';
+            if (!selectedTill) selectedTill = 'Till 1';
+            if (regInp) regInp.value = selectedTill;
+
+            if (grid) {
+                grid.innerHTML = Array.from({ length: totalTills }, (_, i) => {
+                    const tName = `Till ${i + 1}`;
+                    const isOccupied = occupied.includes(tName);
+                    const shift = activeShifts.find(s => s.register_name === tName);
+                    const isSelected = (!isOccupied && tName === selectedTill);
+
+                    if (isOccupied) {
+                        return `
+                        <div style="border: 2px solid #fca5a5; background: #fef2f2; border-radius: 8px; padding: 10px 8px; text-align: center; cursor: not-allowed; opacity: 0.8;" title="Occupied by ${escapeHtml(shift?.cashier_name || 'another cashier')}">
+                            <div style="font-weight: 800; color: #b91c1c; font-size: 0.95rem;">
+                                <i class="fa-solid fa-desktop"></i> ${tName}
+                            </div>
+                            <div style="font-size: 0.68rem; color: #ef4444; font-weight: 800; margin-top: 3px;">
+                                IN USE (${escapeHtml(shift?.cashier_name || 'Staff')})
+                            </div>
+                        </div>`;
+                    }
+
+                    return `
+                    <div class="start-shift-till-card" data-till="${tName}" onclick="selectStartShiftTill('${tName}')"
+                        style="border: 2px solid ${isSelected ? '#16a34a' : '#cbd5e1'}; background: ${isSelected ? '#f0fdf4' : '#ffffff'}; border-radius: 8px; padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.15s ease;">
+                        <div class="start-shift-till-title" style="font-weight: 800; color: ${isSelected ? '#15803d' : '#0f172a'}; font-size: 0.95rem;">
+                            <i class="fa-solid fa-desktop"></i> ${tName}
+                        </div>
+                        <div class="start-shift-till-status" style="font-size: 0.68rem; color: ${isSelected ? '#16a34a' : '#64748b'}; font-weight: 800; margin-top: 3px;">
+                            ${isSelected ? '✓ SELECTED' : 'AVAILABLE'}
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+    } catch (_) {
+        if (grid) {
+            grid.innerHTML = `
+            <div class="start-shift-till-card" data-till="Till 1" onclick="selectStartShiftTill('Till 1')" style="border: 2px solid #16a34a; background: #f0fdf4; border-radius: 8px; padding: 10px 8px; text-align: center; cursor: pointer;">
+                <div style="font-weight: 800; color: #15803d;">Till 1</div>
+                <div style="font-size: 0.68rem; color: #16a34a; font-weight: 800;">✓ SELECTED</div>
+            </div>`;
         }
     }
+
     openModal('start-shift-modal');
+}
+
+function selectStartShiftTill(tillName) {
+    const regInp = document.getElementById('start-shift-register-name');
+    if (regInp) regInp.value = tillName;
+    localStorage.setItem('jomish_pos_register_name', tillName);
+
+    document.querySelectorAll('.start-shift-till-card').forEach(card => {
+        const isSel = card.getAttribute('data-till') === tillName;
+        card.style.border = isSel ? '2px solid #16a34a' : '2px solid #cbd5e1';
+        card.style.background = isSel ? '#f0fdf4' : '#ffffff';
+        const labelEl = card.querySelector('.start-shift-till-status');
+        if (labelEl) {
+            labelEl.textContent = isSel ? '✓ SELECTED' : 'AVAILABLE';
+            labelEl.style.color = isSel ? '#16a34a' : '#64748b';
+        }
+        const titleEl = card.querySelector('.start-shift-till-title');
+        if (titleEl) {
+            titleEl.style.color = isSel ? '#15803d' : '#0f172a';
+        }
+    });
 }
 
 async function handleSaveStartShift(e) {
     e.preventDefault();
     const start_cash = parseFloat(document.getElementById('start-shift-float').value) || 0;
-    // Read from dynamic till select, fall back to hidden text input
-    const tillSel = document.getElementById('start-shift-till-select');
-    const register_name = (tillSel && tillSel.value) ? tillSel.value.trim()
-        : (document.getElementById('start-shift-register-name')?.value.trim() || 'Till 1');
+    const register_name = document.getElementById('start-shift-register-name')?.value.trim() || 'Till 1';
     localStorage.setItem('jomish_pos_register_name', register_name);
 
     try {
@@ -4246,8 +4300,11 @@ function switchShiftSubView(subView) {
 
 function refreshActiveShiftTab() {
     const adminView = document.getElementById('shift-subview-admin');
+    const tillsView = document.getElementById('shift-subview-tills');
     if (adminView && adminView.style.display === 'flex') {
         loadAdminShiftsList();
+    } else if (tillsView && tillsView.style.display === 'flex') {
+        loadTillsSubView();
     } else {
         loadActiveShiftInfo();
         loadShiftTransactions();
@@ -4807,94 +4864,25 @@ async function handleSaveTillSettings() {
 }
 
 function handleStartShiftTillSelect(val) {
-    // Sync the hidden text input so the form value is always set
     const regInp = document.getElementById('start-shift-register-name');
     if (regInp) regInp.value = val;
 }
 
 // ============================================================================
-// MANAGE TILLS SUBVIEW (Shift Tab → Tills)
+// MANAGE TILLS SUBVIEW (Shift Tab → Manage Tills)
 // ============================================================================
-async function loadTillsSubView() {
-    const listEl      = document.getElementById('tills-subview-list');
-    const openCountEl = document.getElementById('tills-open-count');
-    const maxDispEl   = document.getElementById('tills-max-display');
-    const totalEl     = document.getElementById('tills-total-count');
-    const workersEl   = document.getElementById('tills-workers-count');
-    const maxInpEl    = document.getElementById('tills-max-input');
-    const workersInpEl= document.getElementById('tills-workers-input');
-
-    if (listEl) listEl.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:14px;">Loading tills...</div>`;
-
-    try {
-        const res = await fetch('/api/pos/store-config', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
-        });
-        if (!res.ok) throw new Error('Failed to load config');
-        const cfg = await res.json();
-
-        const tills    = cfg.tills || [];
-        const occupied = cfg.occupied_tills || [];
-
-        // Update stat cards
-        if (openCountEl)  openCountEl.textContent  = occupied.length;
-        if (maxDispEl)    maxDispEl.textContent     = cfg.max_tills_per_shift || 5;
-        if (totalEl)      totalEl.textContent       = tills.length;
-        if (workersEl)    workersEl.textContent     = cfg.workers_count || 0;
-
-        // Sync inputs
-        if (maxInpEl)     maxInpEl.value     = cfg.max_tills_per_shift || 5;
-        if (workersInpEl) workersInpEl.value = cfg.target_workers_capacity || 10;
-
-        // Clear add-till inputs
-        const nameInp = document.getElementById('new-till-name-input');
-        const descInp = document.getElementById('new-till-desc-input');
-        // Don't clear these — user may be mid-type
-
-        // Render till cards
-        if (!listEl) return;
-        if (tills.length === 0) {
-            listEl.innerHTML = `
-                <div style="grid-column:1/-1;text-align:center;padding:30px;color:#94a3b8;">
-                    <i class="fa-solid fa-desktop" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
-                    No tills configured yet. Add your first till above.
-                </div>`;
-            return;
-        }
-
-        listEl.innerHTML = tills.map(t => {
-            const isActive = occupied.includes(t.name);
-            return `
-            <div style="background:#fff; border:1.5px solid ${isActive ? '#86efac' : '#e2e8f0'}; border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:8px; position:relative;">
-                ${isActive ? `<span style="position:absolute;top:10px;right:10px;font-size:0.65rem;background:#dcfce7;color:#15803d;font-weight:800;padding:2px 8px;border-radius:10px;">● IN USE</span>` : ''}
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div style="width:40px;height:40px;border-radius:10px;background:${isActive ? '#dcfce7' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <i class="fa-solid fa-desktop" style="color:${isActive ? '#16a34a' : '#64748b'};font-size:1.2rem;"></i>
-                    </div>
-                    <div>
-                        <div style="font-weight:800;color:#0f172a;font-size:0.95rem;">${escapeHtml(t.name)}</div>
-                        <div style="font-size:0.75rem;color:#64748b;margin-top:1px;">${t.description ? escapeHtml(t.description) : '<span style="font-style:italic;color:#cbd5e1;">No description</span>'}</div>
-                    </div>
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-top:8px;border-top:1px dashed #f1f5f9;">
-                    <span style="font-size:0.72rem;color:#94a3b8;">Till ID: ${t.id}</span>
-                    <button class="header-idle-btn" style="font-size:0.72rem;padding:5px 12px;color:#ef4444;border-color:#fecaca;"
-                        onclick="handleDeleteTill(${t.id}, '${escapeHtml(t.name).replace(/'/g, "\\'")}')"
-                        ${isActive ? 'disabled title="Cannot delete a till currently in use"' : 'title="Delete this till station"'}>
-                        <i class="fa-solid fa-trash-can"></i> Delete
-                    </button>
-                </div>
-            </div>`;
-        }).join('');
-
-    } catch (err) {
-        if (listEl) listEl.innerHTML = `<div style="color:#ef4444;padding:14px;">Error loading tills: ${escapeHtml(err.message)}</div>`;
-    }
+function updateTillsPreview(val) {
+    const num = Math.max(1, parseInt(val, 10) || 1);
+    const txt = document.getElementById('tills-count-preview-text');
+    if (!txt) return;
+    const names = Array.from({ length: Math.min(num, 8) }, (_, i) => `Till ${i + 1}`).join(', ');
+    const more = num > 8 ? ` and ${num - 8} more...` : '';
+    txt.innerHTML = `<i class="fa-solid fa-circle-info" style="color:#0284c7;"></i> This creates <strong>${escapeHtml(names)}${more}</strong>. Cashiers pick any free till when opening a shift.`;
 }
 
-async function handleSaveTillsCapacity() {
-    const maxTills      = parseInt(document.getElementById('tills-max-input')?.value) || 5;
-    const targetWorkers = parseInt(document.getElementById('tills-workers-input')?.value) || 10;
+async function handleSaveTillCount() {
+    const inp = document.getElementById('tills-count-input');
+    const total_tills = Math.max(1, parseInt(inp?.value, 10) || 2);
 
     try {
         const res = await fetch('/api/pos/store-config', {
@@ -4903,18 +4891,79 @@ async function handleSaveTillsCapacity() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
             },
-            body: JSON.stringify({ max_tills_per_shift: maxTills, target_workers_capacity: targetWorkers })
+            body: JSON.stringify({ total_tills: total_tills, max_tills_per_shift: total_tills })
         });
         const data = await res.json();
         if (res.ok) {
-            // Update the display badge immediately
-            const maxDispEl = document.getElementById('tills-max-display');
-            if (maxDispEl) maxDispEl.textContent = maxTills;
-            alert(`✓ Capacity saved!\nMax Tills Per Shift: ${maxTills}\nTarget Staff: ${targetWorkers}`);
+            alert(`✓ Store till configuration saved!\nYour shop now has ${total_tills} till${total_tills > 1 ? 's' : ''} (Till 1${total_tills > 1 ? ' to Till ' + total_tills : ''}).\nCashiers can pick any free till to work on.`);
+            await loadTillsSubView();
+            if (typeof loadStoreTillsSettings === 'function') loadStoreTillsSettings();
         } else {
-            alert('Could not save: ' + (data.error || 'Server error'));
+            alert('Could not save till count: ' + (data.error || 'Server error'));
         }
     } catch (_) {
-        alert('Connection error saving capacity settings.');
+        alert('Connection error saving store tills.');
+    }
+}
+
+async function loadTillsSubView() {
+    const grid = document.getElementById('tills-status-grid');
+    const inp = document.getElementById('tills-count-input');
+    if (grid) grid.innerHTML = `<div style="color:#94a3b8;font-size:0.85rem;padding:12px;">Loading till status...</div>`;
+
+    try {
+        const res = await fetch('/api/pos/store-config', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` }
+        });
+        if (!res.ok) throw new Error('Failed to load store config');
+        const cfg = await res.json();
+
+        const totalTills = cfg.total_tills || 2;
+        if (inp && document.activeElement !== inp) {
+            inp.value = totalTills;
+            updateTillsPreview(totalTills);
+        }
+
+        const occupied = cfg.occupied_tills || [];
+        const activeShifts = cfg.active_shifts || [];
+
+        if (grid) {
+            grid.innerHTML = Array.from({ length: totalTills }, (_, i) => {
+                const tillName = `Till ${i + 1}`;
+                const shift = activeShifts.find(s => s.register_name === tillName);
+                const isInUse = Boolean(shift);
+                const startTimeStr = shift?.start_time ? new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+                return `
+                <div style="background:#fff; border:2px solid ${isInUse ? '#fca5a5' : '#86efac'}; border-radius:10px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.05); transition:all 0.15s ease;">
+                    <div style="font-size:1.6rem; color:${isInUse ? '#ef4444' : '#16a34a'}; margin-bottom:4px;">
+                        <i class="fa-solid fa-desktop"></i>
+                    </div>
+                    <div style="font-weight:800; color:#0f172a; font-size:1.05rem;">${tillName}</div>
+                    <div style="margin-top:6px;">
+                        ${isInUse ? `
+                            <span style="background:#fef2f2; color:#b91c1c; font-size:0.7rem; font-weight:800; padding:3px 8px; border-radius:12px; display:inline-block;">
+                                ● IN USE
+                            </span>
+                            <div style="font-size:0.75rem; color:#475569; margin-top:4px; font-weight:700;">
+                                ${escapeHtml(shift?.cashier_name || 'Staff')}
+                            </div>
+                            <div style="font-size:0.68rem; color:#94a3b8; margin-top:2px;">
+                                Since ${startTimeStr}
+                            </div>
+                        ` : `
+                            <span style="background:#f0fdf4; color:#15803d; font-size:0.7rem; font-weight:800; padding:3px 8px; border-radius:12px; display:inline-block;">
+                                ✓ AVAILABLE
+                            </span>
+                            <div style="font-size:0.72rem; color:#64748b; margin-top:4px;">
+                                Ready for any cashier
+                            </div>
+                        `}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    } catch (err) {
+        if (grid) grid.innerHTML = `<div style="color:#ef4444;padding:12px;">Failed to load till status: ${escapeHtml(err.message)}</div>`;
     }
 }

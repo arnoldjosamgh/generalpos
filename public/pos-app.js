@@ -1825,26 +1825,14 @@ async function loadSystemPrintersList() {
     if (!cardList) return;
 
     if (printers.length === 0) {
-        // Show cloud / network mode with selectable popular presets
+        // Show thermal printer presets for optimal receipt sizing
         cardList.innerHTML = `
-            <div style="background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px 14px; font-size:0.78rem; color:#78350f; margin-bottom:10px;">
-                <div style="font-weight:700; color:#92400e; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
-                    <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i> Local Server Not Detected on port ${localStorage.getItem('jomish_local_port') || '3000'}
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:0.78rem; color:#64748b; margin-bottom:10px;">
+                <div style="font-weight:700; color:#334155; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-print" style="color:var(--primary, #0284c7);"></i> Thermal Receipt Printer Presets
                 </div>
-                Silent (no-dialog) printing requires the <strong>Jomish local server</strong> running on this PC.<br>
-                Make sure the server is running, then set the port below and click <strong>Refresh</strong>.
-                <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-                    <label style="font-weight:600;white-space:nowrap;">Local Port:</label>
-                    <input id="local-server-port-input" type="number" value="${localStorage.getItem('jomish_local_port') || '3000'}"
-                        style="width:80px;padding:4px 8px;border:1px solid #fcd34d;border-radius:6px;font-size:0.85rem;"
-                        onchange="localStorage.setItem('jomish_local_port', this.value)">
-                    <button onclick="loadSystemPrintersList()"
-                        style="padding:4px 12px;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">
-                        <i class="fa-solid fa-rotate-right"></i> Retry
-                    </button>
-                </div>
+                Select your printer model to automatically set the paper width (58mm or 80mm). All receipts open directly in your Windows print dialog.
             </div>
-            <div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;font-weight:600;">— Or select your printer name manually —</div>
             <div style="display:flex; flex-direction:column; gap:6px;">
                 ${[
                     { name: 'RETSOL RTP-4800', note: 'Thermal Receipt 80mm USB' },
@@ -1912,7 +1900,6 @@ async function loadSystemPrintersList() {
     }
 
     updateHeaderPrinterLabel(activePrinter);
-    updatePrintAnimSubtext(activePrinter);
     updatePaperSizeButtons();
 }
 
@@ -1943,15 +1930,12 @@ function selectPrinterCard(printerName) {
     // Show saved toast
     const statusEl = document.getElementById('printer-save-status');
     const msgEl    = document.getElementById('printer-save-msg');
-    if (msgEl) msgEl.textContent = `✓ "${printerName}" set as default printer. All subsequent receipts will print here silently.`;
+    if (msgEl) msgEl.textContent = `✓ "${printerName}" set as default printer.`;
     if (statusEl) {
         statusEl.style.display = 'block';
         clearTimeout(statusEl._hideTimer);
         statusEl._hideTimer = setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
     }
-
-    // Update animation overlay
-    updatePrintAnimSubtext(printerName);
 
     console.log('[PRINTER] Default printer set to:', printerName);
 }
@@ -2020,43 +2004,10 @@ async function testPrintCurrentPrinter() {
         alert('Please select or type a printer name first.');
         return;
     }
-
-    showPrintAnimation('Jomish POS', 'TEST', '');
-
-    // For test print: cleanly print "Printer installed successfully" as requested
-    const text = 'Printer installed successfully\n\n';
-
-    try {
-        const res = await fetch('/api/system/print-raw', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('jomish_token')}`
-            },
-            body: JSON.stringify({
-                receiptText: text,
-                printerName: printerName,
-                paperWidth: localStorage.getItem('jomish_paper_size') || '58mm'
-            })
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (data.printed === true) {
-            const statusLabel = document.getElementById('anim-status-label');
-            if (statusLabel) statusLabel.textContent = '✓ Printer installed successfully';
-            setTimeout(hidePrintAnimation, 2200);
-        } else {
-            hidePrintAnimation();
-            // Browser print fallback: print a clean minimal slip
-            triggerBrowserPrint(
-                '<div style="text-align:center; padding:18px 4px; font-family:\'Courier New\', monospace; font-size:13px; font-weight:bold;">Printer installed successfully</div>',
-                'Printer Test'
-            );
-        }
-    } catch (e) {
-        hidePrintAnimation();
-        alert('Test print error: ' + e.message);
-    }
+    triggerBrowserPrint(
+        '<div style="text-align:center; padding:18px 4px; font-family:\'Courier New\', monospace; font-size:13px; font-weight:bold;">Printer installed successfully</div>',
+        'Printer Test'
+    );
 }
 
 function updateHeaderPrinterLabel(printerName) {
@@ -2064,7 +2015,7 @@ function updateHeaderPrinterLabel(printerName) {
     const label = document.getElementById('header-printer-label');
     if (label) {
         label.textContent = pName ? pName : 'Printer';
-        label.title = pName ? `Default Printer: ${pName} (Silent Print Enabled)` : 'No thermal printer selected (Click to configure)';
+        label.title = pName ? `Default Printer: ${pName}` : 'No printer selected (Click to configure)';
     }
     const modalLabel = document.getElementById('receipt-modal-printer-name');
     if (modalLabel) {
@@ -2087,14 +2038,7 @@ function goToPrinterSettings() {
     }, 250);
 }
 
-function updatePrintAnimSubtext(printerName) {
-    const sub = document.getElementById('anim-printer-subtext');
-    if (sub) {
-        sub.textContent = printerName
-            ? `Sending to: ${printerName}`
-            : 'Connecting to Windows Default Printer';
-    }
-}
+
 
 function saveSelectedPrinterPreference() {
     // Legacy function — kept for compatibility if called from elsewhere
@@ -3121,41 +3065,7 @@ function renderReceiptModal(r) {
     `;
 }
 
-// Show custom thermal printer animation overlay
-function showPrintAnimation(brandName, rcptNo, totalAmount) {
-    const overlay = document.getElementById('pos-print-animation-overlay');
-    if (!overlay) return;
 
-    const headEl = document.getElementById('anim-receipt-header');
-    const metaEl = document.getElementById('anim-receipt-meta');
-    const totalEl = document.getElementById('anim-receipt-total');
-    const paperEl = document.getElementById('pos-anim-paper-content');
-    const statusEl = document.getElementById('anim-status-label');
-
-    if (headEl) headEl.textContent = brandName || (companyData.name || 'JOMISH POS');
-    if (metaEl) metaEl.innerHTML = `#${rcptNo || 'RECEIPT'}<br>${new Date().toLocaleTimeString()}`;
-    if (totalEl) totalEl.textContent = `TOTAL: ${totalAmount || ''}`;
-    if (statusEl) statusEl.textContent = 'Printing Receipt...';
-
-    const defaultPrinter = localStorage.getItem('jomish_default_printer') || '';
-    updatePrintAnimSubtext(defaultPrinter);
-
-    // Reset animation
-    if (paperEl) {
-        paperEl.style.animation = 'none';
-        paperEl.offsetHeight; // trigger reflow
-        paperEl.style.animation = 'feedPaperDown 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards';
-    }
-
-    overlay.style.display = 'flex';
-}
-
-function hidePrintAnimation() {
-    const overlay = document.getElementById('pos-print-animation-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-    }
-}
 
 function triggerBrowserPrint(htmlContent, title) {
     let oldFrame = document.getElementById('receipt-print-frame');
@@ -3247,8 +3157,7 @@ function triggerBrowserPrint(htmlContent, title) {
     `);
     doc.close();
 
-    // Ensure animation overlay is dismissed so user can see print dialog / window
-    hidePrintAnimation();
+    // Direct Windows print execution
 
     let printDone = false;
     const executePrint = () => {
@@ -3272,105 +3181,8 @@ function triggerBrowserPrint(htmlContent, title) {
     }, 400);
 }
 
-// Generic print receipt helper using custom animation + silent direct Windows spooler printing
+// Print receipt — opens Windows print dialog directly
 async function printReceiptHtml(htmlContent, title, receiptMeta = {}) {
-    // 1. Show the print animation
-    showPrintAnimation(
-        companyData.name || 'JOMISH POS',
-        receiptMeta.receipt_no || title,
-        receiptMeta.total || ''
-    );
-
-    const printerName = localStorage.getItem('jomish_default_printer') || '';
-
-    // 2. Build structured receiptData for high-quality ESC/POS printer engine
-    const curr = companyData.currency || 'Sh';
-    const receiptData = {
-        brand: companyData.name || 'JOMISH POS',
-        address: companyData.location || companyData.address || 'Kampala, Uganda',
-        contact: companyData.contact_phone || companyData.phone || companyData.email || '',
-        receiptNo: `RECEIPT: #${receiptMeta.receipt_no || title || 'N/A'}`,
-        date: new Date().toLocaleString(),
-        cashier: localStorage.getItem('jomish_name') || 'Cashier',
-        items: (receiptMeta.items && Array.isArray(receiptMeta.items) && receiptMeta.items.length > 0)
-            ? receiptMeta.items.map(it => ({
-                description: `${(it.product_name || it.name || 'Item').slice(0, 18)} x${it.qty || 1}`,
-                total: `${parseFloat(it.total || (it.price * it.qty) || 0).toLocaleString()} ${curr}`
-            }))
-            : [{ description: receiptMeta.description || 'POS SALE', total: `${receiptMeta.total || '0'} ${curr}` }],
-        total: `${receiptMeta.total || '0'} ${curr}`,
-        method: receiptMeta.payment_method || 'CASH'
-    };
-
-    const textLines = [
-        companyData.name || 'JOMISH POS',
-        companyData.location || 'Kampala, Uganda',
-        `RECEIPT: #${receiptMeta.receipt_no || 'N/A'}`,
-        new Date().toLocaleString(),
-        `--------------------------------`
-    ];
-
-    if (receiptMeta.items && Array.isArray(receiptMeta.items) && receiptMeta.items.length > 0) {
-        receiptMeta.items.forEach(it => {
-            const name = (it.product_name || it.name || 'Item').padEnd(16).slice(0, 16);
-            const qty = String(it.qty || 1).padStart(3);
-            const tot = String(parseFloat(it.total || (it.price * it.qty) || 0).toLocaleString()).padStart(10);
-            textLines.push(`${name} ${qty} ${tot}`);
-        });
-    } else {
-        textLines.push(receiptMeta.description || 'POS SALE');
-    }
-
-    textLines.push(`--------------------------------`);
-    textLines.push(`TOTAL: ${receiptMeta.total || '0'}`);
-    textLines.push(`Thank you for your business!`);
-
-    const plainReceiptText = textLines.join('\n');
-
-    // 3. Attempt silent printing — always try localhost:3000 first (where the Windows printer lives),
-    //    then fall back to the current origin (works when running fully locally).
-    let printedSilently = false;
-    const printPayload = JSON.stringify({
-        receiptText: plainReceiptText,
-        receiptData: receiptData,
-        printerName: printerName,
-        paperWidth: localStorage.getItem('jomish_paper_size') || '58mm'
-    });
-    const authHeader = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('jomish_token')}` };
-
-    // Build ordered list of endpoints to try: local server first, then same-origin
-    const isAlreadyLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const localPort = localStorage.getItem('jomish_local_port') || '3000';
-    const printEndpoints = isAlreadyLocal
-        ? ['/api/system/print-raw']
-        : [`http://localhost:${localPort}/api/system/print-raw`, '/api/system/print-raw'];
-
-    for (const endpoint of printEndpoints) {
-        try {
-            const printRes = await fetch(endpoint, { method: 'POST', headers: authHeader, body: printPayload });
-            if (printRes.ok) {
-                const printData = await printRes.json().catch(() => ({}));
-                if (printData && printData.printed === true) {
-                    printedSilently = true;
-                    console.log('[SILENT PRINT] Printed via', endpoint, '→ printer:', printerName);
-                    const statusLabel = document.getElementById('anim-status-label');
-                    if (statusLabel) statusLabel.textContent = '✓ Receipt Printed!';
-                    break;
-                }
-            }
-        } catch (e) {
-            console.warn('[SILENT PRINT] Endpoint failed:', endpoint, e.message);
-        }
-    }
-
-    // 4. If silent spooler succeeded on local server, let animation finish without opening Windows print dialog
-    if (printedSilently) {
-        setTimeout(hidePrintAnimation, 2200);
-        return;
-    }
-
-    // 5. Always trigger reliable browser print dialog
-    hidePrintAnimation();
     triggerBrowserPrint(htmlContent, title);
 }
 

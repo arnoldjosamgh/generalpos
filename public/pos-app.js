@@ -335,9 +335,10 @@ function switchNavTab(tabName, finSubTab) {
     if (tabName === 'customer') loadCustomerList();
     if (tabName === 'inventory') loadProducts();
     if (tabName === 'shift') {
+        // Always default back to the register (cashier) subview when navigating to Shift tab
+        switchShiftSubView('register');
         loadActiveShiftInfo();
         loadShiftTransactions();
-        populateAdminShiftFilters();
     }
     if (tabName === 'kitchen') loadKitchenTokens();
     if (tabName === 'finance') {
@@ -4212,15 +4213,22 @@ function renderAvailableCards() {
 // SHIFT SUB-VIEW SWITCHER
 // ============================================================================
 function switchShiftSubView(subView) {
-    // Toggle subtab buttons
+    // Toggle subtab buttons (reuse the same .active class used by finance tabs)
     document.querySelectorAll('#view-pane-shift .pos-fin-subtab-btn').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById(`shift-subtab-btn-${subView}`);
     if (btn) btn.classList.add('active');
 
-    // Toggle subview panes
+    // Toggle subview panes using the CSS .active class (not inline style)
     ['register', 'admin'].forEach(v => {
         const el = document.getElementById(`shift-subview-${v}`);
-        if (el) el.style.display = (v === subView) ? '' : 'none';
+        if (!el) return;
+        // Remove any leftover inline display that may fight the CSS class
+        el.style.display = '';
+        if (v === subView) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
     });
 
     if (subView === 'admin') {
